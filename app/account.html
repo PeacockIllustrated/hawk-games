@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Account | The Hawk Games</title>
+    <link rel="stylesheet" href="css/hawk-games.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="main-header"></header>
+
+    <main class="container">
+        <h2 class="section-title">My Account</h2>
+        <div class="account-layout">
+            <aside id="profile-card" class="profile-card">
+                <!-- JS populates this -->
+                <div class="placeholder">Loading Profile...</div>
+            </aside>
+
+            <div class="account-main-content">
+                <!-- GDPR Marketing Consent Section -->
+                <div class="content-panel">
+                    <h3>Communication Preferences</h3>
+                    <div class="preference-row">
+                        <label for="marketing-consent">I would like to receive marketing emails and updates from The Hawk Games.</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="marketing-consent">
+                            <span class="slider"></span>
+                        </div>
+                    </div>
+                    <p id="preference-feedback" class="feedback-message"></p>
+                </div>
+                
+                <!-- User Entries Section -->
+                <div class="content-panel">
+                    <h3>Your Competition Entries</h3>
+                    <div id="entries-list">
+                        <div class="placeholder">Loading your entries...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="main-footer"></footer>
+
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/account.js"></script>
+</body>
+</html>

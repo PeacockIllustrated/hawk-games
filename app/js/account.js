@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, updateDoc, collection, query, where, documentId } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, updateDoc, collection, query, where, documentId, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js';
 
 const db = getFirestore(app);
@@ -19,7 +19,8 @@ async function loadAccountData(user) {
     const userDocSnap = await getDoc(userDocRef);
 
     if (!userDocSnap.exists()) {
-        console.error("User profile not found!");
+        console.error("User profile not found! Redirecting...");
+        window.location.replace('login.html');
         return;
     }
 
@@ -67,7 +68,8 @@ async function renderUserEntries(userData) {
         snapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
     }
     
-    entriesListDiv.innerHTML = competitionIds.map(compId => {
+    // Sort by most recent entry first (assuming compId is related to time, which it might not be. A better approach would be to store lastEntryDate on the user doc if needed)
+    entriesListDiv.innerHTML = competitionIds.reverse().map(compId => {
         const compData = competitionsMap.get(compId);
         if (!compData) return ''; // Skip if comp data not found
         const userTickets = entryCountMap[compId];
@@ -79,7 +81,7 @@ function createEntryCardHTML(compData, ticketCount) {
     let statusText = compData.status.toUpperCase();
     let statusClass = `status-${compData.status}`;
 
-    if (compData.winnerId && compData.winnerId === auth.currentUser.uid) {
+    if (compData.status === 'ended' && compData.winnerId && compData.winnerId === auth.currentUser.uid) {
         statusText = 'YOU WON!';
         statusClass = 'status-won';
     }
@@ -111,8 +113,8 @@ function setupEventListeners(uid, initialConsent) {
     // Marketing Consent Toggle
     const consentCheckbox = document.getElementById('marketing-consent');
     const feedbackEl = document.getElementById('preference-feedback');
-    if (consentCheckbox) {
-        consentCheckbox.checked = initialConsent;
+    if (consentCheckbox && feedbackEl) {
+        consentCheckbox.checked = !!initialConsent; // Ensure it's a boolean
         
         consentCheckbox.addEventListener('change', async (e) => {
             const newConsentValue = e.target.checked;
@@ -120,11 +122,11 @@ function setupEventListeners(uid, initialConsent) {
             feedbackEl.textContent = 'Saving...';
             try {
                 await updateDoc(userRef, { marketingConsent: newConsentValue });
-                feedbackEl.textContent = 'Preferences saved!';
+                feedbackEl.textContent = 'Preferences Saved!';
                 setTimeout(() => feedbackEl.textContent = '', 2000);
             } catch (error) {
                 console.error("Error updating consent:", error);
-                feedbackEl.textContent = 'Error saving.';
+                feedbackEl.textContent = 'Error Saving. Please try again.';
             }
         });
     }

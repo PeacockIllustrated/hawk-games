@@ -1,0 +1,166 @@
+/* =================================================== */
+/* ==         THE HAWK GAMES - MASTER CSS           == */
+/* ==      Single Source of Truth for all styles      == */
+/* =================================================== */
+
+/* --- 1. Root Variables & Global Reset --- */
+:root {
+    --primary-gold: #e0a94a;
+    --light-white: #f0f0f0;
+    --dark-bg: #121212;
+    --card-bg: #1a1a1a;
+    --border-color: #2c2c2c;
+
+    --font-heading: 'Oswald', sans-serif;
+    --font-body: 'Roboto', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--dark-bg);
+    color: var(--light-white);
+    line-height: 1.6;
+}
+
+.container {
+    width: 90%;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* --- 2. Universal Components --- */
+
+.section-title {
+    font-family: var(--font-heading);
+    font-size: 2.8rem;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 2px;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    position: relative;
+}
+
+.section-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 3px;
+    background-color: var(--primary-gold);
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.8rem 2.5rem;
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    text-decoration: none;
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border: 2px solid var(--primary-gold);
+    border-radius: 4px;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.btn:hover {
+    background-color: transparent;
+    color: var(--primary-gold);
+}
+
+.hawk-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hawk-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+}
+
+.placeholder {
+    padding: 4rem;
+    text-align: center;
+    font-family: var(--font-heading);
+}
+
+
+/* --- 3. Layout: Header & Footer --- */
+.main-header, .main-footer {
+    padding: 1rem 0;
+    background-color: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.main-header .container, .main-footer .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    text-decoration: none;
+    color: var(--light-white);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+.logo-highlight {
+    color: var(--primary-gold);
+}
+
+.main-nav a {
+    color: var(--light-white);
+    text-decoration: none;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    margin-left: 2rem;
+    transition: color 0.3s ease;
+}
+
+.main-nav a:hover {
+    color: var(--primary-gold);
+}
+
+.main-nav a.btn {
+    margin-left: 2rem;
+}
+
+.main-footer {
+    margin-top: 5rem;
+    border-top: 1px solid var(--border-color);
+    border-bottom: none;
+}
+.footer-links a {
+    color: #aaa;
+    text-decoration: none;
+    margin-left: 1.5rem;
+    font-size: 0.9rem;
+}
+.footer-links a:hover {
+    color: var(--primary-gold);
+}
+.copyright {
+    color: #777;
+    font-size: 0.9rem;
+}

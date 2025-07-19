@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitions | The Hawk Games</title>
+    <!-- The ONLY Stylesheet -->
+    <link rel="stylesheet" href="css/hawk-games.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <header class="main-header">
+        <!-- js/auth.js will generate the header content here -->
+    </header>
+
+    <main>
+        <!-- The competition grid will be rendered here by main.js -->
+        <section id="live-competitions" class="container">
+            <h2 class="section-title">Live Competitions</h2>
+            <div id="competition-grid">
+                <div class="hawk-card placeholder">Loading competitions...</div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="main-footer">
+        <!-- The footer content will be generated here -->
+    </footer>
+    
+    <!-- Firebase SDKs -->
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"></script>
+
+    <!-- App Logic -->
+    <script type="module" src="js/auth.js"></script>
+    <!-- <script type="module" src="js/main.js"></script> --> <!-- To be added in next phase -->
+
+</body>
+</html>

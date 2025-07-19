@@ -1,0 +1,32 @@
+# FIRESTORE DATA MODELS V2 (COMPLIANT)
+
+This document defines the required Firestore data structures for The Hawk Games.
+
+## `competitions` (collection)
+- `title` (String)
+- `prizeDescription` (String)
+- `prizeImage` (String)
+- `status` (String: 'live', 'ended')
+- `endDate` (Timestamp)
+- `ticketsSold` (Number)
+- `totalTickets` (Number)
+- `cashAlternative` (Number)
+- `skillQuestion` (Object: `{ text, answers, correctAnswer }`)
+- `ticketTiers` (Array of Objects: `[{ amount, price }]`)
+- **NEW (Required):** `userEntryLimit` (Number, Default: 75)
+- **NEW (Optional):** `fallbackClause` (Object, e.g. `{ type: 'percent', value: 70 }`)
+
+## `users` (collection)
+- `uid` (String)
+- `displayName` (String)
+- `email` (String)
+- `photoURL` (String)
+- `isAdmin` (Boolean)
+- `myEntries` (Array of Strings: `[competitionId, ...]`)
+- **NEW (Required):** `marketingConsent` (Boolean, Default: `false`)
+
+## `competitions/{id}/entries` (sub-collection)
+- `userId` (String)
+- `userDisplayName` (String)
+- `enteredAt` (Timestamp)
+- **NEW (Required):** `entryType` (String: 'paid', 'free_postal')

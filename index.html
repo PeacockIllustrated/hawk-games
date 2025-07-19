@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Hawk Games - Coming Soon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gold: #e0a94a;
+            --light-white: #f0f0f0;
+            --dark-bg: #121212;
+            --banner-bg: #111;
+            --border-color: rgba(224, 169, 74, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            color: var(--light-white);
+            background-color: var(--dark-bg);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Main Hero Section --- */
+        .hero-section {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            min-height: 60vh;
+        }
+        
+        .hero-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; 
+        }
+
+        /* --- Bottom Info Banner --- */
+        .info-banner {
+            display: flex;
+            /* ** KEY CHANGE: Centering the items with a fixed gap ** */
+            justify-content: center; 
+            gap: 3rem; /* Spacing as requested */
+            align-items: center;
+            padding: 2rem;
+            background-color: var(--banner-bg);
+            border-top: 2px solid var(--primary-gold);
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+        }
+
+        /* Using display:contents to treat the tagline-blocks as direct children of the banner */
+        .taglines-wrapper {
+            display: contents;
+        }
+        
+        .tagline-block {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+            text-align: center;
+        }
+
+        /* Ordering for the T1 > CTA > T2 layout on desktop */
+        .tagline-block:first-child { order: 1; }
+        .cta-wrapper { order: 2; }
+        .tagline-block:last-child { order: 3; }
+
+        .tag-large {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-gold);
+        }
+
+        .tag-small {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--light-white);
+            letter-spacing: 2px;
+        }
+
+        /* CTA inside the banner */
+        .cta-wrapper {
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .cta-wrapper h3 {
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+        }
+        
+        .cta-form {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .cta-form input[type="email"] {
+            flex-grow: 1;
+            padding: 0.7rem 1rem;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #444;
+            color: var(--light-white);
+            border-radius: 4px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 1rem;
+        }
+        
+        .btn {
+            padding: 0.7rem 1.5rem;
+            background-color: var(--primary-gold);
+            color: var(--dark-bg);
+            border: 2px solid var(--primary-gold);
+            border-radius: 4px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .btn:hover {
+            background-color: transparent;
+            color: var(--primary-gold);
+        }
+
+        /* --- Responsive Adjustments --- */
+        @media (max-width: 1200px) {
+            .info-banner {
+                flex-direction: column; /* This remains the key for stacking */
+            }
+
+            /* Revert .taglines-wrapper to a normal flex container for mobile */
+            .taglines-wrapper {
+                display: flex;
+                gap: 3rem;
+                order: 2;
+            }
+            .cta-wrapper {
+                order: 1;
+            }
+            /* Reset individual block order */
+            .tagline-block:first-child,
+            .tagline-block:last-child {
+                order: 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                overflow-y: auto;
+            }
+            .info-banner {
+                padding: 1.5rem;
+            }
+            .taglines-wrapper {
+                gap: 1.5rem;
+                width: 100%;
+                justify-content: center;
+            }
+            .tag-large {
+                font-size: 1.5rem;
+            }
+            .tag-small {
+                font-size: 0.7rem;
+            }
+            .cta-form {
+                flex-direction: column;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <main class="hero-section">
+        <img src="the-hawk-games-banner.png" alt="The Hawk Games - Coming Soon">
+    </main>
+
+    <footer class="info-banner">
+        <div class="taglines-wrapper">
+            <div class="tagline-block">
+                <span class="tag-small">Instant</span>
+                <span class="tag-large">Wins</span>
+                <span class="tag-small">and</span>
+                <span class="tag-large">Huge</span>
+                <span class="tag-small">Competitions</span>
+            </div>
+            
+            <div class="tagline-block">
+                <span class="tag-small">That Could</span>
+                <span class="tag-large">Change</span>
+                <span class="tag-small">Your</span>
+                <span class="tag-large">Life</span>
+                <span class="tag-small">Forever</span>
+            </div>
+        </div>
+        
+        <div class="cta-wrapper">
+            <h3>Be The First To Play</h3>
+            <form class="cta-form" action="#" method="post">
+                <input type="email" name="email" placeholder="Enter your email" required>
+                <button type="submit" class="btn">Notify Me</button>
+            </form>
+        </div>
+    </footer>
+
+</body>
+</html>

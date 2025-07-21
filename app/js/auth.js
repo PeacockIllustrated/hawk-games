@@ -14,7 +14,8 @@ const firebaseConfig = {
   appId: "1:48429329122:web:d1960978e465feec218cbb"
 };
 
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase and EXPORT the app instance for other modules to use
+export const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -60,7 +61,7 @@ function renderFooter() {
     footerEl.innerHTML = `
         <div class="container">
             <div class="copyright">
-                <p>&copy; ${new Date().getFullYear()} Hawk Games Ltd. All rights reserved.</p>
+                <p>© ${new Date().getFullYear()} Hawk Games Ltd. All rights reserved.</p>
                 <p>No gambling licence required. Skill-based competition.</p>
             </div>
             <div class="footer-links">
@@ -95,7 +96,8 @@ const createUserProfileIfNotExists = async (user) => {
             photoURL: user.photoURL,
             createdAt: serverTimestamp(),
             isAdmin: false,
-            myEntries: [],
+            myEntries: [], // Legacy field from retrocomps, can be deprecated later.
+            entryCount: {}, // New, more efficient model
             marketingConsent: false // NEW COMPLIANCE FIELD
         };
         try {

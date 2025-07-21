@@ -1,6 +1,5 @@
 /* =================================================== */
 /* ==         THE HAWK GAMES - MASTER CSS           == */
-/* ==      Single Source of Truth for all styles      == */
 /* =================================================== */
 
 /* --- 1. Root Variables & Global Reset --- */
@@ -15,428 +14,90 @@
     --font-body: 'Roboto', sans-serif;
 }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: var(--font-body);
-    background-color: var(--dark-bg);
-    color: var(--light-white);
-    line-height: 1.6;
-}
-
-.container {
-    width: 90%;
-    max-width: 1400px;
-    margin: 0 auto;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font-body); background-color: var(--dark-bg); color: var(--light-white); line-height: 1.6; }
+.container { width: 90%; max-width: 1400px; margin: 0 auto; }
 
 /* --- 2. Universal Components --- */
-
-.section-title {
-    font-family: var(--font-heading);
-    font-size: 2.8rem;
-    text-transform: uppercase;
-    text-align: center;
-    letter-spacing: 2px;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    position: relative;
-}
-
-.section-title::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100px;
-    height: 3px;
-    background-color: var(--primary-gold);
-}
-
-.btn {
-    display: inline-block;
-    padding: 0.8rem 2.5rem;
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    text-decoration: none;
-    font-family: var(--font-heading);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    border: 2px solid var(--primary-gold);
-    border-radius: 4px;
-    font-weight: 700;
-    text-align: center;
-    cursor: pointer;
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.btn:hover {
-    background-color: transparent;
-    color: var(--primary-gold);
-}
-
-.hawk-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.hawk-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-}
-
-.placeholder {
-    padding: 4rem;
-    text-align: center;
-    font-family: var(--font-heading);
-}
-
+.section-title { font-family: var(--font-heading); font-size: 2.8rem; text-transform: uppercase; text-align: center; letter-spacing: 2px; margin-bottom: 3rem; padding-bottom: 1rem; position: relative; }
+.section-title::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 3px; background-color: var(--primary-gold); }
+.btn { display: inline-block; padding: 0.8rem 2.5rem; background-color: var(--primary-gold); color: var(--dark-bg); text-decoration: none; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 1.5px; border: 2px solid var(--primary-gold); border-radius: 4px; font-weight: 700; text-align: center; cursor: pointer; transition: background-color 0.3s ease, color 0.3s ease; }
+.btn:hover { background-color: transparent; color: var(--primary-gold); }
+.btn-small { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+.btn-secondary { background-color: #333; border-color: #555; color: var(--light-white); }
+.btn-secondary:hover { background-color: #444; border-color: #666; }
+.placeholder { padding: 4rem; text-align: center; font-family: var(--font-heading); color: #888; }
 
 /* --- 3. Layout: Header & Footer --- */
-.main-header, .main-footer {
-    padding: 1rem 0;
-    background-color: rgba(18, 18, 18, 0.8);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.main-header .container, .main-footer .container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.logo {
-    font-family: var(--font-heading);
-    font-size: 1.8rem;
-    text-decoration: none;
-    color: var(--light-white);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-}
-.logo-highlight {
-    color: var(--primary-gold);
-}
-
-.main-nav a {
-    color: var(--light-white);
-    text-decoration: none;
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.9rem;
-    margin-left: 2rem;
-    transition: color 0.3s ease;
-}
-
-.main-nav a:hover {
-    color: var(--primary-gold);
-}
-
-.main-nav a.btn {
-    margin-left: 2rem;
-}
-
-.main-footer {
-    margin-top: 5rem;
-    border-top: 1px solid var(--border-color);
-    border-bottom: none;
-}
-.footer-links a {
-    color: #aaa;
-    text-decoration: none;
-    margin-left: 1.5rem;
-    font-size: 0.9rem;
-}
-.footer-links a:hover {
-    color: var(--primary-gold);
-}
-.copyright {
-    color: #777;
-    font-size: 0.9rem;
-}
+.main-header, .main-footer { padding: 1rem 0; background-color: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); }
+.main-header .container, .main-footer .container { display: flex; justify-content: space-between; align-items: center; }
+.logo { font-family: var(--font-heading); font-size: 1.8rem; text-decoration: none; color: var(--light-white); letter-spacing: 3px; text-transform: uppercase; }
+.logo-highlight { color: var(--primary-gold); }
+.main-nav a { color: var(--light-white); text-decoration: none; font-weight: 700; text-transform: uppercase; font-size: 0.9rem; margin-left: 2rem; transition: color 0.3s ease; }
+.main-nav a:hover { color: var(--primary-gold); }
+.main-footer { margin-top: 5rem; border-top: 1px solid var(--border-color); border-bottom: none; }
+.footer-links a { color: #aaa; text-decoration: none; margin-left: 1.5rem; font-size: 0.9rem; }
+.footer-links a:hover { color: var(--primary-gold); }
+.copyright { color: #777; font-size: 0.9rem; }
 
 /* --- 4. Competition Card Component (Homepage) --- */
-
-#competition-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 2.5rem;
-    margin-top: 3rem;
-}
-
-.hawk-card__image {
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: cover;
-    background-color: #333;
-}
-
-.hawk-card__content {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1; /* Ensures content fills the card */
-}
-
-.hawk-card__title {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    line-height: 1.3;
-    margin-bottom: 1rem;
-    flex-grow: 1; /* Pushes footer to the bottom */
-}
-
-.hawk-card__timer {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #ccc;
-    margin-bottom: 1rem;
-    text-align: center;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 10px;
-    background-color: var(--border-color);
-    border-radius: 5px;
-    overflow: hidden;
-}
-.progress-bar-fill {
-    height: 100%;
-    background-color: var(--primary-gold);
-    transition: width 0.5s ease;
-}
-.hawk-card__progress-text {
-    font-size: 0.8rem;
-    text-align: center;
-    color: #aaa;
-    margin-top: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-.hawk-card__footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 1px solid var(--border-color);
-    padding-top: 1rem;
-    margin-top: 1rem;
-}
-
-.hawk-card__price {
-    font-family: var(--font-heading);
-    font-size: 1.8rem;
-    color: var(--primary-gold);
-}
+#competition-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2.5rem; }
+.hawk-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: var(--light-white); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.hawk-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
+.hawk-card__image { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background-color: #333; }
+.hawk-card__content { padding: 1.5rem; display: flex; flex-direction: column; flex-grow: 1; }
+.hawk-card__title { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; line-height: 1.3; margin-bottom: 1rem; flex-grow: 1; }
+.hawk-card__timer { font-size: 0.9rem; font-weight: 700; color: #ccc; margin-bottom: 1rem; text-align: center; }
+.progress-bar { width: 100%; height: 10px; background-color: var(--border-color); border-radius: 5px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background-color: var(--primary-gold); transition: width 0.5s ease; }
+.hawk-card__progress-text { font-size: 0.8rem; text-align: center; color: #aaa; margin-top: 0.5rem; margin-bottom: 1rem; }
+.hawk-card__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; }
+.hawk-card__price { font-family: var(--font-heading); font-size: 1.8rem; color: var(--primary-gold); }
 
 /* --- 5. Competition Detail Page --- */
-
-.competition-detail-view {
-    display: grid;
-    grid-template-columns: 1fr 0.8fr;
-    gap: 3rem;
-    margin-top: 3rem;
-}
-
-.prize-image-panel img {
-    width: 100%;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-}
-
-.entry-details-panel {
-    background-color: var(--card-bg);
-    padding: 2rem;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-}
-
-.entry-details-panel h1 {
-    font-family: var(--font-heading);
-    font-size: 2.2rem;
-    text-transform: uppercase;
-    line-height: 1.2;
-}
-
-.cash-alternative {
-    color: #ccc;
-    font-weight: 700;
-    margin-top: -0.5rem;
-    margin-bottom: 1.5rem;
-}
-.cash-alternative span {
-    color: var(--primary-gold);
-}
-
-.detail-section {
-    padding: 1.5rem 0;
-    border-top: 1px solid var(--border-color);
-}
-.detail-timer {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    text-align: center;
-    letter-spacing: 2px;
-}
-.detail-timer small {
-    display: block;
-    font-family: var(--font-body);
-    font-size: 0.7rem;
-    color: #aaa;
-    text-transform: none;
-    letter-spacing: 1px;
-}
-.detail-progress p {
-    font-size: 0.9rem;
-    text-align: center;
-    margin-top: 0.5rem;
-}
-
-.skill-question-box h3, .ticket-selector-box h3 {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    text-transform: uppercase;
-    margin-bottom: 1rem;
-}
-.question-text {
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-    font-weight: 700;
-}
-.answer-options {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-}
-.answer-btn, .ticket-option {
-    background-color: transparent;
-    border: 2px solid var(--border-color);
-    color: var(--light-white);
-    padding: 1rem;
-    border-radius: 4px;
-    text-align: left;
-    font-size: 1rem;
-    font-family: var(--font-body);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.answer-btn:hover, .ticket-option:hover {
-    border-color: var(--primary-gold);
-}
-.answer-btn.selected, .ticket-option.selected {
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    border-color: var(--primary-gold);
-    font-weight: 700;
-}
-
-#entry-button {
-    width: 100%;
-    margin-top: 1.5rem;
-    padding: 1rem;
-    font-size: 1.2rem;
-}
+.competition-detail-view { display: grid; grid-template-columns: 1fr 0.8fr; gap: 3rem; margin-top: 3rem; }
+.prize-image-panel img { width: 100%; border-radius: 5px; border: 1px solid var(--border-color); }
+.entry-details-panel { background-color: var(--card-bg); padding: 2rem; border-radius: 5px; border: 1px solid var(--border-color); }
+.entry-details-panel h1 { font-family: var(--font-heading); font-size: 2.2rem; text-transform: uppercase; line-height: 1.2; }
+.cash-alternative { color: #ccc; font-weight: 700; margin-top: -0.5rem; margin-bottom: 1.5rem; }
+.cash-alternative span { color: var(--primary-gold); }
+.detail-section { padding: 1.5rem 0; border-top: 1px solid var(--border-color); }
+.detail-timer { font-family: var(--font-heading); font-size: 2.5rem; text-align: center; letter-spacing: 2px; }
+.detail-timer small { display: block; font-family: var(--font-body); font-size: 0.7rem; color: #aaa; text-transform: none; letter-spacing: 1px; }
+.detail-progress p { font-size: 0.9rem; text-align: center; margin-top: 0.5rem; }
+.skill-question-box h3, .ticket-selector-box h3 { font-family: var(--font-heading); font-size: 1.2rem; text-transform: uppercase; margin-bottom: 1rem; }
+.question-text { font-size: 1.1rem; margin-bottom: 1rem; font-weight: 700; }
+.answer-options, .ticket-options { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+.answer-btn, .ticket-option { background-color: transparent; border: 2px solid var(--border-color); color: var(--light-white); padding: 1rem; border-radius: 4px; text-align: left; font-size: 1rem; font-family: var(--font-body); cursor: pointer; transition: all 0.2s ease; }
+.answer-btn:hover, .ticket-option:hover { border-color: var(--primary-gold); }
+.answer-btn.selected, .ticket-option.selected { background-color: var(--primary-gold); color: var(--dark-bg); border-color: var(--primary-gold); font-weight: 700; }
+#entry-button { width: 100%; margin-top: 1.5rem; padding: 1rem; font-size: 1.2rem; }
 
 /* --- 6. Modal Styles --- */
-.modal-container {
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.7);
-    backdrop-filter: blur(8px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-}
-.modal-container.show {
-    opacity: 1;
-    pointer-events: auto;
-}
-.modal-content {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    padding: 2rem;
-    border-radius: 5px;
-    width: 90%;
-    max-width: 450px;
-    text-align: center;
-}
+.modal-container { position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.modal-container.show { opacity: 1; pointer-events: auto; }
+.modal-content { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 2rem; border-radius: 5px; width: 90%; max-width: 450px; text-align: center; }
 .modal-content h2 { font-family: var(--font-heading); font-size: 1.8rem; text-transform: uppercase; }
 .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
 
 /* --- 7. Account Page Styles --- */
-.account-layout {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 2.5rem;
-    align-items: flex-start;
-    margin-top: 3rem;
-}
-
-.profile-card {
-    background-color: var(--card-bg);
-    padding: 2rem;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    text-align: center;
-}
-.profile-avatar {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    object-fit: cover;
-    margin-bottom: 1rem;
-    border: 3px solid var(--primary-gold);
-}
+.account-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: flex-start; margin-top: 3rem; }
+.profile-card { background-color: var(--card-bg); padding: 2rem; border: 1px solid var(--border-color); border-radius: 5px; text-align: center; }
+.profile-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; border: 3px solid var(--primary-gold); }
 .profile-name { font-family: var(--font-heading); font-size: 1.8rem; }
 .profile-email { color: #aaa; margin-bottom: 1.5rem; word-break: break-all; }
 .profile-actions { display: flex; flex-direction: column; gap: 1rem; }
-
-.content-panel {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 2rem;
-    margin-bottom: 2rem; /* Spacing between panels */
-}
-.content-panel h3 {
-    font-family: var(--font-heading);
-    text-transform: uppercase;
-    font-size: 1.4rem;
-    padding-bottom: 0.75rem;
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-}
-.preference-row { display: flex; justify-content: space-between; align-items: center; }
-.preference-row label { flex-grow: 1; margin-right: 1rem; }
+.content-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2rem; margin-bottom: 2rem; }
+.content-panel h3 { font-family: var(--font-heading); text-transform: uppercase; font-size: 1.4rem; padding-bottom: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); }
+.preference-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.preference-row label { flex-grow: 1; }
 .feedback-message { min-height: 1.2rem; margin-top: 1rem; color: var(--primary-gold); font-weight: bold; }
-
-/* Toggle Switch for GDPR Consent */
-.toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+.toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; flex-shrink: 0; }
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px; }
 .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--primary-gold); }
 input:checked + .slider:before { transform: translateX(26px); }
-
-/* Entry List Styles */
 #entries-list { display: grid; gap: 1rem; }
 .entry-item { display: grid; grid-template-columns: 80px 1fr auto; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid var(--border-color); border-radius: 4px; }
 .entry-item-image { width: 80px; height: 50px; object-fit: cover; border-radius: 3px; }
@@ -448,35 +109,15 @@ input:checked + .slider:before { transform: translateX(26px); }
 .status-won { background-color: var(--primary-gold); color: var(--dark-bg); }
 
 /* --- 8. Admin Page Styles --- */
-.competition-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 1.5rem;
-    align-items: center;
-    padding: 1.5rem;
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    margin-bottom: 1rem;
-}
+.admin-nav { display: flex; flex-direction: column; }
+.admin-nav-link { padding: 1rem; text-decoration: none; font-weight: bold; text-transform: uppercase; border-radius: 4px; margin-bottom: 0.5rem; transition: background-color 0.2s ease; }
+.admin-nav-link.active { background-color: var(--primary-gold); color: var(--dark-bg); }
+.competition-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1.5rem; align-items: center; padding: 1.5rem; background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 1rem; }
 .comp-info h4 { font-family: var(--font-heading); font-size: 1.3rem; margin-bottom: 0.5rem; }
 .comp-info .progress-bar { height: 6px; }
 .comp-info span { font-size: 0.8rem; color: #aaa; }
-.comp-status { text-align: center; }
 .comp-actions { display: flex; gap: 0.5rem; }
-.btn.btn-small { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
-.btn.btn-secondary { background-color: #333; border-color: #555; color: var(--light-white); }
-.btn.btn-secondary:hover { background-color: #444; border-color: #666; }
-
 .modal-form { text-align: left; }
 .modal-form .form-group { margin-bottom: 1rem; }
 .modal-form label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
-.modal-form input {
-    width: 100%;
-    padding: 0.7rem;
-    background-color: var(--dark-bg);
-    border: 1px solid var(--border-color);
-    color: var(--light-white);
-    border-radius: 4px;
-    font-size: 1rem;
-}
+.modal-form input { width: 100%; padding: 0.7rem; background-color: var(--dark-bg); border: 1px solid var(--border-color); color: var(--light-white); border-radius: 4px; font-size: 1rem; }

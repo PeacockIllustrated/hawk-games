@@ -13,7 +13,8 @@
             --light-white: #f0f0f0;
             --dark-bg: #121212;
             --banner-bg: #111;
-            --border-color: rgba(224, 169, 74, 0.5);
+            --success-green: #28a745;
+            --failure-red: #dc3545;
         }
 
         * {
@@ -51,9 +52,8 @@
         /* --- Bottom Info Banner --- */
         .info-banner {
             display: flex;
-            /* ** KEY CHANGE: Centering the items with a fixed gap ** */
             justify-content: center; 
-            gap: 3rem; /* Spacing as requested */
+            gap: 3rem;
             align-items: center;
             padding: 2rem;
             background-color: var(--banner-bg);
@@ -62,7 +62,6 @@
             text-transform: uppercase;
         }
 
-        /* Using display:contents to treat the tagline-blocks as direct children of the banner */
         .taglines-wrapper {
             display: contents;
         }
@@ -74,7 +73,6 @@
             text-align: center;
         }
 
-        /* Ordering for the T1 > CTA > T2 layout on desktop */
         .tagline-block:first-child { order: 1; }
         .cta-wrapper { order: 2; }
         .tagline-block:last-child { order: 3; }
@@ -137,13 +135,102 @@
             color: var(--primary-gold);
         }
 
+        /* --- Completion Modal --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-content {
+            background: var(--dark-bg);
+            padding: 2.5rem 3rem;
+            border-radius: 8px;
+            text-align: center;
+            position: relative;
+            border: 2px solid var(--primary-gold);
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 2.2rem;
+            line-height: 1;
+            color: var(--light-white);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .modal-close-btn:hover {
+            color: var(--primary-gold);
+        }
+
+        .modal-icon {
+            margin-bottom: 1rem;
+        }
+
+        .modal-icon .icon-svg {
+            width: 80px;
+            height: 80px;
+        }
+
+        .modal-icon .icon-circle {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            animation: draw-circle 0.5s ease-out forwards;
+        }
+
+        .modal-icon .icon-path {
+            stroke-dasharray: 48;
+            stroke-dashoffset: 48;
+            animation: draw-path 0.4s 0.4s ease-out forwards;
+        }
+        
+        #modal-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .modal-content.success #modal-title { color: var(--success-green); }
+        .modal-content.failure #modal-title { color: var(--failure-red); }
+
+        #modal-message {
+            font-size: 1rem;
+            max-width: 350px;
+        }
+
+        @keyframes draw-circle { to { stroke-dashoffset: 0; } }
+        @keyframes draw-path { to { stroke-dashoffset: 0; } }
+
         /* --- Responsive Adjustments --- */
         @media (max-width: 1200px) {
             .info-banner {
-                flex-direction: column; /* This remains the key for stacking */
+                flex-direction: column;
             }
-
-            /* Revert .taglines-wrapper to a normal flex container for mobile */
             .taglines-wrapper {
                 display: flex;
                 gap: 3rem;
@@ -152,7 +239,6 @@
             .cta-wrapper {
                 order: 1;
             }
-            /* Reset individual block order */
             .tagline-block:first-child,
             .tagline-block:last-child {
                 order: 0;
@@ -180,8 +266,13 @@
             .cta-form {
                 flex-direction: column;
             }
+            .modal-content {
+                padding: 2rem 1.5rem;
+                width: 90%;
+            }
+            #modal-title { font-size: 1.5rem; }
+            #modal-message { font-size: 0.9rem; }
         }
-
     </style>
 </head>
 <body>
@@ -211,12 +302,100 @@
         
         <div class="cta-wrapper">
             <h3>Be The First To Play</h3>
-            <form class="cta-form" action="https://hook.eu2.make.com/759pxut80lhjk189jd1tyvoof8r3f9kq" method="post">
+            <form class="cta-form" id="notify-form" action="https://hook.eu2.make.com/759pxut80lhjk189jd1tyvoof8r3f9kq" method="post">
                 <input type="email" name="email" placeholder="Enter your email" required>
                 <button type="submit" class="btn">Notify Me</button>
             </form>
         </div>
     </footer>
+
+    <!-- Completion Modal -->
+    <div id="completion-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close-btn">×</span>
+            <div id="modal-icon-container" class="modal-icon"></div>
+            <h2 id="modal-title"></h2>
+            <p id="modal-message"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const notifyForm = document.getElementById('notify-form');
+            const modalOverlay = document.getElementById('completion-modal');
+            const modalContent = modalOverlay.querySelector('.modal-content');
+            const modalCloseBtn = modalOverlay.querySelector('.modal-close-btn');
+            const modalIconContainer = document.getElementById('modal-icon-container');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            
+            const successIconSVG = `
+                <svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4"/>
+                    <path class="icon-path" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+                </svg>`;
+
+            const failureIconSVG = `
+                <svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4"/>
+                    <path class="icon-path" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4" d="M16 16 36 36 M36 16 16 36"/>
+                </svg>`;
+
+            const showModal = (status) => {
+                if (status === 'success') {
+                    modalContent.className = 'modal-content success';
+                    modalIconContainer.innerHTML = successIconSVG;
+                    modalTitle.textContent = 'YOU\'RE ON THE LIST!';
+                    modalMessage.textContent = 'Submission successful. We\'ll drop you an email the second the gates open.';
+                } else {
+                    modalContent.className = 'modal-content failure';
+                    modalIconContainer.innerHTML = failureIconSVG;
+                    modalTitle.textContent = 'SOMETHING WENT WRONG';
+                    modalMessage.textContent = 'We couldn\'t process your request right now. Please check your connection and try again.';
+                }
+                modalOverlay.classList.add('visible');
+            };
+
+            const hideModal = () => {
+                modalOverlay.classList.remove('visible');
+            };
+
+            notifyForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitButton = notifyForm.querySelector('.btn');
+                const originalButtonText = submitButton.textContent;
+                submitButton.textContent = 'Submitting...';
+                submitButton.disabled = true;
+
+                try {
+                    const response = await fetch(notifyForm.action, {
+                        method: 'POST',
+                        body: new FormData(notifyForm)
+                    });
+
+                    if (response.ok) {
+                        showModal('success');
+                        notifyForm.reset();
+                    } else {
+                        throw new Error('Server responded with an error');
+                    }
+                } catch (error) {
+                    console.error('Submission failed:', error);
+                    showModal('failure');
+                } finally {
+                    submitButton.textContent = originalButtonText;
+                    submitButton.disabled = false;
+                }
+            });
+
+            modalCloseBtn.addEventListener('click', hideModal);
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    hideModal();
+                }
+            });
+        });
+    </script>
 
 </body>
 </html>

@@ -90,9 +90,9 @@
             letter-spacing: 2px;
         }
 
-        /* CTA inside the banner */
+        /* --- CTA & Form Styles --- */
         .cta-wrapper {
-            max-width: 400px;
+            max-width: 450px; /* Increased max-width */
             width: 100%;
             text-align: center;
         }
@@ -105,10 +105,18 @@
         
         .cta-form {
             display: flex;
-            gap: 0.5rem;
+            flex-direction: column; /* Stack form elements vertically */
+            gap: 0.75rem;
         }
 
-        .cta-form input[type="email"] {
+        .form-name-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .cta-form input[type="email"],
+        .cta-form input[type="text"] {
+            width: 100%;
             flex-grow: 1;
             padding: 0.7rem 1rem;
             background-color: rgba(0, 0, 0, 0.3);
@@ -117,6 +125,52 @@
             border-radius: 4px;
             font-family: 'Roboto', sans-serif;
             font-size: 1rem;
+        }
+
+        .form-email-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* --- Prize Preference Styles (New) --- */
+        .form-prize-pref {
+            text-align: left;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .form-prize-pref h4 {
+            text-transform: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+            color: #aaa;
+        }
+
+        .prize-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .prize-tag {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #555;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            text-transform: none;
+        }
+
+        .prize-tag:hover {
+            border-color: var(--primary-gold);
+        }
+
+        .prize-tag.selected {
+            background-color: var(--primary-gold);
+            color: var(--dark-bg);
+            border-color: var(--primary-gold);
+            font-weight: 700;
         }
         
         .btn {
@@ -263,7 +317,7 @@
             .tag-small {
                 font-size: 0.7rem;
             }
-            .cta-form {
+            .form-email-group { /* Stack email and button on smallest screens */
                 flex-direction: column;
             }
             .modal-content {
@@ -303,8 +357,30 @@
         <div class="cta-wrapper">
             <h3>Be The First To Play</h3>
             <form class="cta-form" id="notify-form" action="https://hook.eu2.make.com/759pxut80lhjk189jd1tyvoof8r3f9kq" method="post">
-                <input type="email" name="email" placeholder="Enter your email" required>
-                <button type="submit" class="btn">Notify Me</button>
+                <!-- New Name Fields -->
+                <div class="form-name-group">
+                    <input type="text" name="firstName" placeholder="First Name*" required>
+                    <input type="text" name="lastName" placeholder="Last Name (Optional)">
+                </div>
+                
+                <!-- New Prize Preference Section -->
+                <div class="form-prize-pref">
+                    <h4>What are you playing for? (Optional)</h4>
+                    <div class="prize-tags-container">
+                        <div class="prize-tag" data-value="Tech">💻 Tech</div>
+                        <div class="prize-tag" data-value="Cash">💰 Cash</div>
+                        <div class="prize-tag" data-value="Travel">✈️ Travel</div>
+                        <div class="prize-tag" data-value="Luxury">💎 Luxury</div>
+                        <div class="prize-tag" data-value="Vehicle">🚗 Vehicle</div>
+                    </div>
+                    <input type="hidden" name="prizePreference" id="prize-preference-input">
+                </div>
+                
+                <!-- Email and Submit Button -->
+                <div class="form-email-group">
+                    <input type="email" name="email" placeholder="Enter your email" required>
+                    <button type="submit" class="btn">Notify Me</button>
+                </div>
             </form>
         </div>
     </footer>
@@ -328,18 +404,32 @@
             const modalIconContainer = document.getElementById('modal-icon-container');
             const modalTitle = document.getElementById('modal-title');
             const modalMessage = document.getElementById('modal-message');
-            
-            const successIconSVG = `
-                <svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                    <circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4"/>
-                    <path class="icon-path" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
-                </svg>`;
 
-            const failureIconSVG = `
-                <svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
-                    <circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4"/>
-                    <path class="icon-path" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4" d="M16 16 36 36 M36 16 16 36"/>
-                </svg>`;
+            // --- New Prize Tag Logic ---
+            const prizeTags = document.querySelectorAll('.prize-tag');
+            const prizePreferenceInput = document.getElementById('prize-preference-input');
+
+            prizeTags.forEach(tag => {
+                tag.addEventListener('click', () => {
+                    const selectedTag = document.querySelector('.prize-tag.selected');
+                    // If clicking the already selected tag, deselect it
+                    if (selectedTag && selectedTag === tag) {
+                        tag.classList.remove('selected');
+                        prizePreferenceInput.value = '';
+                    } else {
+                        // Deselect the previous tag if one exists
+                        if (selectedTag) {
+                            selectedTag.classList.remove('selected');
+                        }
+                        // Select the new tag
+                        tag.classList.add('selected');
+                        prizePreferenceInput.value = tag.dataset.value;
+                    }
+                });
+            });
+            
+            const successIconSVG = `<svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4"/><path class="icon-path" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4" d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg>`;
+            const failureIconSVG = `<svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4"/><path class="icon-path" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4" d="M16 16 36 36 M36 16 16 36"/></svg>`;
 
             const showModal = (status) => {
                 if (status === 'success') {
@@ -376,6 +466,11 @@
                     if (response.ok) {
                         showModal('success');
                         notifyForm.reset();
+                        // Also reset the prize preference UI
+                        const selectedTag = document.querySelector('.prize-tag.selected');
+                        if (selectedTag) {
+                            selectedTag.classList.remove('selected');
+                        }
                     } else {
                         throw new Error('Server responded with an error');
                     }

@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, query, orderBy, where, runTransaction, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, query, orderBy, where, runTransaction, limit, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js';
 
 const auth = getAuth(app);
@@ -35,6 +35,16 @@ const createCompViewHTML = `
                 </div>
             </fieldset>
             <fieldset><legend>Ticket Pricing</legend><div id="ticket-tiers-container"></div><button type="button" id="add-tier-btn" class="btn btn-secondary btn-small">Add Tier</button></fieldset>
+            
+            <fieldset><legend>Instant Wins</legend>
+                <div class="form-group-inline"><label for="enable-instant-wins" style="display:flex; align-items: center; gap: 10px;">Enable Instant Wins? <input type="checkbox" id="enable-instant-wins" style="width:auto; height:auto;"></label></div>
+                <div id="instant-win-config-panel" style="display:none; margin-top: 1rem;">
+                    <div id="instant-win-prizes-container"></div>
+                    <button type="button" id="add-instant-prize-btn" class="btn btn-secondary btn-small">Add Instant Prize Tier</button>
+                    <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Define how many instant prizes of a certain value to create.</p>
+                </div>
+            </fieldset>
+
             <fieldset><legend>Skill Question</legend>
                 <div class="form-group"><label for="questionText">Question</label><input type="text" id="questionText" required></div>
                 <div class="form-group-inline">
@@ -146,7 +156,27 @@ function initializeCreateFormView() {
         tierEl.querySelector('.btn-remove-tier').addEventListener('click', () => tierEl.remove());
     };
     addTierBtn.addEventListener('click', addTier);
-    addTier(); // Add one tier by default
+    addTier();
+
+    // Instant Win form logic
+    const instantWinCheckbox = document.getElementById('enable-instant-wins');
+    const instantWinPanel = document.getElementById('instant-win-config-panel');
+    const addInstantPrizeBtn = document.getElementById('add-instant-prize-btn');
+    const instantPrizesContainer = document.getElementById('instant-win-prizes-container');
+
+    instantWinCheckbox.addEventListener('change', (e) => {
+        instantWinPanel.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    const addInstantPrize = () => {
+        const prizeEl = document.createElement('div');
+        prizeEl.className = 'form-group-inline instant-prize-row';
+        prizeEl.innerHTML = `<div class="form-group"><label>Number of Prizes</label><input type="number" class="instant-prize-count" required></div><div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="instant-prize-value" required></div><button type="button" class="btn-remove-tier">×</button>`;
+        instantPrizesContainer.appendChild(prizeEl);
+        prizeEl.querySelector('.btn-remove-tier').addEventListener('click', () => prizeEl.remove());
+    };
+    addInstantPrizeBtn.addEventListener('click', addInstantPrize);
+    addInstantPrize();
     
     form.addEventListener('submit', handleCreateFormSubmit);
 }
@@ -156,6 +186,7 @@ async function handleCreateFormSubmit(e) {
     const form = e.target;
     const submitButton = form.querySelector('button[type="submit"]');
     submitButton.disabled = true;
+    submitButton.textContent = 'Generating...';
 
     try {
         const ticketTiers = Array.from(document.querySelectorAll('.ticket-tier-row')).map(row => ({ amount: parseInt(row.querySelector('.tier-amount').value), price: parseFloat(row.querySelector('.tier-price').value) }));
@@ -172,8 +203,63 @@ async function handleCreateFormSubmit(e) {
         const competitionData = {
             title: form.querySelector('#title').value, prizeImage: form.querySelector('#prizeImage').value, totalTickets: parseInt(form.querySelector('#totalTickets').value), userEntryLimit: parseInt(form.querySelector('#userEntryLimit').value), cashAlternative: parseFloat(form.querySelector('#cashAlternative').value), endDate: Timestamp.fromDate(new Date(form.querySelector('#endDate').value)), skillQuestion: { text: form.querySelector('#questionText').value, answers, correctAnswer: correctKey }, ticketTiers, ticketsSold: 0, status: 'live', createdAt: serverTimestamp(), winnerId: null,
         };
-        await addDoc(collection(db, "competitions"), competitionData);
-        alert('Competition created!');
+        
+        // --- STEP #1: SEED THE GAME (INSTANT WINS) ---
+        const instantWinsEnabled = form.querySelector('#enable-instant-wins').checked;
+        let instantWinPrizesToCreate = [];
+
+        if (instantWinsEnabled) {
+            const instantPrizeTiers = Array.from(document.querySelectorAll('.instant-prize-row')).map(row => ({
+                count: parseInt(row.querySelector('.instant-prize-count').value),
+                value: parseFloat(row.querySelector('.instant-prize-value').value)
+            }));
+            const totalInstantPrizes = instantPrizeTiers.reduce((sum, tier) => sum + tier.count, 0);
+            const totalTickets = competitionData.totalTickets;
+
+            if (totalInstantPrizes > totalTickets) {
+                throw new Error("Total number of instant prizes cannot exceed the total number of tickets.");
+            }
+
+            // Generate winning ticket numbers using a secure shuffle
+            const allTicketNumbers = Array.from({ length: totalTickets }, (_, i) => i);
+            for (let i = allTicketNumbers.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [allTicketNumbers[i], allTicketNumbers[j]] = [allTicketNumbers[j], allTicketNumbers[i]];
+            }
+            const winningTicketNumbers = allTicketNumbers.slice(0, totalInstantPrizes);
+            
+            competitionData.instantWinsConfig = { enabled: true, prizes: instantPrizeTiers };
+            
+            let ticketIndex = 0;
+            for (const tier of instantPrizeTiers) {
+                for (let i = 0; i < tier.count; i++) {
+                    instantWinPrizesToCreate.push({
+                        ticketNumber: winningTicketNumbers[ticketIndex++],
+                        prizeValue: tier.value,
+                    });
+                }
+            }
+        } else {
+            competitionData.instantWinsConfig = { enabled: false };
+        }
+
+        const newCompRef = await addDoc(collection(db, "competitions"), competitionData);
+        
+        if (instantWinsEnabled) {
+            const batch = writeBatch(db);
+            for (const prize of instantWinPrizesToCreate) {
+                const instantWinRef = doc(collection(db, `competitions/${newCompRef.id}/instant_wins`));
+                batch.set(instantWinRef, {
+                    ...prize,
+                    claimed: false,
+                    claimedBy: null,
+                    claimedAt: null
+                });
+            }
+            await batch.commit();
+        }
+
+        alert('Competition created successfully!');
         renderView('dashboard');
 
     } catch (error) {
@@ -181,6 +267,7 @@ async function handleCreateFormSubmit(e) {
         alert(`Error: ${error.message}`);
     } finally {
         submitButton.disabled = false;
+        submitButton.textContent = 'Create Competition';
     }
 }
 
@@ -192,7 +279,6 @@ function handleDashboardClick(e) {
     if (!action || !compId) return;
     
     if (action === 'add-fer') showAddFerModal(compId);
-    // ... other actions like edit, end, draw winner
 }
 
 function showAddFerModal(compId) {

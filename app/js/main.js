@@ -5,7 +5,6 @@ const db = getFirestore(app);
 
 document.addEventListener('DOMContentLoaded', () => {
     loadLiveCompetitions();
-    // loadRecentWinners(); // We can add this back later
 });
 
 const loadLiveCompetitions = async () => {
@@ -39,8 +38,13 @@ function createCompetitionCard(compData, compId) {
     const endDate = compData.endDate.toDate();
     const price = compData.ticketTiers[0]?.price || 0.00;
 
+    const instantWinBadge = compData.instantWinsConfig?.enabled 
+        ? `<div class="hawk-card__instant-win-badge">⚡️ Instant Wins</div>` 
+        : '';
+
     return `
         <a href="competition.html?id=${compId}" class="hawk-card">
+            ${instantWinBadge}
             <img src="${compData.prizeImage || 'https://via.placeholder.com/600x400.png?text=Prize'}" alt="${compData.title}" class="hawk-card__image">
             <div class="hawk-card__content">
                 <h3 class="hawk-card__title">${compData.title}</h3>

@@ -1,5 +1,5 @@
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, runTransaction, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, runTransaction, serverTimestamp, arrayUnion, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js';
 
 const db = getFirestore(app);
@@ -163,6 +163,7 @@ async function handleEntry(ticketsBought) {
 
     const competitionRef = doc(db, 'competitions', competitionId);
     const userRef = doc(db, 'users', user.uid);
+    let firstTicketNumber = -1;
 
     try {
         await runTransaction(db, async (transaction) => {
@@ -177,20 +178,20 @@ async function handleEntry(ticketsBought) {
             
             if (compData.status !== 'live') throw new Error("This competition is no longer live.");
             
-            // --- COMPLIANCE: PER-USER ENTRY LIMIT CHECK ---
             const userEntryCount = userData.entryCount?.[competitionId] || 0;
             const limit = compData.userEntryLimit || 75;
             if (userEntryCount + ticketsBought > limit) {
                 throw new Error(`Entry limit exceeded. You have ${limit - userEntryCount} entries remaining.`);
             }
 
-            // --- TICKET AVAILABILITY CHECK ---
-            const newTicketsSold = (compData.ticketsSold || 0) + ticketsBought;
+            const ticketsSoldBefore = compData.ticketsSold || 0;
+            const newTicketsSold = ticketsSoldBefore + ticketsBought;
             if (newTicketsSold > compData.totalTickets) {
                 throw new Error("Not enough tickets available for this purchase.");
             }
+            
+            firstTicketNumber = ticketsSoldBefore;
 
-            // All checks passed, perform updates
             transaction.update(competitionRef, { ticketsSold: newTicketsSold });
             
             const newEntryCount = userEntryCount + ticketsBought;
@@ -198,7 +199,6 @@ async function handleEntry(ticketsBought) {
                 [`entryCount.${competitionId}`]: newEntryCount
             });
 
-            // Log the entry in the subcollection for drawing purposes
             transaction.set(doc(collection(competitionRef, 'entries')), {
                 userId: user.uid,
                 userDisplayName: user.displayName,
@@ -208,13 +208,60 @@ async function handleEntry(ticketsBought) {
             });
         });
 
-        openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p>`);
-        setTimeout(() => window.location.reload(), 2000);
+        if (currentCompetitionData.instantWinsConfig?.enabled && firstTicketNumber !== -1) {
+            const purchasedTicketNumbers = Array.from({ length: ticketsBought }, (_, i) => firstTicketNumber + i);
+            await checkAndClaimInstantWins(purchasedTicketNumbers, user.uid);
+        } else {
+            openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p><button id="reload-btn" class="btn">Done</button>`);
+            document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
+        }
 
     } catch (error) {
         console.error("Entry Transaction failed: ", error);
         openModal(`<h2>Error</h2><p>${error.message}</p><button id="close-error-btn" class="btn">Close</button>`);
         document.getElementById('close-error-btn')?.addEventListener('click', closeModal);
+    }
+}
+
+async function checkAndClaimInstantWins(ticketNumbers, userId) {
+    const instantWinsRef = collection(db, `competitions/${competitionId}/instant_wins`);
+    const q = query(instantWinsRef, where('ticketNumber', 'in', ticketNumbers), where('claimed', '==', false));
+    
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+        openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p><button id="reload-btn" class="btn">Done</button>`);
+        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
+        return;
+    }
+    
+    let totalWinnings = 0;
+    const batch = writeBatch(db);
+    
+    snapshot.forEach(doc => {
+        totalWinnings += doc.data().prizeValue;
+        batch.update(doc.ref, {
+            claimed: true,
+            claimedBy: userId,
+            claimedAt: serverTimestamp()
+        });
+    });
+    
+    try {
+        await batch.commit();
+        openModal(`
+            <div class="modal-icon-win">⚡️</div>
+            <h2>INSTANT WIN!</h2>
+            <p>Congratulations! You've just won <strong>£${totalWinnings.toFixed(2)}</strong> instantly!</p>
+            <p class="small-text">This has been added to your account. Your tickets are still in the main draw!</p>
+            <button id="reload-btn" class="btn">Awesome!</button>
+        `);
+        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
+
+    } catch (error) {
+        console.error("Failed to claim instant win:", error);
+        openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p><button id="reload-btn" class="btn">Done</button>`);
+        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
     }
 }
 

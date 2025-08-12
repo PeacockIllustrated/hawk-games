@@ -82,7 +82,6 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
         if (compData.endDate && compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'Competition has ended.');
         
-        // --- RESILIENT REPLACEMENT for userData.entryCount?.[compId] ---
         const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
         
         const limit = compData.userEntryLimit || 75;
@@ -99,7 +98,6 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         transaction.set(entryRef, { userId: uid, userDisplayName: userData.displayName || "N/A", ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1, enteredAt: FieldValue.serverTimestamp(), entryType: 'paid' });
         
         const wonPrizes = [];
-        // --- RESILIENT REPLACEMENT for compData.instantWinsConfig?.enabled ---
         if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
             const instantWinsRef = compRef.collection('instant_wins');
             for (let i = 0; i < ticketsBought; i++) {
@@ -120,32 +118,39 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     await assertIsAdmin(request);
     const { compId } = request.data;
     if (!compId) throw new HttpsError('invalid-argument', 'Competition ID is required.');
-    const compRef = db.collection('competitions').doc(compId);
     
-    return await db.runTransaction(async (transaction) => {
-        const compDoc = await transaction.get(compRef);
-        if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
-        const compData = compDoc.data();
-        if (compData.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended.');
-        if (compData.winnerId) throw new HttpsError('failed-precondition', 'Winner already drawn.');
-        if (!compData.ticketsSold || compData.ticketsSold === 0) throw new HttpsError('failed-precondition', 'No entries to draw from.');
-        
-        const winningTicketNumber = crypto.randomInt(0, compData.ticketsSold);
-        const entriesRef = compRef.collection('entries');
-        
-        // This query must be performed outside the main transaction read operations
-        const winnerQuery = entriesRef.where('ticketStart', '<=', winningTicketNumber).orderBy('ticketStart', 'desc').limit(1);
-        const winnerSnapshot = await winnerQuery.get();
+    const compRef = db.collection('competitions').doc(compId);
+    const entriesRef = compRef.collection('entries');
+    
+    // --- THIS IS THE BUG FIX ---
+    // The query MUST be performed *before* the transaction starts.
+    const compDocForCheck = await compRef.get();
+    if (!compDocForCheck.exists()) throw new HttpsError('not-found', 'Competition not found.');
+    const compDataForCheck = compDocForCheck.data();
 
-        if (winnerSnapshot.empty) throw new HttpsError('internal', `Could not find owner for ticket #${winningTicketNumber}.`);
-        
-        const winnerEntryDoc = winnerSnapshot.docs[0];
-        const winnerData = winnerEntryDoc.data();
-        const winnerId = winnerData.userId;
-        const winnerDisplayName = winnerData.userDisplayName;
+    if (compDataForCheck.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended.');
+    if (compDataForCheck.winnerId) throw new HttpsError('failed-precondition', 'Winner already drawn.');
+    if (!compDataForCheck.ticketsSold || compDataForCheck.ticketsSold === 0) throw new HttpsError('failed-precondition', 'No entries to draw from.');
+
+    const winningTicketNumber = crypto.randomInt(0, compDataForCheck.ticketsSold);
+    
+    const winnerQuery = entriesRef.where('ticketStart', '<=', winningTicketNumber).orderBy('ticketStart', 'desc').limit(1);
+    const winnerSnapshot = await winnerQuery.get();
+    
+    if (winnerSnapshot.empty) throw new HttpsError('internal', `Could not find owner for ticket #${winningTicketNumber}.`);
+    
+    const winnerEntryDoc = winnerSnapshot.docs[0];
+    const winnerData = winnerEntryDoc.data();
+    const winnerId = winnerData.userId;
+    
+    // Now that we have the winner, we can run a transaction to write the results.
+    return await db.runTransaction(async (transaction) => {
+        const compDoc = await transaction.get(compRef); // Re-get inside transaction for safety
+        const compData = compDoc.data();
         
         const winnerUserDocSnap = await db.collection('users').doc(winnerId).get();
         const winnerPhotoURL = winnerUserDocSnap.exists() ? winnerUserDocSnap.data().photoURL : null;
+        const winnerDisplayName = winnerData.userDisplayName;
 
         transaction.update(compRef, { status: 'drawn', winnerId, winnerDisplayName, winningTicketNumber, drawnAt: FieldValue.serverTimestamp() });
         const pastWinnerRef = db.collection('pastWinners').doc(compId);

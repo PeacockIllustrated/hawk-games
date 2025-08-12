@@ -77,21 +77,36 @@ async function renderUserEntries(userData) {
     }).join('');
 }
 
-function createEntryCardHTML(compData, ticketCount) {
+// REPLACE the existing createEntryCardHTML function in account.js
+
+function createEntryCardHTML(compData, userTickets, entryData) { // We now pass the full entryData
     let statusText = compData.status.toUpperCase();
     let statusClass = `status-${compData.status}`;
 
-    if (compData.status === 'ended' && compData.winnerId && compData.winnerId === auth.currentUser.uid) {
-        statusText = 'YOU WON!';
+    if (compData.status === 'drawn' && compData.winnerId && compData.winnerId === auth.currentUser.uid) {
+        statusText = 'YOU WON THE MAIN PRIZE!';
         statusClass = 'status-won';
+    }
+
+    // **THE NEW PART**: Check for and display instant wins
+    let instantWinHTML = '';
+    if (entryData.instantWins && entryData.instantWins.length > 0) {
+        const totalWinnings = entryData.instantWins.reduce((sum, prize) => sum + prize.prizeValue, 0);
+        instantWinHTML = `
+            <div class="entry-item-win-banner">
+                ⚡️ YOU WON £${totalWinnings.toFixed(2)} INSTANTLY!
+            </div>
+        `;
     }
 
     return `
         <div class="entry-item">
+            ${instantWinHTML}
             <img src="${compData.prizeImage}" alt="${compData.title}" class="entry-item-image">
             <div class="entry-item-details">
                 <h4>${compData.title}</h4>
-                <p>You have <strong>${ticketCount}</strong> entries.</p>
+                <p>You have <strong>${userTickets}</strong> entries.</p>
+                <p class="entry-ticket-numbers">Tickets: #${entryData.ticketStart} - #${entryData.ticketEnd}</p>
             </div>
             <div class="entry-item-status">
                 <span class="status-badge ${statusClass}">${statusText}</span>

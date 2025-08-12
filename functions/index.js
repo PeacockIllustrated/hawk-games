@@ -11,7 +11,7 @@ const db = getFirestore();
 const assertIsAdmin = async (context) => {
     if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
     const userDoc = await db.collection('users').doc(context.auth.uid).get();
-    if (!userDoc.exists() || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'Admin privileges required.');
+    if (!userDoc.exists || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'Admin privileges required.');
 };
 
 // Helper to check for authentication.
@@ -73,8 +73,10 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
     return await db.runTransaction(async (transaction) => {
         const compDoc = await transaction.get(compRef);
         const userDoc = await transaction.get(userRef);
-        if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
-        if (!userDoc.exists()) throw new HttpsError('not-found', 'User profile not found.');
+        
+        // THE FIX IS HERE: Changed compDoc.exists() to compDoc.exists
+        if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
         
         const compData = compDoc.data();
         const userData = userDoc.data();
@@ -104,7 +106,9 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
                 const currentTicketNumber = ticketStartNumber + i;
                 const winDocRef = instantWinsRef.doc(String(currentTicketNumber));
                 const winDoc = await transaction.get(winDocRef);
-                if (winDoc.exists() && winDoc.data().claimed === false) {
+                
+                // THE FIX IS HERE: Changed winDoc.exists() to winDoc.exists
+                if (winDoc.exists && winDoc.data().claimed === false) {
                     transaction.update(winDocRef, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
                     wonPrizes.push({ ticketNumber: currentTicketNumber, prizeValue: winDoc.data().prizeValue });
                 }
@@ -122,10 +126,9 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     const compRef = db.collection('competitions').doc(compId);
     const entriesRef = compRef.collection('entries');
     
-    // --- THIS IS THE BUG FIX ---
-    // The query MUST be performed *before* the transaction starts.
     const compDocForCheck = await compRef.get();
-    if (!compDocForCheck.exists()) throw new HttpsError('not-found', 'Competition not found.');
+    // THE FIX IS HERE: Changed compDocForCheck.exists() to compDocForCheck.exists
+    if (!compDocForCheck.exists) throw new HttpsError('not-found', 'Competition not found.');
     const compDataForCheck = compDocForCheck.data();
 
     if (compDataForCheck.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended.');
@@ -143,13 +146,13 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     const winnerData = winnerEntryDoc.data();
     const winnerId = winnerData.userId;
     
-    // Now that we have the winner, we can run a transaction to write the results.
     return await db.runTransaction(async (transaction) => {
-        const compDoc = await transaction.get(compRef); // Re-get inside transaction for safety
+        const compDoc = await transaction.get(compRef); 
         const compData = compDoc.data();
         
         const winnerUserDocSnap = await db.collection('users').doc(winnerId).get();
-        const winnerPhotoURL = winnerUserDocSnap.exists() ? winnerUserDocSnap.data().photoURL : null;
+        // THE FIX IS HERE: Changed winnerUserDocSnap.exists() to winnerUserDocSnap.exists
+        const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
         const winnerDisplayName = winnerData.userDisplayName;
 
         transaction.update(compRef, { status: 'drawn', winnerId, winnerDisplayName, winningTicketNumber, drawnAt: FieldValue.serverTimestamp() });

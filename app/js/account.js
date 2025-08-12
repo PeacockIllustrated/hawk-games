@@ -3,12 +3,24 @@ import { getFirestore, doc, getDoc, collection, query, where, documentId, getDoc
 import { app } from './auth.js';
 
 const db = getFirestore(app);
-const auth = getAuth();
+const auth = getAuth(app); // Pass the app instance for best practice
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async (user) => { // Make this function async
     if (user) {
-        loadAccountData(user);
+        try {
+            // THE FIX IS HERE: Force the SDK to refresh the auth token.
+            // This pauses execution until the Firestore service is fully aware of the user's auth state.
+            await user.getIdToken(true); 
+            
+            // Now that we are certain the user is fully authenticated, proceed to load data.
+            await loadAccountData(user);
+
+        } catch (error) {
+            console.error("Error during authenticated data load:", error);
+            // Handle error, maybe show a message to the user
+        }
     } else {
+        // If not logged in, redirect to login page
         window.location.replace('login.html');
     }
 });
@@ -18,24 +30,28 @@ async function loadAccountData(user) {
     const userDocSnap = await getDoc(userDocRef);
 
     if (!userDocSnap.exists()) {
-        console.error("User profile not found! Redirecting...");
-        window.location.replace('login.html');
+        console.error("User profile not found in Firestore! This might happen for a brand new user on first load.");
+        // We can still try to render what we can
+        renderUserProfile({ displayName: user.displayName, email: user.email, photoURL: user.photoURL });
+        document.getElementById('entries-list').innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
         return;
     }
 
     const userData = userDocSnap.data();
     renderUserProfile(userData);
-    renderUserEntries(user.uid); // Pass UID for the new query
+    await renderUserEntries(user.uid); // Pass UID for the query
     setupEventListeners(user.uid, userData.marketingConsent);
 }
 
 function renderUserProfile(userData) {
     const profileCard = document.getElementById('profile-card');
     if (!profileCard) return;
+
     const adminButtonHTML = userData.isAdmin ? `<a href="admin.html" class="btn">Admin Panel</a>` : '';
+
     profileCard.innerHTML = `
         <img src="${userData.photoURL || 'https://i.pravatar.cc/150'}" alt="User Avatar" class="profile-avatar">
-        <h2 class="profile-name">${userData.displayName}</h2>
+        <h2 class="profile-name">${userData.displayName || 'New User'}</h2>
         <p class="profile-email">${userData.email}</p>
         <div class="profile-actions">
             ${adminButtonHTML}
@@ -48,46 +64,48 @@ async function renderUserEntries(uid) {
     const entriesListDiv = document.getElementById('entries-list');
     if (!entriesListDiv) return;
 
-    // 1. Use a collectionGroup query to get all entries for this user, ordered by date
-    const entriesQuery = query(collectionGroup(db, 'entries'), where('userId', '==', uid), orderBy('enteredAt', 'desc'));
-    const entriesSnapshot = await getDocs(entriesQuery);
+    try {
+        // This query now runs AFTER getIdToken(true) has completed.
+        const entriesQuery = query(collectionGroup(db, 'entries'), where('userId', '==', uid), orderBy('enteredAt', 'desc'));
+        const entriesSnapshot = await getDocs(entriesQuery);
 
-    if (entriesSnapshot.empty) {
-        entriesListDiv.innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
-        return;
-    }
-
-    // 2. Get the unique IDs of all competitions the user has entered
-    const competitionIds = [...new Set(entriesSnapshot.docs.map(doc => doc.ref.parent.parent.id))];
-
-    // 3. Fetch the data for all those competitions in a single query
-    const competitionsMap = new Map();
-    if (competitionIds.length > 0) {
-        // Firestore 'in' queries are limited to 10 items. We need to chunk it.
-        for (let i = 0; i < competitionIds.length; i += 10) {
-            const chunk = competitionIds.slice(i, i + 10);
-            const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
-            const compsSnapshot = await getDocs(compsQuery);
-            compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
+        if (entriesSnapshot.empty) {
+            entriesListDiv.innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
+            return;
         }
-    }
-    
-    // 4. Map over the entries and render the HTML
-    entriesListDiv.innerHTML = entriesSnapshot.docs.map(entryDoc => {
-        const entryData = entryDoc.data();
-        const compId = entryDoc.ref.parent.parent.id;
-        const compData = competitionsMap.get(compId);
-        if (!compData) return ''; // Failsafe
 
-        return createEntryCardHTML(compData, entryData);
-    }).join('');
+        const competitionIds = [...new Set(entriesSnapshot.docs.map(doc => doc.ref.parent.parent.id))];
+
+        const competitionsMap = new Map();
+        if (competitionIds.length > 0) {
+            for (let i = 0; i < competitionIds.length; i += 10) {
+                const chunk = competitionIds.slice(i, i + 10);
+                const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
+                const compsSnapshot = await getDocs(compsQuery);
+                compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
+            }
+        }
+        
+        entriesListDiv.innerHTML = entriesSnapshot.docs.map(entryDoc => {
+            const entryData = entryDoc.data();
+            const compId = entryDoc.ref.parent.parent.id;
+            const compData = competitionsMap.get(compId);
+            if (!compData) return '';
+
+            return createEntryCardHTML(compData, entryData);
+        }).join('');
+
+    } catch (error) {
+        console.error("Error rendering user entries:", error);
+        entriesListDiv.innerHTML = `<div class="placeholder" style="color:red;">Could not load your entries. Please try again.</div>`;
+    }
 }
 
 function createEntryCardHTML(compData, entryData) {
     let statusText = compData.status.toUpperCase();
     let statusClass = `status-${compData.status}`;
 
-    if (compData.status === 'drawn' && compData.winnerId && compData.winnerId === auth.currentUser.uid) {
+    if (compData.status === 'drawn' && compData.winnerId && auth.currentUser && compData.winnerId === auth.currentUser.uid) {
         statusText = 'YOU WON THE MAIN PRIZE!';
         statusClass = 'status-won';
     }

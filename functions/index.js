@@ -190,3 +190,104 @@ exports.allocateTicketsAndCheckWins = onCall(async (request) => {
         throw new HttpsError('internal', 'An error occurred while processing your entry. Please try again.');
     }
 });
+
+/**
+ * Draws a winner for a closed competition.
+ * Only callable by admins.
+ */
+exports.drawWinner = onCall(async (request) => {
+    await assertIsAdmin(request.auth);
+    const { compId } = request.data;
+    if (!compId) {
+        throw new HttpsError('invalid-argument', 'Competition ID is required.');
+    }
+
+    const compRef = db.collection('competitions').doc(compId);
+    
+    try {
+        const result = await db.runTransaction(async (transaction) => {
+            const compDoc = await transaction.get(compRef);
+            if (!compDoc.exists) {
+                throw new HttpsError('not-found', 'Competition not found.');
+            }
+            const compData = compDoc.data();
+
+            // --- Validations ---
+            if (compData.status !== 'ended') {
+                throw new HttpsError('failed-precondition', 'Competition must be ended before drawing a winner.');
+            }
+            if (compData.winnerId) {
+                throw new HttpsError('failed-precondition', 'A winner has already been drawn for this competition.');
+            }
+            if (!compData.ticketsSold || compData.ticketsSold === 0) {
+                throw new HttpsError('failed-precondition', 'Cannot draw a winner for a competition with no entries.');
+            }
+
+            // --- The Draw ---
+            // Use a cryptographically secure random number generator.
+            const winningTicketNumber = crypto.randomInt(0, compData.ticketsSold);
+
+            // --- Find the Winner ---
+            // Query the entries sub-collection to find which user owns the winning ticket.
+            const entriesRef = compRef.collection('entries');
+            const winnerQuery = query(
+                entriesRef,
+                where('ticketStart', '<=', winningTicketNumber),
+                orderBy('ticketStart', 'desc'),
+                limit(1)
+            );
+            const winnerSnapshot = await getDocs(winnerQuery); // Use getDocs, not transaction.get for queries
+
+            if (winnerSnapshot.empty) {
+                // This should be virtually impossible if ticketsSold > 0, but is a critical safeguard.
+                throw new HttpsError('internal', `Could not find an owner for the winning ticket #${winningTicketNumber}.`);
+            }
+            const winnerEntryDoc = winnerSnapshot.docs[0];
+            const winnerData = winnerEntryDoc.data();
+
+            const winnerId = winnerData.userId;
+            const winnerDisplayName = winnerData.userDisplayName;
+
+            // Get the winner's photoURL for the public winners page
+            const winnerUserDoc = await db.collection('users').doc(winnerId).get();
+            const winnerPhotoURL = winnerUserDoc.exists() ? winnerUserDoc.data().photoURL : null;
+
+            // --- Update Firestore Documents ---
+            // 1. Update the competition with the winner's details
+            transaction.update(compRef, {
+                status: 'drawn',
+                winnerId: winnerId,
+                winnerDisplayName: winnerDisplayName,
+                winningTicketNumber: winningTicketNumber,
+                drawnAt: FieldValue.serverTimestamp()
+            });
+
+            // 2. Create a public record in the pastWinners collection
+            const pastWinnerRef = db.collection('pastWinners').doc(compId);
+            transaction.set(pastWinnerRef, {
+                prizeTitle: compData.title,
+                prizeImage: compData.prizeImage,
+                winnerId: winnerId,
+                winnerDisplayName: winnerDisplayName,
+                winnerPhotoURL: winnerPhotoURL,
+                winningTicketNumber: winningTicketNumber,
+                drawDate: FieldValue.serverTimestamp()
+            });
+
+            return {
+                success: true,
+                winnerDisplayName: winnerDisplayName,
+                winningTicketNumber: winningTicketNumber
+            };
+        });
+        
+        return result;
+
+    } catch (error) {
+        console.error("Draw winner failed:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', 'An unexpected error occurred during the draw.');
+    }
+});

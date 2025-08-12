@@ -142,6 +142,7 @@ function renderCompetitionRow(comp) {
         ? `<div style="font-size:0.7rem; color:#aaa; margin-top:5px; word-break:break-all;">Fairness Hash: ${comp.instantWinsConfig.positionsHash}</div>`
         : '';
 
+    // THE FIX IS IN THE LINE BELOW: Added the closing '}' to ${comp.status}
     return `
         <div class="competition-row" data-comp-id="${comp.id}">
             <div class="comp-info">
@@ -237,7 +238,6 @@ async function handleCreateFormSubmit(e) {
                 value: parseFloat(row.querySelector('.instant-prize-value').value)
             }));
             
-            // Call the secure Cloud Function to seed the wins
             const functions = getFunctions(app);
             const seedInstantWins = httpsCallable(functions, 'seedInstantWins');
             const result = await seedInstantWins({
@@ -273,7 +273,6 @@ function handleDashboardClick(e) {
     if (!action || !compId) return;
     
     if (action === 'add-fer') showAddFerModal(compId);
-    // Add other actions like 'draw-winner' here later
 }
 
 function showAddFerModal(compId) {
@@ -287,7 +286,7 @@ function showAddFerModal(compId) {
             <div class="form-group"><label for="fer-email">User's Email</label><input type="email" id="fer-email" required placeholder="user@example.com"></div>
             <div class="form-group"><label for="fer-tickets">Number of Entries</label><input type="number" id="fer-tickets" required value="1" min="1"></div>
             <div class="modal-actions">
-                <button type="button" class="btn" id="modal-cancel-btn">Cancel</button>
+                <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
                 <button type="submit" class="btn">Add Entry</button>
             </div>
         </form>
@@ -313,15 +312,7 @@ async function handleAddFerSubmit(e, compId) {
         if (userSnapshot.empty) throw new Error(`User with email ${userEmail} not found.`);
         const userDoc = userSnapshot.docs[0];
         const userId = userDoc.id;
-
-        // Use the secure Cloud Function to add the entry
-        // NOTE: A dedicated 'addFreeEntry' function would be even better,
-        // but for now, we can reuse the allocation logic if we trust the admin.
-        // Let's call the existing function, but a dedicated one is a future improvement.
         
-        // This simulates a purchase without payment for the FER.
-        // A dedicated cloud function 'addFreePostalEntry' would be better for perfect auditing.
-        // For now, we will do a direct transaction from the admin panel, as it is a trusted environment.
         await runTransaction(db, async (transaction) => {
             const competitionRef = doc(db, 'competitions', compId);
             const userRef = doc(db, 'users', userId);
@@ -337,4 +328,50 @@ async function handleAddFerSubmit(e, compId) {
             const userEntryCount = userData.entryCount?.[compId] || 0;
             const entryLimit = compData.userEntryLimit || 75;
             if (userEntryCount + ticketsToAdd > entryLimit) {
-                throw new Error(`Entry limit exceeded. User has ${entryLi
+                throw new Error(`Entry limit exceeded. User has ${entryLimit - userEntryCount} entries remaining.`);
+            }
+
+            const ticketsSoldBefore = compData.ticketsSold || 0;
+            if (ticketsSoldBefore + ticketsToAdd > compData.totalTickets) throw new Error("Not enough tickets available.");
+
+            transaction.update(competitionRef, { ticketsSold: ticketsSoldBefore + ticketsToAdd });
+            transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsToAdd });
+            
+            const entryRef = doc(collection(competitionRef, 'entries'));
+            transaction.set(entryRef, {
+                userId: userId, 
+                userDisplayName: userData.displayName, 
+                ticketsBought: ticketsToAdd, 
+                ticketStart: ticketsSoldBefore,
+                ticketEnd: ticketsSoldBefore + ticketsToAdd -1,
+                enteredAt: serverTimestamp(), 
+                entryType: 'free_postal'
+            });
+        });
+
+
+        alert('Free entry added successfully!');
+        closeModal();
+        loadAndRenderCompetitions();
+
+    } catch (error) {
+        console.error("FER Error:", error);
+        alert(`Error: ${error.message}`);
+        submitBtn.disabled = false;
+    }
+}
+
+function setupModal() {
+    modalContainer.addEventListener('click', (e) => {
+        if (e.target === modalContainer) closeModal();
+    });
+}
+
+function openModal(content) {
+    modalBody.innerHTML = content;
+    modalContainer.classList.add('show');
+}
+
+function closeModal() {
+    modalContainer.classList.remove('show');
+}

@@ -1,5 +1,6 @@
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, runTransaction, serverTimestamp, arrayUnion, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
 const db = getFirestore(app);
@@ -16,6 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         document.getElementById('competition-container').innerHTML = '<div class="hawk-card placeholder">Error: No competition specified.</div>';
     }
+
+    // Add event listener for clicks inside the modal to handle closing it
+    document.getElementById('modal-container').addEventListener('click', (e) => {
+        if (e.target.id === 'modal-container' || e.target.closest('#cancel-entry-btn') || e.target.closest('#close-error-btn')) {
+            closeModal();
+        }
+    });
 });
 
 async function loadCompetitionDetails(id) {
@@ -34,6 +42,7 @@ async function loadCompetitionDetails(id) {
         }
     } catch (error) {
         console.error("Error fetching competition details:", error);
+        container.innerHTML = '<div class="hawk-card placeholder" style="color:red">Could not load competition details.</div>';
     }
 }
 
@@ -98,7 +107,8 @@ function setupCountdown(endDate) {
         const d = String(Math.floor(distance / (1000*60*60*24))).padStart(2,'0');
         const h = String(Math.floor((distance % (1000*60*60*24))/(1000*60*60))).padStart(2,'0');
         const m = String(Math.floor((distance % (1000*60*60))/(1000*60))).padStart(2,'0');
-        timerElement.innerHTML = `${d}<small>d</small> : ${h}<small>h</small> : ${m}<small>m</small>`;
+        const s = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
+        timerElement.innerHTML = `${d}<small>d</small> : ${h}<small>h</small> : ${m}<small>m</small> : ${s}<small>s</small>`;
     }, 1000);
 }
 
@@ -125,12 +135,11 @@ function setupEntryLogic(correctAnswer) {
 
     entryButton.addEventListener('click', () => {
         if (!auth.currentUser) {
-            alert("Please log in to enter.");
-            window.location.href = 'login.html';
+            openModal(`<h2>Login Required</h2><p>Please log in or register to enter the competition.</p><a href="login.html" class="btn">Login</a>`);
             return;
         }
         if (!isAnswerCorrect) {
-            alert("You must select the correct answer to enter.");
+            openModal(`<h2>Incorrect Answer</h2><p>You must select the correct answer to be eligible to enter.</p><button id="close-error-btn" class="btn">Try Again</button>`);
             return;
         }
         showConfirmationModal();
@@ -139,6 +148,10 @@ function setupEntryLogic(correctAnswer) {
 
 function showConfirmationModal() {
     const selectedTicket = document.querySelector('.ticket-option.selected');
+    if (!selectedTicket) {
+        openModal(`<h2>Select Tickets</h2><p>Please choose a ticket bundle before confirming.</p><button id="close-error-btn" class="btn">OK</button>`);
+        return;
+    }
     const tickets = parseInt(selectedTicket.dataset.amount);
     const price = parseFloat(selectedTicket.dataset.price).toFixed(2);
     
@@ -146,122 +159,62 @@ function showConfirmationModal() {
         <h2>Confirm Your Entry</h2>
         <p>You are about to purchase <strong>${tickets}</strong> entries for <strong>£${price}</strong>.</p>
         <div class="modal-actions">
-            <button id="cancel-entry-btn" class="btn">Cancel</button>
+            <button id="cancel-entry-btn" class="btn btn-secondary">Cancel</button>
             <button id="confirm-entry-btn" class="btn">Confirm & Pay</button>
         </div>
     `);
     
     document.getElementById('confirm-entry-btn').addEventListener('click', () => handleEntry(tickets));
-    document.getElementById('cancel-entry-btn').addEventListener('click', closeModal);
 }
 
 async function handleEntry(ticketsBought) {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) return; // Should be caught earlier, but as a safeguard.
 
-    openModal(`<h2>Processing...</h2><p>Please wait.</p>`);
-
-    const competitionRef = doc(db, 'competitions', competitionId);
-    const userRef = doc(db, 'users', user.uid);
-    let firstTicketNumber = -1;
-
+    openModal(`<h2>Processing Entry...</h2><p>Please wait, do not close this window.</p>`);
+    
     try {
-        await runTransaction(db, async (transaction) => {
-            const compDoc = await transaction.get(competitionRef);
-            const userDoc = await transaction.get(userRef);
+        // Initialize the callable function from Firebase.
+        const functions = getFunctions(app);
+        const allocateTicketsAndCheckWins = httpsCallable(functions, 'allocateTicketsAndCheckWins');
 
-            if (!compDoc.exists()) throw new Error("Competition not found.");
-            if (!userDoc.exists()) throw new Error("User not found.");
-
-            const compData = compDoc.data();
-            const userData = userDoc.data();
-            
-            if (compData.status !== 'live') throw new Error("This competition is no longer live.");
-            
-            const userEntryCount = userData.entryCount?.[competitionId] || 0;
-            const limit = compData.userEntryLimit || 75;
-            if (userEntryCount + ticketsBought > limit) {
-                throw new Error(`Entry limit exceeded. You have ${limit - userEntryCount} entries remaining.`);
-            }
-
-            const ticketsSoldBefore = compData.ticketsSold || 0;
-            const newTicketsSold = ticketsSoldBefore + ticketsBought;
-            if (newTicketsSold > compData.totalTickets) {
-                throw new Error("Not enough tickets available for this purchase.");
-            }
-            
-            firstTicketNumber = ticketsSoldBefore;
-
-            transaction.update(competitionRef, { ticketsSold: newTicketsSold });
-            
-            const newEntryCount = userEntryCount + ticketsBought;
-            transaction.update(userRef, {
-                [`entryCount.${competitionId}`]: newEntryCount
-            });
-
-            transaction.set(doc(collection(competitionRef, 'entries')), {
-                userId: user.uid,
-                userDisplayName: user.displayName,
-                ticketsBought: ticketsBought,
-                enteredAt: serverTimestamp(),
-                entryType: 'paid'
-            });
+        // Call our new, single, atomic Cloud Function.
+        const result = await allocateTicketsAndCheckWins({
+            compId: competitionId,
+            ticketsBought: ticketsBought,
         });
 
-        if (currentCompetitionData.instantWinsConfig?.enabled && firstTicketNumber !== -1) {
-            const purchasedTicketNumbers = Array.from({ length: ticketsBought }, (_, i) => firstTicketNumber + i);
-            await checkAndClaimInstantWins(purchasedTicketNumbers, user.uid);
-        } else {
-            openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p><button id="reload-btn" class="btn">Done</button>`);
-            document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
+        const data = result.data;
+        if (!data.success) {
+            // This case should be rare as the function itself throws detailed errors.
+            throw new Error(data.message || "An unknown server error occurred.");
         }
+        
+        // Check if any instant wins were returned from the server.
+        if (data.wonPrizes && data.wonPrizes.length > 0) {
+            const totalWinnings = data.wonPrizes.reduce((sum, prize) => sum + prize.prizeValue, 0);
+            openModal(`
+                <div class="modal-icon-win">⚡️</div>
+                <h2>INSTANT WIN!</h2>
+                <p>Congratulations! You've just won <strong>£${totalWinnings.toFixed(2)}</strong> instantly!</p>
+                <p class="small-text">Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} are still in the main draw!</p>
+                <button id="reload-btn" class="btn">Awesome!</button>
+            `);
+        } else {
+            // Standard success message with audited ticket numbers.
+            openModal(`
+                <h2>Entry Successful!</h2>
+                <p>Thank you for entering. Your ticket numbers are ${data.ticketStart} to ${data.ticketStart + data.ticketsBought - 1}. Good luck!</p>
+                <button id="reload-btn" class="btn">Done</button>
+            `);
+        }
+        // Add listener to reload page to show updated progress bar.
+        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
 
     } catch (error) {
-        console.error("Entry Transaction failed: ", error);
+        console.error("Entry failed:", error);
+        // Display the specific error message from the Cloud Function.
         openModal(`<h2>Error</h2><p>${error.message}</p><button id="close-error-btn" class="btn">Close</button>`);
-        document.getElementById('close-error-btn')?.addEventListener('click', closeModal);
-    }
-}
-
-async function checkAndClaimInstantWins(ticketNumbers, userId) {
-    const instantWinsRef = collection(db, `competitions/${competitionId}/instant_wins`);
-    const q = query(instantWinsRef, where('ticketNumber', 'in', ticketNumbers), where('claimed', '==', false));
-    
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-        openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p><button id="reload-btn" class="btn">Done</button>`);
-        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
-        return;
-    }
-    
-    let totalWinnings = 0;
-    const batch = writeBatch(db);
-    
-    snapshot.forEach(doc => {
-        totalWinnings += doc.data().prizeValue;
-        batch.update(doc.ref, {
-            claimed: true,
-            claimedBy: userId,
-            claimedAt: serverTimestamp()
-        });
-    });
-    
-    try {
-        await batch.commit();
-        openModal(`
-            <div class="modal-icon-win">⚡️</div>
-            <h2>INSTANT WIN!</h2>
-            <p>Congratulations! You've just won <strong>£${totalWinnings.toFixed(2)}</strong> instantly!</p>
-            <p class="small-text">This has been added to your account. Your tickets are still in the main draw!</p>
-            <button id="reload-btn" class="btn">Awesome!</button>
-        `);
-        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
-
-    } catch (error) {
-        console.error("Failed to claim instant win:", error);
-        openModal(`<h2>Entry Successful!</h2><p>Thank you for entering. Good luck!</p><button id="reload-btn" class="btn">Done</button>`);
-        document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
     }
 }
 
@@ -272,6 +225,7 @@ function openModal(content) {
     modalContent.innerHTML = content;
     modalContainer.classList.add('show');
 }
+
 function closeModal() {
     const modalContainer = document.getElementById('modal-container');
     if(modalContainer) modalContainer.classList.remove('show');

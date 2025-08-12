@@ -268,11 +268,66 @@ async function handleCreateFormSubmit(e) {
 function handleDashboardClick(e) {
     const button = e.target.closest('button');
     if (!button) return;
+
     const action = button.dataset.action;
-    const compId = button.closest('.competition-row')?.dataset.compId;
+    const compRow = button.closest('.competition-row');
+    const compId = compRow?.dataset.compId;
     if (!action || !compId) return;
+
+    button.disabled = true; // Disable button immediately to prevent double clicks
+
+    if (action === 'add-fer') {
+        showAddFerModal(compId);
+        button.disabled = false; // Re-enable since modal handles its own logic
+    } else if (action === 'end') {
+        handleEndCompetition(compId, button);
+    } else if (action === 'draw-winner') {
+        handleDrawWinner(compId, button);
+    }
+}
+
+async function handleEndCompetition(compId, button) {
+    if (!confirm('Are you sure you want to end this competition? This cannot be undone.')) {
+        button.disabled = false;
+        return;
+    }
+    try {
+        const compRef = doc(db, 'competitions', compId);
+        await updateDoc(compRef, { status: 'ended' });
+        alert('Competition has been ended.');
+        loadAndRenderCompetitions(); // Refresh the dashboard
+    } catch (error) {
+        console.error('Error ending competition:', error);
+        alert(`Error: ${error.message}`);
+        button.disabled = false;
+    }
+}
+
+async function handleDrawWinner(compId, button) {
+    if (!confirm('This will draw a winner and publicly announce them. Are you absolutely sure?')) {
+        button.disabled = false;
+        return;
+    }
     
-    if (action === 'add-fer') showAddFerModal(compId);
+    button.textContent = 'Drawing...';
+    
+    try {
+        const functions = getFunctions(app);
+        const drawWinner = httpsCallable(functions, 'drawWinner');
+        const result = await drawWinner({ compId });
+
+        if (result.data.success) {
+            alert(`🎉 Winner Drawn! 🎉\n\nWinner: ${result.data.winnerDisplayName}\nTicket: #${result.data.winningTicketNumber}`);
+            loadAndRenderCompetitions(); // Refresh dashboard to show winner
+        } else {
+            throw new Error(result.data.message || 'The draw failed for an unknown reason.');
+        }
+    } catch (error) {
+        console.error('Error drawing winner:', error);
+        alert(`Draw Failed: ${error.message}`);
+        button.disabled = false;
+        button.textContent = 'Draw Winner';
+    }
 }
 
 function showAddFerModal(compId) {

@@ -1,105 +1,134 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
-
-// sha256 is not a built-in crypto function in Node, so we implement it.
 const { createHash } = require("crypto");
-const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 
 initializeApp();
 const db = getFirestore();
+const { HttpsError } = functions.https;
 
-// Helper to check if the caller is an admin
-const assertIsAdmin = async (auth) => {
-    if (!auth) {
+// --- CORS Configuration ---
+// This explicitly allows your website domains to communicate with these functions.
+const allowedOrigins = [
+    "https://the-hawk-games-64239.web.app", // Your Firebase Hosting URL
+    "https://the-hawk-games.co.uk",      // Your custom domain
+    // Add your local development URLs for testing with 'firebase serve'
+    "http://localhost:5000",
+    "http://127.0.0.1:5000"
+];
+const cors = require("cors")({ origin: allowedOrigins });
+
+
+// --- Helper Functions for Security & Code Reusability ---
+
+// Throws an error if the user is not a verified admin.
+const assertIsAdmin = async (context) => {
+    if (!context.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in to call this function.');
     }
-    const userDoc = await db.collection('users').doc(auth.uid).get();
+    const userDoc = await db.collection('users').doc(context.auth.uid).get();
     if (!userDoc.exists() || !userDoc.data().isAdmin) {
         throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
     }
 };
 
+// Throws an error if the user is not logged in.
+const assertIsAuthenticated = (context) => {
+    if (!context.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in to perform this action.');
+    }
+};
+
+// A wrapper to create a callable-style function with robust CORS handling.
+const createCallable = (handler) => {
+    return functions.https.onRequest((req, res) => {
+        // Run the CORS middleware
+        cors(req, res, async () => {
+            try {
+                // Emulate the 'onCall' behavior by extracting context and data
+                const context = { auth: req.auth };
+                const data = req.body.data;
+                const result = await handler(data, context);
+                // Send a successful response
+                res.status(200).send({ data: result });
+            } catch (err) {
+                // Handle errors gracefully
+                if (err instanceof HttpsError) {
+                    res.status(err.httpErrorCode.status).send({ error: { message: err.message, code: err.code } });
+                } else {
+                    console.error("Unhandled error:", err);
+                    res.status(500).send({ error: { message: "An internal server error occurred." } });
+                }
+            }
+        });
+    });
+};
+
+
+// ======================================================================
+// ===                CORE BUSINESS LOGIC FUNCTIONS                   ===
+// ======================================================================
+
+
 /**
  * Seeds a competition with securely generated instant win ticket numbers.
- * Only callable by admins.
+ * Callable only by admins.
  */
-exports.seedInstantWins = onCall(async (request) => {
-    await assertIsAdmin(request.auth);
-    const { compId, instantWinPrizes, totalTickets } = request.data;
-    if (!compId || !instantWinPrizes || !totalTickets) {
-        throw new HttpsError('invalid-argument', 'Missing required parameters.');
-    }
+exports.seedInstantWins = createCallable(async (data, context) => {
+    await assertIsAdmin(context);
+    const { compId, instantWinPrizes, totalTickets } = data;
 
+    if (!compId || !instantWinPrizes || !totalTickets) {
+        throw new HttpsError('invalid-argument', 'Missing required parameters: compId, instantWinPrizes, and totalTickets.');
+    }
     const totalPrizeCount = instantWinPrizes.reduce((sum, tier) => sum + tier.count, 0);
     if (totalPrizeCount > totalTickets) {
         throw new HttpsError('invalid-argument', 'Total number of instant prizes cannot exceed the total number of tickets.');
     }
 
-    // 1. Generate unique winning ticket numbers using a Cryptographically Secure PRNG
     const winningPicks = new Set();
     while (winningPicks.size < totalPrizeCount) {
         winningPicks.add(crypto.randomInt(0, totalTickets));
     }
     const sortedWinningNumbers = Array.from(winningPicks).sort((a, b) => a - b);
-    
-    // 2. Create the commit-reveal hash for provable fairness
+
     const salt = crypto.randomBytes(16).toString('hex');
     const positionsToHash = JSON.stringify(sortedWinningNumbers);
-    const hash = sha256(positionsToHash + ':' + salt);
+    const hash = createHash("sha256").update(positionsToHash + ':' + salt).digest("hex");
 
     const batch = db.batch();
-
-    // 3. Create the instant_wins documents, keyed by ticket number for fast lookups
     const instantWinsRef = db.collection('competitions').doc(compId).collection('instant_wins');
     let prizeCursor = 0;
     instantWinPrizes.forEach(tier => {
         for (let i = 0; i < tier.count; i++) {
             const ticketNumber = sortedWinningNumbers[prizeCursor++];
             const docRef = instantWinsRef.doc(String(ticketNumber));
-            batch.set(docRef, {
-                ticketNumber: ticketNumber,
-                prizeValue: tier.value,
-                claimed: false,
-                claimedBy: null,
-                claimedAt: null,
-            });
+            batch.set(docRef, { ticketNumber, prizeValue: tier.value, claimed: false, claimedBy: null, claimedAt: null });
         }
     });
-    
-    // 4. Update the main competition document with the config and fairness hash
+
     const compRef = db.collection('competitions').doc(compId);
-    batch.update(compRef, {
-        'instantWinsConfig.enabled': true,
-        'instantWinsConfig.prizes': instantWinPrizes,
-        'instantWinsConfig.positionsHash': hash,
-        'instantWinsConfig.generator': 'v2-csprng-salt',
-    });
+    batch.update(compRef, { 'instantWinsConfig.enabled': true, 'instantWinsConfig.prizes': instantWinPrizes, 'instantWinsConfig.positionsHash': hash, 'instantWinsConfig.generator': 'v2-csprng-salt' });
     
-    // 5. Store the salt securely on the server (inaccessible to clients)
     const serverMetaRef = compRef.collection('server_meta').doc('fairness_reveal');
     batch.set(serverMetaRef, { salt, positions: sortedWinningNumbers });
     
     await batch.commit();
-
     return { success: true, positionsHash: hash };
 });
 
-
 /**
  * Atomically allocates tickets to a user and checks for instant wins.
- * This is the primary entry transaction. Callable by any authenticated user.
+ * Callable by any authenticated user.
  */
-exports.allocateTicketsAndCheckWins = onCall(async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-        throw new HttpsError('unauthenticated', 'You must be logged in to enter.');
-    }
+exports.allocateTicketsAndCheckWins = createCallable(async (data, context) => {
+    assertIsAuthenticated(context);
+    const uid = context.auth.uid;
+    const { compId, ticketsBought } = data;
 
-    const { compId, ticketsBought } = request.data;
     if (!compId || !ticketsBought || ticketsBought <= 0) {
-        throw new HttpsError('invalid-argument', 'Competition ID and number of tickets are required.');
+        throw new HttpsError('invalid-argument', 'Competition ID and a valid number of tickets are required.');
     }
 
     const compRef = db.collection('competitions').doc(compId);
@@ -107,187 +136,97 @@ exports.allocateTicketsAndCheckWins = onCall(async (request) => {
     const wonPrizes = [];
     let ticketStartNumber;
 
-    try {
-        await db.runTransaction(async (transaction) => {
-            const compDoc = await transaction.get(compRef);
-            const userDoc = await transaction.get(userRef);
+    const result = await db.runTransaction(async (transaction) => {
+        const compDoc = await transaction.get(compRef);
+        const userDoc = await transaction.get(userRef);
 
-            if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
-            if (!userDoc.exists()) throw new HttpsError('not-found', 'User profile not found.');
+        if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
+        if (!userDoc.exists()) throw new HttpsError('not-found', 'User profile not found.');
 
-            const compData = compDoc.data();
-            const userData = userDoc.data();
+        const compData = compDoc.data();
+        const userData = userDoc.data();
 
-            // Validations
-            if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'This competition is no longer live.');
-            
-            // CORRECTED LINE: Check if endDate exists before trying to use it.
-            if (compData.endDate && compData.endDate.toDate() < new Date()) {
-                throw new HttpsError('failed-precondition', 'This competition has ended.');
-            }
+        if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'This competition is no longer live.');
+        if (compData.endDate && compData.endDate.toDate() < new Date()) {
+            throw new HttpsError('failed-precondition', 'This competition has ended.');
+        }
+        const userEntryCount = userData.entryCount?.[compId] || 0;
+        const limit = compData.userEntryLimit || 75;
+        if (userEntryCount + ticketsBought > limit) {
+            throw new HttpsError('failed-precondition', `Entry limit exceeded. You can enter ${limit - userEntryCount} more times.`);
+        }
+        const ticketsSoldBefore = compData.ticketsSold || 0;
+        if (ticketsSoldBefore + ticketsBought > compData.totalTickets) {
+            throw new HttpsError('failed-precondition', `Not enough tickets available. Only ${compData.totalTickets - ticketsSoldBefore} left.`);
+        }
+        ticketStartNumber = ticketsSoldBefore;
 
-            const userEntryCount = userData.entryCount?.[compId] || 0;
-            const limit = compData.userEntryLimit || 75;
-            if (userEntryCount + ticketsBought > limit) {
-                throw new HttpsError('failed-precondition', `Entry limit exceeded. You can enter ${limit - userEntryCount} more times.`);
-            }
+        transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
+        transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
+        const entryRef = compRef.collection('entries').doc();
+        transaction.set(entryRef, { userId: uid, userDisplayName: userData.displayName || "N/A", ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1, enteredAt: FieldValue.serverTimestamp(), entryType: 'paid' });
 
-            const ticketsSoldBefore = compData.ticketsSold || 0;
-            if (ticketsSoldBefore + ticketsBought > compData.totalTickets) {
-                throw new HttpsError('failed-precondition', `Not enough tickets available. Only ${compData.totalTickets - ticketsSoldBefore} left.`);
-            }
-
-            ticketStartNumber = ticketsSoldBefore;
-
-            // Perform all writes within the transaction
-            transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
-            transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
-            
-            const entryRef = compRef.collection('entries').doc();
-            transaction.set(entryRef, {
-                userId: uid,
-                userDisplayName: userData.displayName || "N/A",
-                ticketsBought: ticketsBought,
-                ticketStart: ticketStartNumber,
-                ticketEnd: ticketStartNumber + ticketsBought - 1,
-                enteredAt: FieldValue.serverTimestamp(),
-                entryType: 'paid'
-            });
-
-            if (compData.instantWinsConfig?.enabled) {
-                const instantWinsRef = compRef.collection('instant_wins');
-                for (let i = 0; i < ticketsBought; i++) {
-                    const currentTicketNumber = ticketStartNumber + i;
-                    const winDocRef = instantWinsRef.doc(String(currentTicketNumber));
-                    const winDoc = await transaction.get(winDocRef);
-                    if (winDoc.exists && winDoc.data().claimed === false) {
-                        transaction.update(winDocRef, {
-                            claimed: true,
-                            claimedBy: uid,
-                            claimedAt: FieldValue.serverTimestamp()
-                        });
-                        wonPrizes.push({
-                            ticketNumber: currentTicketNumber,
-                            prizeValue: winDoc.data().prizeValue
-                        });
-                    }
+        if (compData.instantWinsConfig?.enabled) {
+            const instantWinsRef = compRef.collection('instant_wins');
+            for (let i = 0; i < ticketsBought; i++) {
+                const currentTicketNumber = ticketStartNumber + i;
+                const winDocRef = instantWinsRef.doc(String(currentTicketNumber));
+                const winDoc = await transaction.get(winDocRef);
+                if (winDoc.exists() && winDoc.data().claimed === false) {
+                    transaction.update(winDocRef, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
+                    wonPrizes.push({ ticketNumber: currentTicketNumber, prizeValue: winDoc.data().prizeValue });
                 }
             }
-        });
-
-        return {
-            success: true,
-            ticketStart: ticketStartNumber,
-            ticketsBought: ticketsBought,
-            wonPrizes: wonPrizes
-        };
-
-    } catch (error) {
-        console.error("Transaction failed:", error);
-        if (error instanceof HttpsError) {
-            throw error;
         }
-        throw new HttpsError('internal', 'An error occurred while processing your entry. Please try again.');
-    }
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, wonPrizes };
+    });
+    return result;
 });
+
 
 /**
  * Draws a winner for a closed competition.
- * Only callable by admins.
+ * Callable only by admins.
  */
-exports.drawWinner = onCall(async (request) => {
-    await assertIsAdmin(request.auth);
-    const { compId } = request.data;
+exports.drawWinner = createCallable(async (data, context) => {
+    await assertIsAdmin(context);
+    const { compId } = data;
+
     if (!compId) {
         throw new HttpsError('invalid-argument', 'Competition ID is required.');
     }
 
     const compRef = db.collection('competitions').doc(compId);
-    
-    try {
-        const result = await db.runTransaction(async (transaction) => {
-            const compDoc = await transaction.get(compRef);
-            if (!compDoc.exists) {
-                throw new HttpsError('not-found', 'Competition not found.');
-            }
-            const compData = compDoc.data();
+    const result = await db.runTransaction(async (transaction) => {
+        const compDoc = await transaction.get(compRef);
+        if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
 
-            // --- Validations ---
-            if (compData.status !== 'ended') {
-                throw new HttpsError('failed-precondition', 'Competition must be ended before drawing a winner.');
-            }
-            if (compData.winnerId) {
-                throw new HttpsError('failed-precondition', 'A winner has already been drawn for this competition.');
-            }
-            if (!compData.ticketsSold || compData.ticketsSold === 0) {
-                throw new HttpsError('failed-precondition', 'Cannot draw a winner for a competition with no entries.');
-            }
+        const compData = compDoc.data();
+        if (compData.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended before drawing a winner.');
+        if (compData.winnerId) throw new HttpsError('failed-precondition', 'A winner has already been drawn for this competition.');
+        if (!compData.ticketsSold || compData.ticketsSold === 0) throw new HttpsError('failed-precondition', 'Cannot draw a winner for a competition with no entries.');
 
-            // --- The Draw ---
-            // Use a cryptographically secure random number generator.
-            const winningTicketNumber = crypto.randomInt(0, compData.ticketsSold);
-
-            // --- Find the Winner ---
-            // Query the entries sub-collection to find which user owns the winning ticket.
-            const entriesRef = compRef.collection('entries');
-            const winnerQuery = query(
-                entriesRef,
-                where('ticketStart', '<=', winningTicketNumber),
-                orderBy('ticketStart', 'desc'),
-                limit(1)
-            );
-            const winnerSnapshot = await getDocs(winnerQuery); // Use getDocs, not transaction.get for queries
-
-            if (winnerSnapshot.empty) {
-                // This should be virtually impossible if ticketsSold > 0, but is a critical safeguard.
-                throw new HttpsError('internal', `Could not find an owner for the winning ticket #${winningTicketNumber}.`);
-            }
-            const winnerEntryDoc = winnerSnapshot.docs[0];
-            const winnerData = winnerEntryDoc.data();
-
-            const winnerId = winnerData.userId;
-            const winnerDisplayName = winnerData.userDisplayName;
-
-            // Get the winner's photoURL for the public winners page
-            const winnerUserDoc = await db.collection('users').doc(winnerId).get();
-            const winnerPhotoURL = winnerUserDoc.exists() ? winnerUserDoc.data().photoURL : null;
-
-            // --- Update Firestore Documents ---
-            // 1. Update the competition with the winner's details
-            transaction.update(compRef, {
-                status: 'drawn',
-                winnerId: winnerId,
-                winnerDisplayName: winnerDisplayName,
-                winningTicketNumber: winningTicketNumber,
-                drawnAt: FieldValue.serverTimestamp()
-            });
-
-            // 2. Create a public record in the pastWinners collection
-            const pastWinnerRef = db.collection('pastWinners').doc(compId);
-            transaction.set(pastWinnerRef, {
-                prizeTitle: compData.title,
-                prizeImage: compData.prizeImage,
-                winnerId: winnerId,
-                winnerDisplayName: winnerDisplayName,
-                winnerPhotoURL: winnerPhotoURL,
-                winningTicketNumber: winningTicketNumber,
-                drawDate: FieldValue.serverTimestamp()
-            });
-
-            return {
-                success: true,
-                winnerDisplayName: winnerDisplayName,
-                winningTicketNumber: winningTicketNumber
-            };
-        });
+        const winningTicketNumber = crypto.randomInt(0, compData.ticketsSold);
         
-        return result;
+        const entriesRef = compRef.collection('entries');
+        const winnerQuery = db.collection(entriesRef.path).where('ticketStart', '<=', winningTicketNumber).orderBy('ticketStart', 'desc').limit(1);
+        const winnerSnapshot = await winnerQuery.get();
+        if (winnerSnapshot.empty) throw new HttpsError('internal', `Could not find an owner for the winning ticket #${winningTicketNumber}.`);
 
-    } catch (error) {
-        console.error("Draw winner failed:", error);
-        if (error instanceof HttpsError) {
-            throw error;
-        }
-        throw new HttpsError('internal', 'An unexpected error occurred during the draw.');
-    }
+        const winnerEntryDoc = winnerSnapshot.docs[0];
+        const winnerData = winnerEntryDoc.data();
+        const winnerId = winnerData.userId;
+        const winnerDisplayName = winnerData.userDisplayName;
+
+        const winnerUserDoc = await db.collection('users').doc(winnerId).get();
+        const winnerPhotoURL = winnerUserDoc.exists() ? winnerUserDoc.data().photoURL : null;
+
+        transaction.update(compRef, { status: 'drawn', winnerId, winnerDisplayName, winningTicketNumber, drawnAt: FieldValue.serverTimestamp() });
+        
+        const pastWinnerRef = db.collection('pastWinners').doc(compId);
+        transaction.set(pastWinnerRef, { prizeTitle: compData.title, prizeImage: compData.prizeImage, winnerId, winnerDisplayName, winnerPhotoURL, winningTicketNumber, drawDate: FieldValue.serverTimestamp() });
+
+        return { success: true, winnerDisplayName, winningTicketNumber };
+    });
+    return result;
 });

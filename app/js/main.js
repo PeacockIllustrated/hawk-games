@@ -5,6 +5,7 @@ const db = getFirestore(app);
 
 document.addEventListener('DOMContentLoaded', () => {
     loadLiveCompetitions();
+    loadPastWinners(); // Add this function call
 });
 
 const loadLiveCompetitions = async () => {
@@ -33,10 +34,44 @@ const loadLiveCompetitions = async () => {
     }
 };
 
+// NEW FUNCTION to load past winners for social proof
+const loadPastWinners = async () => {
+    const grid = document.getElementById('past-winners-grid');
+    if (!grid) return;
+
+    try {
+        // Fetch the 4 most recent winners from the 'pastWinners' collection
+        const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"), limit(4));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            grid.innerHTML = '<div class="winner-card placeholder">Be our first winner!</div>';
+            return;
+        }
+
+        grid.innerHTML = ''; // Clear placeholder
+        querySnapshot.forEach((doc) => {
+            const winnerData = doc.data();
+            grid.innerHTML += `
+                <div class="winner-card">
+                    <img src="${winnerData.winnerPhotoURL || 'https://i.pravatar.cc/100'}" alt="Winner">
+                    <h4>${winnerData.winnerDisplayName}</h4>
+                    <p>Won the ${winnerData.prizeTitle}</p>
+                </div>
+            `;
+        });
+    } catch (error) {
+        console.error("Error loading past winners:", error);
+        grid.innerHTML = '<div class="winner-card placeholder" style="color:red;">Could not load winners.</div>';
+    }
+}
+
+
 function createCompetitionCard(compData, compId) {
     const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
     const endDate = compData.endDate.toDate();
-    const price = compData.ticketTiers[0]?.price || 0.00;
+    // Use the first ticket tier for the main price display
+    const price = compData.ticketTiers?.[0]?.price || 0.00;
 
     const instantWinBadge = compData.instantWinsConfig?.enabled 
         ? `<div class="hawk-card__instant-win-badge">⚡️ Instant Wins</div>` 
@@ -70,6 +105,8 @@ function startAllCountdowns() {
 
     const updateTimers = () => {
         timerElements.forEach(timer => {
+            // Prevent error if timer is removed from DOM
+            if (!timer.dataset.endDate) return;
             const endDate = new Date(timer.dataset.endDate);
             const now = new Date();
             const distance = endDate.getTime() - now.getTime();
@@ -86,6 +123,10 @@ function startAllCountdowns() {
             timer.innerHTML = `<strong>${days}D ${hours}H ${minutes}M</strong> LEFT TO ENTER`;
         });
     };
-    updateTimers();
-    setInterval(updateTimers, 60000); // Update every minute
+    
+    // Initial call
+    updateTimers(); 
+    
+    // Set interval and store its ID so we can clear it if needed
+    const timerInterval = setInterval(updateTimers, 60000); // Update every minute
 }

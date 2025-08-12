@@ -169,27 +169,40 @@ function initializeCreateFormView() {
         tierEl.querySelector('.btn-remove-tier').addEventListener('click', () => tierEl.remove());
     };
     addTierBtn.addEventListener('click', addTier);
-    addTier();
+    addTier(); // Add one tier by default
 
+    // --- Instant Win Logic ---
     const instantWinCheckbox = document.getElementById('enable-instant-wins');
     const instantWinPanel = document.getElementById('instant-win-config-panel');
     const addInstantPrizeBtn = document.getElementById('add-instant-prize-btn');
     const instantPrizesContainer = document.getElementById('instant-win-prizes-container');
 
+    const setInstantWinInputsRequired = (isRequired) => {
+        instantWinPanel.querySelectorAll('input').forEach(input => {
+            input.required = isRequired;
+        });
+    };
+
     instantWinCheckbox.addEventListener('change', (e) => {
-        instantWinPanel.style.display = e.target.checked ? 'block' : 'none';
+        const isEnabled = e.target.checked;
+        instantWinPanel.style.display = isEnabled ? 'block' : 'none';
+        setInstantWinInputsRequired(isEnabled);
     });
 
     const addInstantPrize = () => {
         const prizeEl = document.createElement('div');
         prizeEl.className = 'form-group-inline instant-prize-row';
-        prizeEl.innerHTML = `<div class="form-group"><label>Number of Prizes</label><input type="number" class="instant-prize-count" required></div><div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="instant-prize-value" required></div><button type="button" class="btn-remove-tier">×</button>`;
+        // Start with required=false. It will be enabled by the listener if needed.
+        prizeEl.innerHTML = `<div class="form-group"><label>Number of Prizes</label><input type="number" class="instant-prize-count"></div><div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="instant-prize-value"></div><button type="button" class="btn-remove-tier">×</button>`;
         instantPrizesContainer.appendChild(prizeEl);
         prizeEl.querySelector('.btn-remove-tier').addEventListener('click', () => prizeEl.remove());
     };
     addInstantPrizeBtn.addEventListener('click', addInstantPrize);
-    addInstantPrize();
-    
+    addInstantPrize(); // Add one prize tier by default
+
+    // Initialize the state
+    setInstantWinInputsRequired(instantWinCheckbox.checked);
+
     form.addEventListener('submit', handleCreateFormSubmit);
 }
 

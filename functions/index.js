@@ -1,9 +1,11 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
-const { sha256 } = require("firebase-functions/v1/crypto");
+
+// sha256 is not a built-in crypto function in Node, so we implement it.
+const { createHash } = require("crypto");
+const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 
 initializeApp();
 const db = getFirestore();
@@ -14,7 +16,7 @@ const assertIsAdmin = async (auth) => {
         throw new HttpsError('unauthenticated', 'You must be logged in to call this function.');
     }
     const userDoc = await db.collection('users').doc(auth.uid).get();
-    if (!userDoc.exists || !userDoc.data().isAdmin) {
+    if (!userDoc.exists() || !userDoc.data().isAdmin) {
         throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
     }
 };
@@ -55,7 +57,7 @@ exports.seedInstantWins = onCall(async (request) => {
     instantWinPrizes.forEach(tier => {
         for (let i = 0; i < tier.count; i++) {
             const ticketNumber = sortedWinningNumbers[prizeCursor++];
-            const docRef = instantWinsRef.doc(String(ticketNumber)); // Key by ticket number
+            const docRef = instantWinsRef.doc(String(ticketNumber));
             batch.set(docRef, {
                 ticketNumber: ticketNumber,
                 prizeValue: tier.value,
@@ -70,7 +72,7 @@ exports.seedInstantWins = onCall(async (request) => {
     const compRef = db.collection('competitions').doc(compId);
     batch.update(compRef, {
         'instantWinsConfig.enabled': true,
-        'instantWinsConfig.prizes': instantWinPrizes, // Store the prize structure
+        'instantWinsConfig.prizes': instantWinPrizes,
         'instantWinsConfig.positionsHash': hash,
         'instantWinsConfig.generator': 'v2-csprng-salt',
     });
@@ -110,15 +112,19 @@ exports.allocateTicketsAndCheckWins = onCall(async (request) => {
             const compDoc = await transaction.get(compRef);
             const userDoc = await transaction.get(userRef);
 
-            if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
-            if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+            if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
+            if (!userDoc.exists()) throw new HttpsError('not-found', 'User profile not found.');
 
             const compData = compDoc.data();
             const userData = userDoc.data();
 
             // Validations
             if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'This competition is no longer live.');
-            if (compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'This competition has ended.');
+            
+            // CORRECTED LINE: Check if endDate exists before trying to use it.
+            if (compData.endDate && compData.endDate.toDate() < new Date()) {
+                throw new HttpsError('failed-precondition', 'This competition has ended.');
+            }
 
             const userEntryCount = userData.entryCount?.[compId] || 0;
             const limit = compData.userEntryLimit || 75;
@@ -134,25 +140,20 @@ exports.allocateTicketsAndCheckWins = onCall(async (request) => {
             ticketStartNumber = ticketsSoldBefore;
 
             // Perform all writes within the transaction
-            // 1. Update competition ticket count
             transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
-
-            // 2. Update user's entry count for this competition
             transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
             
-            // 3. Create a detailed entry document for auditability
             const entryRef = compRef.collection('entries').doc();
             transaction.set(entryRef, {
                 userId: uid,
-                userDisplayName: userData.displayName,
+                userDisplayName: userData.displayName || "N/A",
                 ticketsBought: ticketsBought,
-                ticketStart: ticketStartNumber, // CRITICAL FOR AUDIT
-                ticketEnd: ticketStartNumber + ticketsBought - 1, // CRITICAL FOR AUDIT
+                ticketStart: ticketStartNumber,
+                ticketEnd: ticketStartNumber + ticketsBought - 1,
                 enteredAt: FieldValue.serverTimestamp(),
                 entryType: 'paid'
             });
 
-            // 4. Check for and claim instant wins atomically
             if (compData.instantWinsConfig?.enabled) {
                 const instantWinsRef = compRef.collection('instant_wins');
                 for (let i = 0; i < ticketsBought; i++) {
@@ -174,7 +175,6 @@ exports.allocateTicketsAndCheckWins = onCall(async (request) => {
             }
         });
 
-        // Transaction was successful
         return {
             success: true,
             ticketStart: ticketStartNumber,
@@ -183,7 +183,6 @@ exports.allocateTicketsAndCheckWins = onCall(async (request) => {
         };
 
     } catch (error) {
-        // If the transaction fails, HttpsError will be propagated
         console.error("Transaction failed:", error);
         if (error instanceof HttpsError) {
             throw error;

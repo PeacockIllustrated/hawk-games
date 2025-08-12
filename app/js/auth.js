@@ -2,7 +2,7 @@
 // The core logic is the same, but `renderHeader` and `renderFooter` are new.
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -108,9 +108,17 @@ const createUserProfileIfNotExists = async (user) => {
     }
 };
 
-// Event listener for login page (to be created)
+
+// Event listeners for auth pages
+// Handles email/password and Google flows for login and registration
+// Redirects to account.html after successful authentication
+
 document.addEventListener('DOMContentLoaded', () => {
     const googleLoginBtn = document.getElementById('google-login-btn');
+    const googleRegisterBtn = document.getElementById('google-register-btn');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+
     if (googleLoginBtn) {
         googleLoginBtn.addEventListener('click', async () => {
             const provider = new GoogleAuthProvider();
@@ -118,7 +126,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 await signInWithPopup(auth, provider);
                 window.location.href = 'account.html';
             } catch (error) {
-                console.error("Google Sign-In Error:", error);
+                console.error('Google Sign-In Error:', error);
+            }
+        });
+    }
+
+    if (googleRegisterBtn) {
+        googleRegisterBtn.addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+                window.location.href = 'account.html';
+            } catch (error) {
+                console.error('Google Sign-Up Error:', error);
+            }
+        });
+    }
+
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                window.location.href = 'account.html';
+            } catch (error) {
+                console.error('Email/Password Sign-In Error:', error);
+            }
+        });
+    }
+
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                window.location.href = 'account.html';
+            } catch (error) {
+                console.error('Email/Password Sign-Up Error:', error);
             }
         });
     }

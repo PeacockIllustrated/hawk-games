@@ -1,32 +1,193 @@
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const crypto = require("crypto");
+const { sha256 } = require("firebase-functions/v1/crypto");
+
+initializeApp();
+const db = getFirestore();
+
+// Helper to check if the caller is an admin
+const assertIsAdmin = async (auth) => {
+    if (!auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in to call this function.');
+    }
+    const userDoc = await db.collection('users').doc(auth.uid).get();
+    if (!userDoc.exists || !userDoc.data().isAdmin) {
+        throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
+    }
+};
+
 /**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ * Seeds a competition with securely generated instant win ticket numbers.
+ * Only callable by admins.
  */
+exports.seedInstantWins = onCall(async (request) => {
+    await assertIsAdmin(request.auth);
+    const { compId, instantWinPrizes, totalTickets } = request.data;
+    if (!compId || !instantWinPrizes || !totalTickets) {
+        throw new HttpsError('invalid-argument', 'Missing required parameters.');
+    }
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+    const totalPrizeCount = instantWinPrizes.reduce((sum, tier) => sum + tier.count, 0);
+    if (totalPrizeCount > totalTickets) {
+        throw new HttpsError('invalid-argument', 'Total number of instant prizes cannot exceed the total number of tickets.');
+    }
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+    // 1. Generate unique winning ticket numbers using a Cryptographically Secure PRNG
+    const winningPicks = new Set();
+    while (winningPicks.size < totalPrizeCount) {
+        winningPicks.add(crypto.randomInt(0, totalTickets));
+    }
+    const sortedWinningNumbers = Array.from(winningPicks).sort((a, b) => a - b);
+    
+    // 2. Create the commit-reveal hash for provable fairness
+    const salt = crypto.randomBytes(16).toString('hex');
+    const positionsToHash = JSON.stringify(sortedWinningNumbers);
+    const hash = sha256(positionsToHash + ':' + salt);
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+    const batch = db.batch();
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+    // 3. Create the instant_wins documents, keyed by ticket number for fast lookups
+    const instantWinsRef = db.collection('competitions').doc(compId).collection('instant_wins');
+    let prizeCursor = 0;
+    instantWinPrizes.forEach(tier => {
+        for (let i = 0; i < tier.count; i++) {
+            const ticketNumber = sortedWinningNumbers[prizeCursor++];
+            const docRef = instantWinsRef.doc(String(ticketNumber)); // Key by ticket number
+            batch.set(docRef, {
+                ticketNumber: ticketNumber,
+                prizeValue: tier.value,
+                claimed: false,
+                claimedBy: null,
+                claimedAt: null,
+            });
+        }
+    });
+    
+    // 4. Update the main competition document with the config and fairness hash
+    const compRef = db.collection('competitions').doc(compId);
+    batch.update(compRef, {
+        'instantWinsConfig.enabled': true,
+        'instantWinsConfig.prizes': instantWinPrizes, // Store the prize structure
+        'instantWinsConfig.positionsHash': hash,
+        'instantWinsConfig.generator': 'v2-csprng-salt',
+    });
+    
+    // 5. Store the salt securely on the server (inaccessible to clients)
+    const serverMetaRef = compRef.collection('server_meta').doc('fairness_reveal');
+    batch.set(serverMetaRef, { salt, positions: sortedWinningNumbers });
+    
+    await batch.commit();
+
+    return { success: true, positionsHash: hash };
+});
+
+
+/**
+ * Atomically allocates tickets to a user and checks for instant wins.
+ * This is the primary entry transaction. Callable by any authenticated user.
+ */
+exports.allocateTicketsAndCheckWins = onCall(async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+        throw new HttpsError('unauthenticated', 'You must be logged in to enter.');
+    }
+
+    const { compId, ticketsBought } = request.data;
+    if (!compId || !ticketsBought || ticketsBought <= 0) {
+        throw new HttpsError('invalid-argument', 'Competition ID and number of tickets are required.');
+    }
+
+    const compRef = db.collection('competitions').doc(compId);
+    const userRef = db.collection('users').doc(uid);
+    const wonPrizes = [];
+    let ticketStartNumber;
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const compDoc = await transaction.get(compRef);
+            const userDoc = await transaction.get(userRef);
+
+            if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
+            if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+
+            const compData = compDoc.data();
+            const userData = userDoc.data();
+
+            // Validations
+            if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'This competition is no longer live.');
+            if (compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'This competition has ended.');
+
+            const userEntryCount = userData.entryCount?.[compId] || 0;
+            const limit = compData.userEntryLimit || 75;
+            if (userEntryCount + ticketsBought > limit) {
+                throw new HttpsError('failed-precondition', `Entry limit exceeded. You can enter ${limit - userEntryCount} more times.`);
+            }
+
+            const ticketsSoldBefore = compData.ticketsSold || 0;
+            if (ticketsSoldBefore + ticketsBought > compData.totalTickets) {
+                throw new HttpsError('failed-precondition', `Not enough tickets available. Only ${compData.totalTickets - ticketsSoldBefore} left.`);
+            }
+
+            ticketStartNumber = ticketsSoldBefore;
+
+            // Perform all writes within the transaction
+            // 1. Update competition ticket count
+            transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
+
+            // 2. Update user's entry count for this competition
+            transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
+            
+            // 3. Create a detailed entry document for auditability
+            const entryRef = compRef.collection('entries').doc();
+            transaction.set(entryRef, {
+                userId: uid,
+                userDisplayName: userData.displayName,
+                ticketsBought: ticketsBought,
+                ticketStart: ticketStartNumber, // CRITICAL FOR AUDIT
+                ticketEnd: ticketStartNumber + ticketsBought - 1, // CRITICAL FOR AUDIT
+                enteredAt: FieldValue.serverTimestamp(),
+                entryType: 'paid'
+            });
+
+            // 4. Check for and claim instant wins atomically
+            if (compData.instantWinsConfig?.enabled) {
+                const instantWinsRef = compRef.collection('instant_wins');
+                for (let i = 0; i < ticketsBought; i++) {
+                    const currentTicketNumber = ticketStartNumber + i;
+                    const winDocRef = instantWinsRef.doc(String(currentTicketNumber));
+                    const winDoc = await transaction.get(winDocRef);
+                    if (winDoc.exists && winDoc.data().claimed === false) {
+                        transaction.update(winDocRef, {
+                            claimed: true,
+                            claimedBy: uid,
+                            claimedAt: FieldValue.serverTimestamp()
+                        });
+                        wonPrizes.push({
+                            ticketNumber: currentTicketNumber,
+                            prizeValue: winDoc.data().prizeValue
+                        });
+                    }
+                }
+            }
+        });
+
+        // Transaction was successful
+        return {
+            success: true,
+            ticketStart: ticketStartNumber,
+            ticketsBought: ticketsBought,
+            wonPrizes: wonPrizes
+        };
+
+    } catch (error) {
+        // If the transaction fails, HttpsError will be propagated
+        console.error("Transaction failed:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', 'An error occurred while processing your entry. Please try again.');
+    }
+});

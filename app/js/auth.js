@@ -5,19 +5,24 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyA5bxzllAaU66gyo1BLVghV40QWvWE4uGc",
-  authDomain: "comps-2727d.firebaseapp.com",
-  projectId: "comps-2727d",
-  storageBucket: "comps-2727d.firebasestorage.app",
-  messagingSenderId: "48429329122",
-  appId: "1:48429329122:web:d1960978e465feec218cbb"
+  apiKey: "AIzaSyCHnYCOB-Y4tA1_ikShsBZJVD0KJfJJMdU",
+  authDomain: "the-hawk-games-64239.firebaseapp.com",
+  projectId: "the-hawk-games-64239",
+  storageBucket: "the-hawk-games-64239.firebasestorage.app",
+  messagingSenderId: "391161456812",
+  appId: "1:391161456812:web:48f7264720dff9a70dd709",
+  measurementId: "G-DGLYCBJLWF"
 };
 
-// Initialize Firebase and EXPORT the app instance for other modules to use
-export const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 // --- NEW: Header Renderer for The Hawk Games ---
 function renderHeader(isLoggedIn) {

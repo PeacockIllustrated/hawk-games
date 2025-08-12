@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | The Hawk Games</title>
+    <link rel="stylesheet" href="css/hawk-games.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .admin-layout { display: grid; grid-template-columns: 250px 1fr; gap: 2.5rem; margin-top: 3rem; align-items: flex-start; }
+        .admin-nav { background-color: var(--card-bg); padding: 1rem; border-radius: 5px; border: 1px solid var(--border-color); }
+        .admin-form fieldset { border: 1px solid var(--border-color); padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 5px; }
+        .admin-form legend { font-family: var(--font-heading); color: var(--primary-gold); padding: 0 0.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        .form-group input, .form-group textarea { width: 100%; padding: 0.7rem; background-color: var(--dark-bg); border: 1px solid var(--border-color); color: var(--light-white); border-radius: 4px; font-size: 1rem; }
+        .form-group-inline { display: flex; gap: 1rem; }
+        .form-group-inline .form-group { flex-grow: 1; }
+        .btn-remove-tier { background: #555; border: none; color: white; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <header class="main-header"></header>
+
+    <main id="auth-wall" class="container">
+        <h2 class="section-title">Admin Panel</h2>
+        <div class="admin-layout">
+            <aside class="admin-nav-container">
+                <nav id="admin-nav" class="admin-nav">
+                    <a href="#" class="admin-nav-link active" data-view="dashboard">Dashboard</a>
+                    <a href="#" class="admin-nav-link" data-view="create">Create Competition</a>
+                </nav>
+            </aside>
+            <div id="admin-main-content" class="admin-main-content">
+                <!-- Admin JS will populate this area -->
+                <div class="placeholder">Loading...</div>
+            </div>
+        </div>
+    </main>
+    
+    <footer class="main-footer"></footer>
+
+    <!-- Modal Structure required by admin.js -->
+    <div id="modal-container" class="modal-container">
+        <div id="modal-content" class="modal-content">
+            <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>

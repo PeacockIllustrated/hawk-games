@@ -5,14 +5,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebas
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Your web app's CORRECT Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCHnYCOB-Y4tA1_ikShsBZJVD0KJfJJMdU",
   authDomain: "the-hawk-games-64239.firebaseapp.com",
@@ -22,6 +15,11 @@ const firebaseConfig = {
   appId: "1:391161456812:web:48f7264720dff9a70dd709",
   measurementId: "G-DGLYCBJLWF"
 };
+
+// Initialize Firebase and EXPORT the app instance for other modules to use
+export const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 
 // --- NEW: Header Renderer for The Hawk Games ---
@@ -79,7 +77,7 @@ function renderFooter() {
     `;
 }
 
-// --- CORE AUTH LOGIC (Unchanged from retrocomps) ---
+// --- CORE AUTH LOGIC ---
 onAuthStateChanged(auth, user => {
     if (user) {
         createUserProfileIfNotExists(user);
@@ -101,9 +99,8 @@ const createUserProfileIfNotExists = async (user) => {
             photoURL: user.photoURL,
             createdAt: serverTimestamp(),
             isAdmin: false,
-            myEntries: [], // Legacy field from retrocomps, can be deprecated later.
-            entryCount: {}, // New, more efficient model
-            marketingConsent: false // NEW COMPLIANCE FIELD
+            entryCount: {},
+            marketingConsent: false
         };
         try {
             await setDoc(userRef, userData);
@@ -114,10 +111,7 @@ const createUserProfileIfNotExists = async (user) => {
 };
 
 
-// Event listeners for auth pages
-// Handles email/password and Google flows for login and registration
-// Redirects to account.html after successful authentication
-
+// --- Event listeners for auth pages ---
 document.addEventListener('DOMContentLoaded', () => {
     const googleLoginBtn = document.getElementById('google-login-btn');
     const googleRegisterBtn = document.getElementById('google-register-btn');

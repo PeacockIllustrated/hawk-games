@@ -1,15 +1,17 @@
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
 const db = getFirestore(app);
-const auth = getAuth();
-const functions = getFunctions(app); // Initialize functions once
+const auth = getAuth(app); // Make sure auth is initialized with the app instance
+
+// We will re-initialize `functions` where needed to ensure context is passed.
 
 let currentCompetitionData = null;
 let competitionId = null;
 
+// ... (Keep the DOMContentLoaded, loadCompetitionDetails, createCompetitionHTML, setupCountdown, and setupEntryLogic functions EXACTLY as they are. No changes needed there.)
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     competitionId = params.get('id');
@@ -18,10 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         document.getElementById('competition-container').innerHTML = '<div class="hawk-card placeholder">Error: No competition specified.</div>';
     }
-
-    // Add a single, more robust event listener for closing the modal
     document.getElementById('modal-container').addEventListener('click', (e) => {
-        // Close if the background overlay is clicked, or any button with a 'data-close' attribute
         if (e.target.id === 'modal-container' || e.target.closest('[data-close-modal]')) {
             closeModal();
         }
@@ -51,44 +50,30 @@ async function loadCompetitionDetails(id) {
 function createCompetitionHTML(data) {
     const answersHTML = Object.entries(data.skillQuestion.answers)
         .map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
-
     const ticketTiersHTML = data.ticketTiers.map(tier => 
         `<button class="ticket-option" data-amount="${tier.amount}" data-price="${tier.price}">${tier.amount} Entries for £${tier.price.toFixed(2)}</button>`
     ).join('');
-    
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
-
     return `
         <div class="competition-detail-view">
-            <div class="prize-image-panel">
-                <img src="${data.prizeImage}" alt="${data.title}">
-            </div>
+            <div class="prize-image-panel"><img src="${data.prizeImage}" alt="${data.title}"></div>
             <div class="entry-details-panel">
                 <h1>${data.title}</h1>
                 <p class="cash-alternative">Or <span>£${(data.cashAlternative || 0).toLocaleString()}</span> Cash Alternative</p>
-                
-                <div class="detail-section detail-timer-section">
-                    <div id="timer" class="detail-timer"></div>
-                </div>
-
+                <div class="detail-section detail-timer-section"><div id="timer" class="detail-timer"></div></div>
                 <div class="detail-section detail-progress">
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
-                    </div>
+                    <div class="progress-bar"><div class="progress-bar-fill" style="width: ${progressPercent}%;"></div></div>
                     <p><strong>${data.ticketsSold || 0}</strong> / ${data.totalTickets} sold</p>
                 </div>
-
                 <div class="detail-section skill-question-box">
                     <h3><span>1.</span> Answer The Question</h3>
                     <p class="question-text">${data.skillQuestion.text}</p>
                     <div class="answer-options">${answersHTML}</div>
                 </div>
-
                 <div class="detail-section ticket-selector-box">
                     <h3><span>2.</span> Choose Your Tickets</h3>
                     <div class="ticket-options">${ticketTiersHTML}</div>
                 </div>
-                
                 <button id="entry-button" class="btn" disabled>Select Answer & Tickets</button>
             </div>
         </div>
@@ -103,7 +88,6 @@ function setupCountdown(endDate) {
         if (distance < 0) {
             clearInterval(interval);
             timerElement.innerHTML = "COMPETITION CLOSED";
-            // Disable all interactive elements when competition is closed
             document.querySelectorAll('#entry-button, .answer-btn, .ticket-option').forEach(el => el.disabled = true);
             return;
         }
@@ -118,7 +102,6 @@ function setupCountdown(endDate) {
 function setupEntryLogic(correctAnswer) {
     const entryButton = document.getElementById('entry-button');
     let isAnswerCorrect = false;
-
     document.querySelector('.answer-options').addEventListener('click', (e) => {
         const button = e.target.closest('.answer-btn');
         if (!button) return;
@@ -126,7 +109,6 @@ function setupEntryLogic(correctAnswer) {
         button.classList.add('selected');
         isAnswerCorrect = button.dataset.answer === correctAnswer;
     });
-
     document.querySelector('.ticket-options').addEventListener('click', (e) => {
         const option = e.target.closest('.ticket-option');
         if (!option) return;
@@ -135,7 +117,6 @@ function setupEntryLogic(correctAnswer) {
         entryButton.disabled = false;
         entryButton.textContent = "Confirm Entry";
     });
-
     entryButton.addEventListener('click', () => {
         if (!auth.currentUser) {
             openModal(`<h2>Login Required</h2><p>Please log in or register to enter the competition.</p><a href="login.html" class="btn">Login</a>`);
@@ -157,7 +138,6 @@ function showConfirmationModal() {
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
     const price = parseFloat(selectedTicket.dataset.price).toFixed(2);
-    
     openModal(`
         <h2>Confirm Your Entry</h2>
         <p>You are about to purchase <strong>${tickets}</strong> entries for <strong>£${price}</strong>.</p>
@@ -166,37 +146,33 @@ function showConfirmationModal() {
             <button id="confirm-entry-btn" class="btn">Confirm & Pay</button>
         </div>
     `);
-    
-    // Add a one-time event listener to the confirm button
     const confirmBtn = document.getElementById('confirm-entry-btn');
     confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
 }
 
+// THIS IS THE MODIFIED FUNCTION
 async function handleEntry(ticketsBought) {
     const user = auth.currentUser;
-    if (!user) return; 
+    if (!user) {
+        // This is a fallback, but the button click should already check for this.
+        openModal(`<h2>Error</h2><p>You seem to have been logged out. Please refresh and log in again.</p><button data-close-modal class="btn">Close</button>`);
+        return;
+    }
 
     openModal(`<h2>Processing Entry...</h2><p>Please wait, do not close this window.</p>`);
     
     try {
-        // Prepare the callable function
+        // THE FIX: Explicitly get the functions instance here to ensure it has the latest auth context.
+        const functions = getFunctions(app); 
         const allocateTicketsAndCheckWins = httpsCallable(functions, 'allocateTicketsAndCheckWins');
 
-        // Call the secure Cloud Function
         const result = await allocateTicketsAndCheckWins({
             compId: competitionId,
             ticketsBought: ticketsBought,
         });
 
-        // The 'result' object from an onCall function has a 'data' property
         const data = result.data; 
 
-        if (!data.success) {
-            // This will be hit if the function returns success: false, which is unlikely with our current setup
-            throw new Error(data.message || "An unknown server error occurred.");
-        }
-        
-        // Check if any instant wins were returned from the server
         if (data.wonPrizes && data.wonPrizes.length > 0) {
             const totalWinnings = data.wonPrizes.reduce((sum, prize) => sum + prize.prizeValue, 0);
             openModal(`
@@ -207,19 +183,16 @@ async function handleEntry(ticketsBought) {
                 <button id="reload-btn" class="btn">Awesome!</button>
             `);
         } else {
-            // Standard success message with audited ticket numbers
             openModal(`
                 <h2>Entry Successful!</h2>
                 <p>Thank you for entering. Your ticket numbers are ${data.ticketStart} to ${data.ticketStart + data.ticketsBought - 1}. Good luck!</p>
                 <button id="reload-btn" class="btn">Done</button>
             `);
         }
-        // Add listener to reload page to show updated progress bar
         document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
 
     } catch (error) {
         console.error("Entry failed:", error);
-        // Display the specific, user-friendly error message from the Cloud Function
         openModal(`<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
     }
 }

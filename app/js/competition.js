@@ -5,6 +5,7 @@ import { app } from './auth.js';
 
 const db = getFirestore(app);
 const auth = getAuth();
+const functions = getFunctions(app); // Initialize functions once
 
 let currentCompetitionData = null;
 let competitionId = null;
@@ -18,9 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('competition-container').innerHTML = '<div class="hawk-card placeholder">Error: No competition specified.</div>';
     }
 
-    // Add event listener for clicks inside the modal to handle closing it
+    // Add a single, more robust event listener for closing the modal
     document.getElementById('modal-container').addEventListener('click', (e) => {
-        if (e.target.id === 'modal-container' || e.target.closest('#cancel-entry-btn') || e.target.closest('#close-error-btn')) {
+        // Close if the background overlay is clicked, or any button with a 'data-close' attribute
+        if (e.target.id === 'modal-container' || e.target.closest('[data-close-modal]')) {
             closeModal();
         }
     });
@@ -101,7 +103,8 @@ function setupCountdown(endDate) {
         if (distance < 0) {
             clearInterval(interval);
             timerElement.innerHTML = "COMPETITION CLOSED";
-            document.getElementById('entry-button').disabled = true;
+            // Disable all interactive elements when competition is closed
+            document.querySelectorAll('#entry-button, .answer-btn, .ticket-option').forEach(el => el.disabled = true);
             return;
         }
         const d = String(Math.floor(distance / (1000*60*60*24))).padStart(2,'0');
@@ -139,7 +142,7 @@ function setupEntryLogic(correctAnswer) {
             return;
         }
         if (!isAnswerCorrect) {
-            openModal(`<h2>Incorrect Answer</h2><p>You must select the correct answer to be eligible to enter.</p><button id="close-error-btn" class="btn">Try Again</button>`);
+            openModal(`<h2>Incorrect Answer</h2><p>You must select the correct answer to be eligible to enter.</p><button data-close-modal class="btn">Try Again</button>`);
             return;
         }
         showConfirmationModal();
@@ -149,7 +152,7 @@ function setupEntryLogic(correctAnswer) {
 function showConfirmationModal() {
     const selectedTicket = document.querySelector('.ticket-option.selected');
     if (!selectedTicket) {
-        openModal(`<h2>Select Tickets</h2><p>Please choose a ticket bundle before confirming.</p><button id="close-error-btn" class="btn">OK</button>`);
+        openModal(`<h2>Select Tickets</h2><p>Please choose a ticket bundle before confirming.</p><button data-close-modal class="btn">OK</button>`);
         return;
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
@@ -159,38 +162,41 @@ function showConfirmationModal() {
         <h2>Confirm Your Entry</h2>
         <p>You are about to purchase <strong>${tickets}</strong> entries for <strong>£${price}</strong>.</p>
         <div class="modal-actions">
-            <button id="cancel-entry-btn" class="btn btn-secondary">Cancel</button>
+            <button data-close-modal class="btn btn-secondary">Cancel</button>
             <button id="confirm-entry-btn" class="btn">Confirm & Pay</button>
         </div>
     `);
     
-    document.getElementById('confirm-entry-btn').addEventListener('click', () => handleEntry(tickets));
+    // Add a one-time event listener to the confirm button
+    const confirmBtn = document.getElementById('confirm-entry-btn');
+    confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
 }
 
 async function handleEntry(ticketsBought) {
     const user = auth.currentUser;
-    if (!user) return; // Should be caught earlier, but as a safeguard.
+    if (!user) return; 
 
     openModal(`<h2>Processing Entry...</h2><p>Please wait, do not close this window.</p>`);
     
     try {
-        // Initialize the callable function from Firebase.
-        const functions = getFunctions(app);
+        // Prepare the callable function
         const allocateTicketsAndCheckWins = httpsCallable(functions, 'allocateTicketsAndCheckWins');
 
-        // Call our new, single, atomic Cloud Function.
+        // Call the secure Cloud Function
         const result = await allocateTicketsAndCheckWins({
             compId: competitionId,
             ticketsBought: ticketsBought,
         });
 
-        const data = result.data;
+        // The 'result' object from an onCall function has a 'data' property
+        const data = result.data; 
+
         if (!data.success) {
-            // This case should be rare as the function itself throws detailed errors.
+            // This will be hit if the function returns success: false, which is unlikely with our current setup
             throw new Error(data.message || "An unknown server error occurred.");
         }
         
-        // Check if any instant wins were returned from the server.
+        // Check if any instant wins were returned from the server
         if (data.wonPrizes && data.wonPrizes.length > 0) {
             const totalWinnings = data.wonPrizes.reduce((sum, prize) => sum + prize.prizeValue, 0);
             openModal(`
@@ -201,20 +207,20 @@ async function handleEntry(ticketsBought) {
                 <button id="reload-btn" class="btn">Awesome!</button>
             `);
         } else {
-            // Standard success message with audited ticket numbers.
+            // Standard success message with audited ticket numbers
             openModal(`
                 <h2>Entry Successful!</h2>
                 <p>Thank you for entering. Your ticket numbers are ${data.ticketStart} to ${data.ticketStart + data.ticketsBought - 1}. Good luck!</p>
                 <button id="reload-btn" class="btn">Done</button>
             `);
         }
-        // Add listener to reload page to show updated progress bar.
+        // Add listener to reload page to show updated progress bar
         document.getElementById('reload-btn')?.addEventListener('click', () => window.location.reload());
 
     } catch (error) {
         console.error("Entry failed:", error);
-        // Display the specific error message from the Cloud Function.
-        openModal(`<h2>Error</h2><p>${error.message}</p><button id="close-error-btn" class="btn">Close</button>`);
+        // Display the specific, user-friendly error message from the Cloud Function
+        openModal(`<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
     }
 }
 

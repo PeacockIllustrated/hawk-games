@@ -62,6 +62,8 @@ exports.seedInstantWins = onCall(functionOptions, async (request) => {
     return { success: true, positionsHash: hash };
 });
 
+// REPLACE the existing allocateTicketsAndCheckWins function in /functions/index.js
+
 exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -71,7 +73,6 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
     const userRef = db.collection('users').doc(uid);
     
     return await db.runTransaction(async (transaction) => {
-        // --- ALL READS MUST HAPPEN FIRST ---
         const compDoc = await transaction.get(compRef);
         const userDoc = await transaction.get(userRef);
         
@@ -81,7 +82,6 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         const compData = compDoc.data();
         const userData = userDoc.data();
 
-        // --- VALIDATIONS (using the data we just read) ---
         if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
         if (compData.endDate && compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'Competition has ended.');
         
@@ -94,7 +94,6 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         
         const ticketStartNumber = ticketsSoldBefore;
         
-        // --- ADDITIONAL READS for Instant Wins ---
         const instantWinsRef = compRef.collection('instant_wins');
         const potentialWinDocsRefs = [];
         if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
@@ -106,25 +105,33 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         
         const potentialWinDocs = potentialWinDocsRefs.length > 0 ? await transaction.getAll(...potentialWinDocsRefs) : [];
         
-        // --- ALL WRITES HAPPEN LAST ---
         const wonPrizes = [];
-        
-        // Write #1: Update the competition ticket count
-        transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
-        
-        // Write #2: Update the user's entry count
-        transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
-        
-        // Write #3: Create the user's entry document
-        const entryRef = compRef.collection('entries').doc();
-        transaction.set(entryRef, { userId: uid, userDisplayName: userData.displayName || "N/A", ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1, enteredAt: FieldValue.serverTimestamp(), entryType: 'paid' });
-        
-        // Write #4 (Conditional): Claim any instant wins found during the read phase
         potentialWinDocs.forEach(winDoc => {
             if (winDoc.exists && winDoc.data().claimed === false) {
-                transaction.update(winDoc.ref, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
                 wonPrizes.push({ ticketNumber: winDoc.data().ticketNumber, prizeValue: winDoc.data().prizeValue });
             }
+        });
+        
+        transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
+        transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
+        
+        const entryRef = compRef.collection('entries').doc();
+        // **THE NEW PART**: We now add the `wonPrizes` array to the entry document.
+        transaction.set(entryRef, {
+            userId: uid,
+            userDisplayName: userData.displayName || "N/A",
+            ticketsBought,
+            ticketStart: ticketStartNumber,
+            ticketEnd: ticketStartNumber + ticketsBought - 1,
+            enteredAt: FieldValue.serverTimestamp(),
+            entryType: 'paid',
+            instantWins: wonPrizes // Store the wins here!
+        });
+        
+        // Claim the wins *after* recording them on the entry
+        wonPrizes.forEach(prize => {
+            const winDocRef = instantWinsRef.doc(String(prize.ticketNumber));
+            transaction.update(winDocRef, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
         });
         
         return { success: true, ticketStart: ticketStartNumber, ticketsBought, wonPrizes };

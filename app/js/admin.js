@@ -128,21 +128,21 @@ function renderCompetitionRow(comp) {
     
     if (comp.status === 'live') {
         buttons = `
-            <button class="btn btn-small" data-action="edit" disabled>Edit</button>
-            <button class="btn btn-small" data-action="end" disabled>End</button>
+            <button class="btn btn-small btn-secondary" data-action="end">End Now</button>
             <button class="btn btn-small btn-secondary" data-action="add-fer">Add Free Entry</button>
         `;
     } else if (comp.status === 'ended' && !comp.winnerId) {
-        buttons = `<button class="btn btn-small" data-action="draw-winner">Draw Winner</button>`;
+        buttons = `<button class="btn btn-small btn-primary" data-action="draw-winner">Draw Winner</button>`;
+    } else if (comp.status === 'drawn') {
+        buttons = `<div class="status-badge status-won">Winner: ${comp.winnerDisplayName || 'N/A'}</div>`;
     } else {
-        buttons = `<span class="status-badge status-won">Winner Drawn</span>`;
+         buttons = `<span class="status-badge">${comp.status}</span>`;
     }
 
     const instantWinHash = comp.instantWinsConfig?.positionsHash 
         ? `<div style="font-size:0.7rem; color:#aaa; margin-top:5px; word-break:break-all;">Fairness Hash: ${comp.instantWinsConfig.positionsHash}</div>`
         : '';
 
-    // THE FIX IS IN THE LINE BELOW: Added the closing '}' to ${comp.status}
     return `
         <div class="competition-row" data-comp-id="${comp.id}">
             <div class="comp-info">

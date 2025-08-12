@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
@@ -6,40 +6,66 @@ const { createHash } = require("crypto");
 
 initializeApp();
 const db = getFirestore();
+const { HttpsError } = functions.https;
 
-// Helper to check if the caller is an admin.
+// --- CORS Configuration ---
+// This explicitly allows your website domains to communicate with these functions.
+const allowedOrigins = [
+    "https://the-hawk-games-64239.web.app", // Your Firebase Hosting URL
+    "https://the-hawk-games.co.uk",      // Your custom domain
+    "http://localhost:5000",             // For local testing
+    "http://127.0.0.1:5000"               // For local testing
+];
+const cors = require("cors")({ origin: allowedOrigins });
+
+
+// --- Helper Functions for Security & Code Reusability ---
 const assertIsAdmin = async (context) => {
-    if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
+    if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in to call this function.');
     const userDoc = await db.collection('users').doc(context.auth.uid).get();
-    if (!userDoc.exists() || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'Admin privileges required.');
+    if (!userDoc.exists() || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
 };
 
-// Helper to check for authentication.
 const assertIsAuthenticated = (context) => {
-    if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
+    if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in to perform this action.');
 };
 
-// --- This is the new, modern way to export with CORS ---
-const functionOptions = {
-    region: "us-central1", // Or your preferred region
-    cors: [
-        "https://the-hawk-games-64239.web.app",
-        "https://the-hawk-games.co.uk",
-        /the-hawk-games\.co\.uk$/, // A regular expression to match subdomains if needed
-        "http://localhost:5000",
-        "http://127.0.0.1:5000"
-    ]
+// This is the robust wrapper that applies CORS to all our functions.
+const createCallable = (handler) => {
+    return functions.https.onRequest((req, res) => {
+        cors(req, res, async () => {
+            try {
+                const context = { auth: req.auth };
+                const data = req.body.data;
+                const result = await handler(data, context);
+                res.status(200).send({ data: result });
+            } catch (err) {
+                if (err instanceof HttpsError) {
+                    res.status(err.httpErrorCode.status).send({ error: { message: err.message, code: err.code } });
+                } else {
+                    console.error("Unhandled error:", err);
+                    res.status(500).send({ error: { message: "An internal server error occurred." } });
+                }
+            }
+        });
+    });
 };
 
-// --- Function Implementations ---
 
-exports.seedInstantWins = onCall(functionOptions, async (request) => {
-    await assertIsAdmin(request);
-    const { compId, instantWinPrizes, totalTickets } = request.data;
-    // ... (The core logic of the function remains identical to the last version)
-    if (!compId || !instantWinPrizes || !totalTickets) throw new HttpsError('invalid-argument', 'Missing parameters.');
+// ======================================================================
+// ===                CORE BUSINESS LOGIC FUNCTIONS                   ===
+// ======================================================================
+
+
+/**
+ * Seeds a competition with securely generated instant win ticket numbers.
+ */
+exports.seedInstantWins = createCallable(async (data, context) => {
+    await assertIsAdmin(context);
+    const { compId, instantWinPrizes, totalTickets } = data;
+    if (!compId || !instantWinPrizes || !totalTickets) throw new HttpsError('invalid-argument', 'Missing required parameters.');
     const totalPrizeCount = instantWinPrizes.reduce((sum, tier) => sum + tier.count, 0);
-    if (totalPrizeCount > totalTickets) throw new HttpsError('invalid-argument', 'Too many prizes for the number of tickets.');
+    if (totalPrizeCount > totalTickets) throw new HttpsError('invalid-argument', 'Total number of instant prizes cannot exceed the total number of tickets.');
     const winningPicks = new Set();
     while (winningPicks.size < totalPrizeCount) {
         winningPicks.add(crypto.randomInt(0, totalTickets));
@@ -66,12 +92,14 @@ exports.seedInstantWins = onCall(functionOptions, async (request) => {
     return { success: true, positionsHash: hash };
 });
 
-exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) => {
-    assertIsAuthenticated(request);
-    const uid = request.auth.uid;
-    const { compId, ticketsBought } = request.data;
-    // ... (The core logic of the function remains identical to the last version)
-    if (!compId || !ticketsBought || ticketsBought <= 0) throw new HttpsError('invalid-argument', 'Invalid parameters.');
+/**
+ * Atomically allocates tickets to a user and checks for instant wins.
+ */
+exports.allocateTicketsAndCheckWins = createCallable(async (data, context) => {
+    assertIsAuthenticated(context);
+    const uid = context.auth.uid;
+    const { compId, ticketsBought } = data;
+    if (!compId || !ticketsBought || ticketsBought <= 0) throw new HttpsError('invalid-argument', 'Competition ID and a valid number of tickets are required.');
     const compRef = db.collection('competitions').doc(compId);
     const userRef = db.collection('users').doc(uid);
     const wonPrizes = [];
@@ -83,13 +111,13 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         if (!userDoc.exists()) throw new HttpsError('not-found', 'User profile not found.');
         const compData = compDoc.data();
         const userData = userDoc.data();
-        if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
-        if (compData.endDate && compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'Competition has ended.');
+        if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'This competition is no longer live.');
+        if (compData.endDate && compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'This competition has ended.');
         const userEntryCount = userData.entryCount?.[compId] || 0;
         const limit = compData.userEntryLimit || 75;
-        if (userEntryCount + ticketsBought > limit) throw new HttpsError('failed-precondition', `Entry limit exceeded.`);
+        if (userEntryCount + ticketsBought > limit) throw new HttpsError('failed-precondition', `Entry limit exceeded. You can enter ${limit - userEntryCount} more times.`);
         const ticketsSoldBefore = compData.ticketsSold || 0;
-        if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available.`);
+        if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available. Only ${compData.totalTickets - ticketsSoldBefore} left.`);
         ticketStartNumber = ticketsSoldBefore;
         transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
         transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
@@ -112,24 +140,27 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
     return result;
 });
 
-exports.drawWinner = onCall(functionOptions, async (request) => {
-    await assertIsAdmin(request);
-    const { compId } = request.data;
-    // ... (The core logic of the function remains identical to the last version)
+
+/**
+ * Draws a winner for a closed competition.
+ */
+exports.drawWinner = createCallable(async (data, context) => {
+    await assertIsAdmin(context);
+    const { compId } = data;
     if (!compId) throw new HttpsError('invalid-argument', 'Competition ID is required.');
     const compRef = db.collection('competitions').doc(compId);
     const result = await db.runTransaction(async (transaction) => {
         const compDoc = await transaction.get(compRef);
         if (!compDoc.exists()) throw new HttpsError('not-found', 'Competition not found.');
         const compData = compDoc.data();
-        if (compData.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended.');
-        if (compData.winnerId) throw new HttpsError('failed-precondition', 'Winner already drawn.');
-        if (!compData.ticketsSold || compData.ticketsSold === 0) throw new HttpsError('failed-precondition', 'No entries to draw from.');
+        if (compData.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended before drawing a winner.');
+        if (compData.winnerId) throw new HttpsError('failed-precondition', 'A winner has already been drawn for this competition.');
+        if (!compData.ticketsSold || compData.ticketsSold === 0) throw new HttpsError('failed-precondition', 'Cannot draw a winner for a competition with no entries.');
         const winningTicketNumber = crypto.randomInt(0, compData.ticketsSold);
         const entriesRef = compRef.collection('entries');
         const winnerQuery = db.collection(entriesRef.path).where('ticketStart', '<=', winningTicketNumber).orderBy('ticketStart', 'desc').limit(1);
         const winnerSnapshot = await winnerQuery.get();
-        if (winnerSnapshot.empty) throw new HttpsError('internal', `Could not find owner for ticket #${winningTicketNumber}.`);
+        if (winnerSnapshot.empty) throw new HttpsError('internal', `Could not find an owner for the winning ticket #${winningTicketNumber}.`);
         const winnerEntryDoc = winnerSnapshot.docs[0];
         const winnerData = winnerEntryDoc.data();
         const winnerId = winnerData.userId;

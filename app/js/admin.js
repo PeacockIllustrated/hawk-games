@@ -1,5 +1,6 @@
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, query, orderBy, where, runTransaction, limit, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
 const auth = getAuth(app);
@@ -62,12 +63,18 @@ onAuthStateChanged(auth, user => {
     if (user) {
         checkAdminStatus(user);
     } else {
-        // Show auth wall if not logged in
+        authWall.innerHTML = `<h2 class="section-title">Access Denied</h2><p style="text-align:center;">You must be logged in as an administrator to view this page.</p>`;
     }
 });
 
 const checkAdminStatus = async (user) => {
-    // ... logic remains the same
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists() && userDocSnap.data().isAdmin) {
+        initializeAdminPage();
+    } else {
+        document.getElementById('auth-wall').innerHTML = `<h2 class="section-title">Access Denied</h2><p style="text-align:center;">You do not have administrative privileges.</p>`;
+    }
 };
 
 function initializeAdminPage() {
@@ -98,7 +105,6 @@ function renderView(viewName) {
             mainContentContainer.innerHTML = createCompViewHTML;
             initializeCreateFormView();
             break;
-        // Other views like 'winners' would go here
     }
 }
 
@@ -112,6 +118,7 @@ async function loadAndRenderCompetitions() {
         listDiv.addEventListener('click', handleDashboardClick);
     } catch (error) {
         console.error("Error loading competitions:", error);
+        listDiv.innerHTML = `<p style="color:red;">Failed to load competitions.</p>`;
     }
 }
 
@@ -121,8 +128,8 @@ function renderCompetitionRow(comp) {
     
     if (comp.status === 'live') {
         buttons = `
-            <button class="btn btn-small" data-action="edit">Edit</button>
-            <button class="btn btn-small" data-action="end">End</button>
+            <button class="btn btn-small" data-action="edit" disabled>Edit</button>
+            <button class="btn btn-small" data-action="end" disabled>End</button>
             <button class="btn btn-small btn-secondary" data-action="add-fer">Add Free Entry</button>
         `;
     } else if (comp.status === 'ended' && !comp.winnerId) {
@@ -131,12 +138,17 @@ function renderCompetitionRow(comp) {
         buttons = `<span class="status-badge status-won">Winner Drawn</span>`;
     }
 
+    const instantWinHash = comp.instantWinsConfig?.positionsHash 
+        ? `<div style="font-size:0.7rem; color:#aaa; margin-top:5px; word-break:break-all;">Fairness Hash: ${comp.instantWinsConfig.positionsHash}</div>`
+        : '';
+
     return `
         <div class="competition-row" data-comp-id="${comp.id}">
             <div class="comp-info">
                 <h4>${comp.title}</h4>
                 <div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
                 <span>${comp.ticketsSold || 0} / ${comp.totalTickets}</span>
+                ${instantWinHash}
             </div>
             <div class="comp-status"><span class="status-badge status-${comp.status}">${comp.status}</span></div>
             <div class="comp-actions">${buttons}</div>
@@ -158,7 +170,6 @@ function initializeCreateFormView() {
     addTierBtn.addEventListener('click', addTier);
     addTier();
 
-    // Instant Win form logic
     const instantWinCheckbox = document.getElementById('enable-instant-wins');
     const instantWinPanel = document.getElementById('instant-win-config-panel');
     const addInstantPrizeBtn = document.getElementById('add-instant-prize-btn');
@@ -186,7 +197,7 @@ async function handleCreateFormSubmit(e) {
     const form = e.target;
     const submitButton = form.querySelector('button[type="submit"]');
     submitButton.disabled = true;
-    submitButton.textContent = 'Generating...';
+    submitButton.textContent = 'Saving...';
 
     try {
         const ticketTiers = Array.from(document.querySelectorAll('.ticket-tier-row')).map(row => ({ amount: parseInt(row.querySelector('.tier-amount').value), price: parseFloat(row.querySelector('.tier-price').value) }));
@@ -201,62 +212,44 @@ async function handleCreateFormSubmit(e) {
         });
 
         const competitionData = {
-            title: form.querySelector('#title').value, prizeImage: form.querySelector('#prizeImage').value, totalTickets: parseInt(form.querySelector('#totalTickets').value), userEntryLimit: parseInt(form.querySelector('#userEntryLimit').value), cashAlternative: parseFloat(form.querySelector('#cashAlternative').value), endDate: Timestamp.fromDate(new Date(form.querySelector('#endDate').value)), skillQuestion: { text: form.querySelector('#questionText').value, answers, correctAnswer: correctKey }, ticketTiers, ticketsSold: 0, status: 'live', createdAt: serverTimestamp(), winnerId: null,
+            title: form.querySelector('#title').value,
+            prizeImage: form.querySelector('#prizeImage').value,
+            totalTickets: parseInt(form.querySelector('#totalTickets').value),
+            userEntryLimit: parseInt(form.querySelector('#userEntryLimit').value),
+            cashAlternative: parseFloat(form.querySelector('#cashAlternative').value),
+            endDate: Timestamp.fromDate(new Date(form.querySelector('#endDate').value)),
+            skillQuestion: { text: form.querySelector('#questionText').value, answers, correctAnswer: correctKey },
+            ticketTiers,
+            ticketsSold: 0,
+            status: 'live',
+            createdAt: serverTimestamp(),
+            winnerId: null,
+            instantWinsConfig: { enabled: false }
         };
         
-        // --- STEP #1: SEED THE GAME (INSTANT WINS) ---
+        const newCompRef = await addDoc(collection(db, "competitions"), competitionData);
+        
         const instantWinsEnabled = form.querySelector('#enable-instant-wins').checked;
-        let instantWinPrizesToCreate = [];
-
         if (instantWinsEnabled) {
-            const instantPrizeTiers = Array.from(document.querySelectorAll('.instant-prize-row')).map(row => ({
+            submitButton.textContent = 'Seeding Instant Wins...';
+            const instantWinPrizes = Array.from(document.querySelectorAll('.instant-prize-row')).map(row => ({
                 count: parseInt(row.querySelector('.instant-prize-count').value),
                 value: parseFloat(row.querySelector('.instant-prize-value').value)
             }));
-            const totalInstantPrizes = instantPrizeTiers.reduce((sum, tier) => sum + tier.count, 0);
-            const totalTickets = competitionData.totalTickets;
-
-            if (totalInstantPrizes > totalTickets) {
-                throw new Error("Total number of instant prizes cannot exceed the total number of tickets.");
-            }
-
-            // Generate winning ticket numbers using a secure shuffle
-            const allTicketNumbers = Array.from({ length: totalTickets }, (_, i) => i);
-            for (let i = allTicketNumbers.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [allTicketNumbers[i], allTicketNumbers[j]] = [allTicketNumbers[j], allTicketNumbers[i]];
-            }
-            const winningTicketNumbers = allTicketNumbers.slice(0, totalInstantPrizes);
             
-            competitionData.instantWinsConfig = { enabled: true, prizes: instantPrizeTiers };
-            
-            let ticketIndex = 0;
-            for (const tier of instantPrizeTiers) {
-                for (let i = 0; i < tier.count; i++) {
-                    instantWinPrizesToCreate.push({
-                        ticketNumber: winningTicketNumbers[ticketIndex++],
-                        prizeValue: tier.value,
-                    });
-                }
-            }
-        } else {
-            competitionData.instantWinsConfig = { enabled: false };
-        }
+            // Call the secure Cloud Function to seed the wins
+            const functions = getFunctions(app);
+            const seedInstantWins = httpsCallable(functions, 'seedInstantWins');
+            const result = await seedInstantWins({
+                compId: newCompRef.id,
+                instantWinPrizes: instantWinPrizes,
+                totalTickets: competitionData.totalTickets
+            });
 
-        const newCompRef = await addDoc(collection(db, "competitions"), competitionData);
-        
-        if (instantWinsEnabled) {
-            const batch = writeBatch(db);
-            for (const prize of instantWinPrizesToCreate) {
-                const instantWinRef = doc(collection(db, `competitions/${newCompRef.id}/instant_wins`));
-                batch.set(instantWinRef, {
-                    ...prize,
-                    claimed: false,
-                    claimedBy: null,
-                    claimedAt: null
-                });
+            if (!result.data.success) {
+                throw new Error("Server failed to seed instant wins.");
             }
-            await batch.commit();
+            console.log("Instant wins seeded successfully. Fairness Hash:", result.data.positionsHash);
         }
 
         alert('Competition created successfully!');
@@ -271,6 +264,7 @@ async function handleCreateFormSubmit(e) {
     }
 }
 
+
 function handleDashboardClick(e) {
     const button = e.target.closest('button');
     if (!button) return;
@@ -279,6 +273,7 @@ function handleDashboardClick(e) {
     if (!action || !compId) return;
     
     if (action === 'add-fer') showAddFerModal(compId);
+    // Add other actions like 'draw-winner' here later
 }
 
 function showAddFerModal(compId) {
@@ -305,7 +300,8 @@ function showAddFerModal(compId) {
 async function handleAddFerSubmit(e, compId) {
     e.preventDefault();
     const form = e.target;
-    form.querySelector('button[type="submit"]').disabled = true;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
 
     const userEmail = form.querySelector('#fer-email').value;
     const ticketsToAdd = parseInt(form.querySelector('#fer-tickets').value);
@@ -315,15 +311,23 @@ async function handleAddFerSubmit(e, compId) {
         const q = query(usersRef, where("email", "==", userEmail), limit(1));
         const userSnapshot = await getDocs(q);
         if (userSnapshot.empty) throw new Error(`User with email ${userEmail} not found.`);
-        const userId = userSnapshot.docs[0].id;
+        const userDoc = userSnapshot.docs[0];
+        const userId = userDoc.id;
 
+        // Use the secure Cloud Function to add the entry
+        // NOTE: A dedicated 'addFreeEntry' function would be even better,
+        // but for now, we can reuse the allocation logic if we trust the admin.
+        // Let's call the existing function, but a dedicated one is a future improvement.
+        
+        // This simulates a purchase without payment for the FER.
+        // A dedicated cloud function 'addFreePostalEntry' would be better for perfect auditing.
+        // For now, we will do a direct transaction from the admin panel, as it is a trusted environment.
         await runTransaction(db, async (transaction) => {
             const competitionRef = doc(db, 'competitions', compId);
             const userRef = doc(db, 'users', userId);
             const compDoc = await transaction.get(competitionRef);
-            const userDoc = await transaction.get(userRef);
-
-            if (!compDoc.exists() || !userDoc.exists()) throw new Error("Competition or User not found.");
+            
+            if (!compDoc.exists()) throw new Error("Competition not found.");
             
             const compData = compDoc.data();
             const userData = userDoc.data();
@@ -331,43 +335,6 @@ async function handleAddFerSubmit(e, compId) {
             if (compData.status !== 'live') throw new Error("This competition is no longer live.");
             
             const userEntryCount = userData.entryCount?.[compId] || 0;
-            const limit = compData.userEntryLimit || 75;
-            if (userEntryCount + ticketsToAdd > limit) {
-                throw new Error(`Entry limit exceeded. User has ${limit - userEntryCount} entries remaining.`);
-            }
-
-            const newTicketsSold = (compData.ticketsSold || 0) + ticketsToAdd;
-            if (newTicketsSold > compData.totalTickets) throw new Error("Not enough tickets available.");
-
-            transaction.update(competitionRef, { ticketsSold: newTicketsSold });
-            transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsToAdd });
-            transaction.set(doc(collection(competitionRef, 'entries')), {
-                userId: userId, userDisplayName: userData.displayName, ticketsBought: ticketsToAdd, enteredAt: serverTimestamp(), entryType: 'free_postal'
-            });
-        });
-
-        alert('Free entry added successfully!');
-        closeModal();
-        loadAndRenderCompetitions();
-
-    } catch (error) {
-        console.error("FER Error:", error);
-        alert(`Error: ${error.message}`);
-        form.querySelector('button[type="submit"]').disabled = false;
-    }
-}
-
-function setupModal() {
-    modalContainer.addEventListener('click', (e) => {
-        if (e.target === modalContainer) closeModal();
-    });
-}
-
-function openModal(content) {
-    modalBody.innerHTML = content;
-    modalContainer.classList.add('show');
-}
-
-function closeModal() {
-    modalContainer.classList.remove('show');
-}
+            const entryLimit = compData.userEntryLimit || 75;
+            if (userEntryCount + ticketsToAdd > entryLimit) {
+                throw new Error(`Entry limit exceeded. User has ${entryLi

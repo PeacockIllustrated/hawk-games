@@ -71,21 +71,21 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
     const userRef = db.collection('users').doc(uid);
     
     return await db.runTransaction(async (transaction) => {
+        // --- ALL READS MUST HAPPEN FIRST ---
         const compDoc = await transaction.get(compRef);
         const userDoc = await transaction.get(userRef);
         
-        // THE FIX IS HERE: Changed compDoc.exists() to compDoc.exists
         if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
         if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
         
         const compData = compDoc.data();
         const userData = userDoc.data();
 
+        // --- VALIDATIONS (using the data we just read) ---
         if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
         if (compData.endDate && compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'Competition has ended.');
         
         const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
-        
         const limit = compData.userEntryLimit || 75;
         if (userEntryCount + ticketsBought > limit) throw new HttpsError('failed-precondition', `Entry limit exceeded.`);
         
@@ -94,26 +94,39 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         
         const ticketStartNumber = ticketsSoldBefore;
         
+        // --- ADDITIONAL READS for Instant Wins ---
+        const instantWinsRef = compRef.collection('instant_wins');
+        const potentialWinDocsRefs = [];
+        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
+            for (let i = 0; i < ticketsBought; i++) {
+                const currentTicketNumber = ticketStartNumber + i;
+                potentialWinDocsRefs.push(instantWinsRef.doc(String(currentTicketNumber)));
+            }
+        }
+        
+        const potentialWinDocs = potentialWinDocsRefs.length > 0 ? await transaction.getAll(...potentialWinDocsRefs) : [];
+        
+        // --- ALL WRITES HAPPEN LAST ---
+        const wonPrizes = [];
+        
+        // Write #1: Update the competition ticket count
         transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
+        
+        // Write #2: Update the user's entry count
         transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
+        
+        // Write #3: Create the user's entry document
         const entryRef = compRef.collection('entries').doc();
         transaction.set(entryRef, { userId: uid, userDisplayName: userData.displayName || "N/A", ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1, enteredAt: FieldValue.serverTimestamp(), entryType: 'paid' });
         
-        const wonPrizes = [];
-        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
-            const instantWinsRef = compRef.collection('instant_wins');
-            for (let i = 0; i < ticketsBought; i++) {
-                const currentTicketNumber = ticketStartNumber + i;
-                const winDocRef = instantWinsRef.doc(String(currentTicketNumber));
-                const winDoc = await transaction.get(winDocRef);
-                
-                // THE FIX IS HERE: Changed winDoc.exists() to winDoc.exists
-                if (winDoc.exists && winDoc.data().claimed === false) {
-                    transaction.update(winDocRef, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
-                    wonPrizes.push({ ticketNumber: currentTicketNumber, prizeValue: winDoc.data().prizeValue });
-                }
+        // Write #4 (Conditional): Claim any instant wins found during the read phase
+        potentialWinDocs.forEach(winDoc => {
+            if (winDoc.exists && winDoc.data().claimed === false) {
+                transaction.update(winDoc.ref, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
+                wonPrizes.push({ ticketNumber: winDoc.data().ticketNumber, prizeValue: winDoc.data().prizeValue });
             }
-        }
+        });
+        
         return { success: true, ticketStart: ticketStartNumber, ticketsBought, wonPrizes };
     });
 });
@@ -127,7 +140,6 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     const entriesRef = compRef.collection('entries');
     
     const compDocForCheck = await compRef.get();
-    // THE FIX IS HERE: Changed compDocForCheck.exists() to compDocForCheck.exists
     if (!compDocForCheck.exists) throw new HttpsError('not-found', 'Competition not found.');
     const compDataForCheck = compDocForCheck.data();
 
@@ -151,7 +163,6 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
         const compData = compDoc.data();
         
         const winnerUserDocSnap = await db.collection('users').doc(winnerId).get();
-        // THE FIX IS HERE: Changed winnerUserDocSnap.exists() to winnerUserDocSnap.exists
         const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
         const winnerDisplayName = winnerData.userDisplayName;
 

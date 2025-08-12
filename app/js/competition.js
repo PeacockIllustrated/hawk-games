@@ -1,17 +1,24 @@
-import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
 const db = getFirestore(app);
-const auth = getAuth(app); // Make sure auth is initialized with the app instance
-
-// We will re-initialize `functions` where needed to ensure context is passed.
+const auth = getAuth(app);
 
 let currentCompetitionData = null;
 let competitionId = null;
+let currentUser = null;
 
-// ... (Keep the DOMContentLoaded, loadCompetitionDetails, createCompetitionHTML, setupCountdown, and setupEntryLogic functions EXACTLY as they are. No changes needed there.)
+// Listen for auth state changes to keep our currentUser variable up to date
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+    } else {
+        currentUser = null;
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     competitionId = params.get('id');
@@ -48,11 +55,8 @@ async function loadCompetitionDetails(id) {
 }
 
 function createCompetitionHTML(data) {
-    const answersHTML = Object.entries(data.skillQuestion.answers)
-        .map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
-    const ticketTiersHTML = data.ticketTiers.map(tier => 
-        `<button class="ticket-option" data-amount="${tier.amount}" data-price="${tier.price}">${tier.amount} Entries for £${tier.price.toFixed(2)}</button>`
-    ).join('');
+    const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
+    const ticketTiersHTML = data.ticketTiers.map(tier => `<button class="ticket-option" data-amount="${tier.amount}" data-price="${tier.price}">${tier.amount} Entries for £${tier.price.toFixed(2)}</button>`).join('');
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
     return `
         <div class="competition-detail-view">
@@ -91,9 +95,9 @@ function setupCountdown(endDate) {
             document.querySelectorAll('#entry-button, .answer-btn, .ticket-option').forEach(el => el.disabled = true);
             return;
         }
-        const d = String(Math.floor(distance / (1000*60*60*24))).padStart(2,'0');
-        const h = String(Math.floor((distance % (1000*60*60*24))/(1000*60*60))).padStart(2,'0');
-        const m = String(Math.floor((distance % (1000*60*60))/(1000*60))).padStart(2,'0');
+        const d = String(Math.floor(distance / (1000 * 60 * 60 * 24))).padStart(2, '0');
+        const h = String(Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
+        const m = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
         const s = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
         timerElement.innerHTML = `${d}<small>d</small> : ${h}<small>h</small> : ${m}<small>m</small> : ${s}<small>s</small>`;
     }, 1000);
@@ -118,7 +122,7 @@ function setupEntryLogic(correctAnswer) {
         entryButton.textContent = "Confirm Entry";
     });
     entryButton.addEventListener('click', () => {
-        if (!auth.currentUser) {
+        if (!currentUser) {
             openModal(`<h2>Login Required</h2><p>Please log in or register to enter the competition.</p><a href="login.html" class="btn">Login</a>`);
             return;
         }
@@ -150,11 +154,8 @@ function showConfirmationModal() {
     confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
 }
 
-// THIS IS THE MODIFIED FUNCTION
 async function handleEntry(ticketsBought) {
-    const user = auth.currentUser;
-    if (!user) {
-        // This is a fallback, but the button click should already check for this.
+    if (!currentUser) {
         openModal(`<h2>Error</h2><p>You seem to have been logged out. Please refresh and log in again.</p><button data-close-modal class="btn">Close</button>`);
         return;
     }
@@ -162,8 +163,11 @@ async function handleEntry(ticketsBought) {
     openModal(`<h2>Processing Entry...</h2><p>Please wait, do not close this window.</p>`);
     
     try {
-        // THE FIX: Explicitly get the functions instance here to ensure it has the latest auth context.
-        const functions = getFunctions(app); 
+        // This forces the SDK to get a fresh, valid auth token before proceeding.
+        // This can solve race conditions on page load.
+        await currentUser.getIdToken(true); 
+
+        const functions = getFunctions(app);
         const allocateTicketsAndCheckWins = httpsCallable(functions, 'allocateTicketsAndCheckWins');
 
         const result = await allocateTicketsAndCheckWins({
@@ -171,8 +175,7 @@ async function handleEntry(ticketsBought) {
             ticketsBought: ticketsBought,
         });
 
-        const data = result.data; 
-
+        const data = result.data;
         if (data.wonPrizes && data.wonPrizes.length > 0) {
             const totalWinnings = data.wonPrizes.reduce((sum, prize) => sum + prize.prizeValue, 0);
             openModal(`
@@ -207,5 +210,5 @@ function openModal(content) {
 
 function closeModal() {
     const modalContainer = document.getElementById('modal-container');
-    if(modalContainer) modalContainer.classList.remove('show');
+    if (modalContainer) modalContainer.classList.remove('show');
 }

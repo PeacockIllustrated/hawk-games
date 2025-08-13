@@ -6,121 +6,111 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // This is the primary listener for the page.
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
-        // If a user is detected, run the main data loading function.
-        loadAccountData(user);
+        console.log("--- STARTING DIAGNOSTIC SEQUENCE ---");
+        await runDiagnostics(user);
     } else {
-        // If no user, redirect to login.
         window.location.replace('login.html');
     }
 });
 
-async function loadAccountData(user) {
+async function runDiagnostics(user) {
     try {
-        // First, get the user's profile from Firestore.
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
+        // --- CHECKPOINT 1: Is the user object valid? ---
+        console.log(`[DEBUG 1/4] Auth state confirmed. User UID: ${user.uid}`);
 
+        // --- CHECKPOINT 2: Can we get a fresh auth token? ---
+        await user.getIdToken(true);
+        console.info(`[DEBUG 2/4] Auth token refresh successful. User is fully authenticated.`);
+
+        // --- CHECKPOINT 3: Can we perform a simple authenticated read? ---
+        const userDocRef = doc(db, 'users', user.uid);
+        console.log(`[DEBUG 3/4] Attempting to read user profile at: ${userDocRef.path}`);
+        const userDocSnap = await getDoc(userDocRef);
+        
         if (!userDocSnap.exists()) {
-            console.error("User profile not found in Firestore!");
-            // Display basic info from the auth object if profile is missing.
+            console.warn(`[DEBUG 3/4] User profile does not exist in Firestore yet. This is normal for a new user.`);
+            // Render basic UI and stop, as there are no entries to load.
             renderUserProfile({ displayName: user.displayName, email: user.email, photoURL: user.photoURL });
             document.getElementById('entries-list').innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
-            return; // Stop here if the profile doesn't exist.
+            return;
         }
-
+        console.info(`[DEBUG 3/4] Successfully read user profile data.`);
+        
+        // Render the profile and setup listeners now that we have the data
         const userData = userDocSnap.data();
         renderUserProfile(userData);
         setupEventListeners(user.uid, userData.marketingConsent);
-        
-        // NOW, after loading the profile, load the competition entries.
-        await renderUserEntries(user);
+
+        // --- CHECKPOINT 4: Can we perform the complex collectionGroup query? ---
+        console.log(`[DEBUG 4/4] Attempting to run collectionGroup query for entries...`);
+        await renderUserEntries(user.uid);
+        console.info(`[DEBUG 4/4] Successfully rendered user entries.`);
 
     } catch (error) {
-        console.error("Error loading account data:", error);
+        console.error("--- DIAGNOSTIC FAILED ---");
+        console.error("The sequence failed. The error below is the root cause:");
+        console.error(error);
+        document.getElementById('entries-list').innerHTML = `<div class="placeholder" style="color:red;">Could not load your entries. An error occurred. Check the console.</div>`;
     }
 }
+
 
 function renderUserProfile(userData) {
     const profileCard = document.getElementById('profile-card');
     if (!profileCard) return;
-
     const adminButtonHTML = userData.isAdmin ? `<a href="admin.html" class="btn">Admin Panel</a>` : '';
-
     profileCard.innerHTML = `
         <img src="${userData.photoURL || 'https://i.pravatar.cc/150'}" alt="User Avatar" class="profile-avatar">
         <h2 class="profile-name">${userData.displayName || 'New User'}</h2>
         <p class="profile-email">${userData.email}</p>
-        <div class="profile-actions">
-            ${adminButtonHTML}
-            <button id="sign-out-btn" class="btn">Sign Out</button>
-        </div>
-    `;
+        <div class="profile-actions">${adminButtonHTML}<button id="sign-out-btn" class="btn">Sign Out</button></div>`;
 }
 
-async function renderUserEntries(user) {
+async function renderUserEntries(uid) {
     const entriesListDiv = document.getElementById('entries-list');
     if (!entriesListDiv) return;
 
-    try {
-        // THE FINAL FIX: Force a token refresh right before the sensitive query.
-        // This makes our code wait until the Firestore backend is 100% aware of the user's auth state.
-        await user.getIdToken(true);
+    // This is the query that is failing.
+    const entriesQuery = query(collectionGroup(db, 'entries'), where('userId', '==', uid), orderBy('enteredAt', 'desc'));
+    const entriesSnapshot = await getDocs(entriesQuery);
 
-        const entriesQuery = query(collectionGroup(db, 'entries'), where('userId', '==', user.uid), orderBy('enteredAt', 'desc'));
-        const entriesSnapshot = await getDocs(entriesQuery);
-
-        if (entriesSnapshot.empty) {
-            entriesListDiv.innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
-            return;
-        }
-
-        const competitionIds = [...new Set(entriesSnapshot.docs.map(doc => doc.ref.parent.parent.id))];
-
-        const competitionsMap = new Map();
-        if (competitionIds.length > 0) {
-            for (let i = 0; i < competitionIds.length; i += 10) {
-                const chunk = competitionIds.slice(i, i + 10);
-                const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
-                const compsSnapshot = await getDocs(compsQuery);
-                compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
-            }
-        }
-        
-        entriesListDiv.innerHTML = entriesSnapshot.docs.map(entryDoc => {
-            const entryData = entryDoc.data();
-            const compId = entryDoc.ref.parent.parent.id;
-            const compData = competitionsMap.get(compId);
-            return compData ? createEntryCardHTML(compData, entryData) : '';
-        }).join('');
-
-    } catch (error) {
-        console.error("Error rendering user entries:", error);
-        entriesListDiv.innerHTML = `<div class="placeholder" style="color:red;">Could not load your entries. Please try again.</div>`;
+    if (entriesSnapshot.empty) {
+        entriesListDiv.innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
+        return;
     }
+    const competitionIds = [...new Set(entriesSnapshot.docs.map(doc => doc.ref.parent.parent.id))];
+    const competitionsMap = new Map();
+    if (competitionIds.length > 0) {
+        for (let i = 0; i < competitionIds.length; i += 10) {
+            const chunk = competitionIds.slice(i, i + 10);
+            const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
+            const compsSnapshot = await getDocs(compsQuery);
+            compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
+        }
+    }
+    entriesListDiv.innerHTML = entriesSnapshot.docs.map(entryDoc => {
+        const entryData = entryDoc.data();
+        const compId = entryDoc.ref.parent.parent.id;
+        const compData = competitionsMap.get(compId);
+        return compData ? createEntryCardHTML(compData, entryData) : '';
+    }).join('');
 }
 
 function createEntryCardHTML(compData, entryData) {
     let statusText = compData.status.toUpperCase();
     let statusClass = `status-${compData.status}`;
-
-    const currentUser = auth.currentUser; // Get the most current user state
+    const currentUser = auth.currentUser;
     if (compData.status === 'drawn' && currentUser && compData.winnerId === currentUser.uid) {
         statusText = 'YOU WON THE MAIN PRIZE!';
         statusClass = 'status-won';
     }
-
     let instantWinHTML = '';
     if (entryData.instantWins && entryData.instantWins.length > 0) {
         const totalWinnings = entryData.instantWins.reduce((sum, prize) => sum + prize.prizeValue, 0);
-        instantWinHTML = `
-            <div class="entry-item-win-banner">
-                ⚡️ YOU WON £${totalWinnings.toFixed(2)} INSTANTLY WITH THIS ENTRY!
-            </div>
-        `;
+        instantWinHTML = `<div class="entry-item-win-banner">⚡️ YOU WON £${totalWinnings.toFixed(2)} INSTANTLY!</div>`;
     }
-
     return `
         <div class="entry-item">
             ${instantWinHTML}
@@ -128,43 +118,24 @@ function createEntryCardHTML(compData, entryData) {
             <div class="entry-item-details">
                 <h4>${compData.title}</h4>
                 <p>You bought <strong>${entryData.ticketsBought}</strong> entries.</p>
-                <p class="entry-ticket-numbers">Your Tickets: #${entryData.ticketStart} - #${entryData.ticketEnd}</p>
+                <p class="entry-ticket-numbers">Tickets: #${entryData.ticketStart} - #${entryData.ticketEnd}</p>
             </div>
-            <div class="entry-item-status">
-                <span class="status-badge ${statusClass}">${statusText}</span>
-            </div>
-        </div>
-    `;
+            <div class="entry-item-status"><span class="status-badge ${statusClass}">${statusText}</span></div>
+        </div>`;
 }
 
 function setupEventListeners(uid, initialConsent) {
     const signOutBtn = document.getElementById('sign-out-btn');
     if (signOutBtn) {
-        signOutBtn.addEventListener('click', () => {
-            signOut(auth).then(() => {
-                window.location.href = 'index.html';
-            });
-        });
+        signOutBtn.addEventListener('click', () => { signOut(auth); });
     }
-
     const consentCheckbox = document.getElementById('marketing-consent');
     const feedbackEl = document.getElementById('preference-feedback');
     if (consentCheckbox && feedbackEl) {
         consentCheckbox.checked = !!initialConsent; 
-        
         consentCheckbox.addEventListener('change', (e) => {
-            const newConsentValue = e.target.checked;
             const userRef = doc(db, 'users', uid);
-            feedbackEl.textContent = 'Saving...';
-            updateDoc(userRef, { marketingConsent: newConsentValue })
-                .then(() => {
-                    feedbackEl.textContent = 'Preferences Saved!';
-                    setTimeout(() => feedbackEl.textContent = '', 2000);
-                })
-                .catch(error => {
-                    console.error("Error updating consent:", error);
-                    feedbackEl.textContent = 'Error Saving. Please try again.';
-                });
+            updateDoc(userRef, { marketingConsent: e.target.checked });
         });
     }
 }

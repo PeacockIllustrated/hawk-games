@@ -1,46 +1,45 @@
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, query, where, documentId, getDocs, collectionGroup, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, query, where, documentId, getDocs, collectionGroup, orderBy, updateDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js';
 
 const db = getFirestore(app);
-const auth = getAuth(app); // Pass the app instance for best practice
+const auth = getAuth(app);
 
-onAuthStateChanged(auth, async (user) => { // Make this function async
+// This is the primary listener for the page.
+onAuthStateChanged(auth, (user) => {
     if (user) {
-        try {
-            // THE FIX IS HERE: Force the SDK to refresh the auth token.
-            // This pauses execution until the Firestore service is fully aware of the user's auth state.
-            await user.getIdToken(true); 
-            
-            // Now that we are certain the user is fully authenticated, proceed to load data.
-            await loadAccountData(user);
-
-        } catch (error) {
-            console.error("Error during authenticated data load:", error);
-            // Handle error, maybe show a message to the user
-        }
+        // If a user is detected, run the main data loading function.
+        loadAccountData(user);
     } else {
-        // If not logged in, redirect to login page
+        // If no user, redirect to login.
         window.location.replace('login.html');
     }
 });
 
 async function loadAccountData(user) {
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDocSnap = await getDoc(userDocRef);
+    try {
+        // First, get the user's profile from Firestore.
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
 
-    if (!userDocSnap.exists()) {
-        console.error("User profile not found in Firestore! This might happen for a brand new user on first load.");
-        // We can still try to render what we can
-        renderUserProfile({ displayName: user.displayName, email: user.email, photoURL: user.photoURL });
-        document.getElementById('entries-list').innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
-        return;
+        if (!userDocSnap.exists()) {
+            console.error("User profile not found in Firestore!");
+            // Display basic info from the auth object if profile is missing.
+            renderUserProfile({ displayName: user.displayName, email: user.email, photoURL: user.photoURL });
+            document.getElementById('entries-list').innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
+            return; // Stop here if the profile doesn't exist.
+        }
+
+        const userData = userDocSnap.data();
+        renderUserProfile(userData);
+        setupEventListeners(user.uid, userData.marketingConsent);
+        
+        // NOW, after loading the profile, load the competition entries.
+        await renderUserEntries(user);
+
+    } catch (error) {
+        console.error("Error loading account data:", error);
     }
-
-    const userData = userDocSnap.data();
-    renderUserProfile(userData);
-    await renderUserEntries(user.uid); // Pass UID for the query
-    setupEventListeners(user.uid, userData.marketingConsent);
 }
 
 function renderUserProfile(userData) {
@@ -60,13 +59,16 @@ function renderUserProfile(userData) {
     `;
 }
 
-async function renderUserEntries(uid) {
+async function renderUserEntries(user) {
     const entriesListDiv = document.getElementById('entries-list');
     if (!entriesListDiv) return;
 
     try {
-        // This query now runs AFTER getIdToken(true) has completed.
-        const entriesQuery = query(collectionGroup(db, 'entries'), where('userId', '==', uid), orderBy('enteredAt', 'desc'));
+        // THE FINAL FIX: Force a token refresh right before the sensitive query.
+        // This makes our code wait until the Firestore backend is 100% aware of the user's auth state.
+        await user.getIdToken(true);
+
+        const entriesQuery = query(collectionGroup(db, 'entries'), where('userId', '==', user.uid), orderBy('enteredAt', 'desc'));
         const entriesSnapshot = await getDocs(entriesQuery);
 
         if (entriesSnapshot.empty) {
@@ -90,9 +92,7 @@ async function renderUserEntries(uid) {
             const entryData = entryDoc.data();
             const compId = entryDoc.ref.parent.parent.id;
             const compData = competitionsMap.get(compId);
-            if (!compData) return '';
-
-            return createEntryCardHTML(compData, entryData);
+            return compData ? createEntryCardHTML(compData, entryData) : '';
         }).join('');
 
     } catch (error) {
@@ -105,7 +105,8 @@ function createEntryCardHTML(compData, entryData) {
     let statusText = compData.status.toUpperCase();
     let statusClass = `status-${compData.status}`;
 
-    if (compData.status === 'drawn' && compData.winnerId && auth.currentUser && compData.winnerId === auth.currentUser.uid) {
+    const currentUser = auth.currentUser; // Get the most current user state
+    if (compData.status === 'drawn' && currentUser && compData.winnerId === currentUser.uid) {
         statusText = 'YOU WON THE MAIN PRIZE!';
         statusClass = 'status-won';
     }
@@ -139,9 +140,10 @@ function createEntryCardHTML(compData, entryData) {
 function setupEventListeners(uid, initialConsent) {
     const signOutBtn = document.getElementById('sign-out-btn');
     if (signOutBtn) {
-        signOutBtn.addEventListener('click', async () => {
-            await signOut(auth);
-            window.location.href = 'index.html';
+        signOutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'index.html';
+            });
         });
     }
 
@@ -150,18 +152,19 @@ function setupEventListeners(uid, initialConsent) {
     if (consentCheckbox && feedbackEl) {
         consentCheckbox.checked = !!initialConsent; 
         
-        consentCheckbox.addEventListener('change', async (e) => {
+        consentCheckbox.addEventListener('change', (e) => {
             const newConsentValue = e.target.checked;
             const userRef = doc(db, 'users', uid);
             feedbackEl.textContent = 'Saving...';
-            try {
-                await updateDoc(userRef, { marketingConsent: newConsentValue });
-                feedbackEl.textContent = 'Preferences Saved!';
-                setTimeout(() => feedbackEl.textContent = '', 2000);
-            } catch (error) {
-                console.error("Error updating consent:", error);
-                feedbackEl.textContent = 'Error Saving. Please try again.';
-            }
+            updateDoc(userRef, { marketingConsent: newConsentValue })
+                .then(() => {
+                    feedbackEl.textContent = 'Preferences Saved!';
+                    setTimeout(() => feedbackEl.textContent = '', 2000);
+                })
+                .catch(error => {
+                    console.error("Error updating consent:", error);
+                    feedbackEl.textContent = 'Error Saving. Please try again.';
+                });
         });
     }
 }

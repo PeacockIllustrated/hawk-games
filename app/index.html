@@ -6,60 +6,39 @@
     <title>Competitions | The Hawk Games</title>
     <link rel="stylesheet" href="css/hawk-games.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <header class="main-header"></header>
     
     <main>
-        <!-- 1. Hero Section -->
+        <!-- This section structure will be populated by main.js -->
         <section class="hero-home">
             <div class="hero-overlay"></div>
             <div class="container hero-content">
-                <h1>Your Chance to Win Big</h1>
+                <h1>Win Prizes Instantly</h1>
                 <p>Enter our skill-based competitions for a chance to win life-changing prizes. Cars, cash, tech, and more.</p>
-                <a href="#live-competitions-section" class="btn">View Live Competitions</a>
+                <a href="#instant-win-section" class="btn">View Instant Win Games</a>
             </div>
         </section>
 
-        <!-- 2. How It Works Section -->
-        <section class="container how-it-works-section">
-            <h2 class="section-title">How It Works</h2>
-            <div class="how-it-works-grid">
-                <div class="step-card">
-                    <div class="step-icon">1</div>
-                    <h3>Pick a Prize</h3>
-                    <p>Browse our live competitions and choose the prize you want to win.</p>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">2</div>
-                    <h3>Answer & Enter</h3>
-                    <p>Use your skill to answer the qualifying question and purchase your entries.</p>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">3</div>
-                    <h3>Winner Chosen</h3>
-                    <p>A winner is drawn at random from all correct entries after the competition closes.</p>
-                </div>
+        <!-- NEW: Dedicated Instant Win Section -->
+        <section id="instant-win-section" class="container">
+            <h2 class="section-title">Instant Win Games</h2>
+            <p class="section-subtitle">
+                Win prizes the moment you enter! Your ticket numbers could be pre-selected winners, and every ticket is still entered into the main prize draw.
+            </p>
+            <div id="instant-win-grid" class="competition-grid-container">
+                <div class="hawk-card placeholder">Loading Instant Win games...</div>
             </div>
         </section>
 
-        <!-- 3. Live Competitions Section -->
+        <!-- Regular Competitions Section -->
         <section id="live-competitions-section" class="container">
-            <h2 class="section-title">Live Competitions</h2>
-            <div id="competition-grid">
-                <!-- This is where main.js will load the competition cards -->
+            <h2 class="section-title">More Live Competitions</h2>
+            <div id="competition-grid" class="competition-grid-container">
                 <div class="hawk-card placeholder">Loading competitions...</div>
-            </div>
-        </section>
-
-        <!-- 4. Past Winners Section -->
-        <section class="container">
-            <h2 class="section-title">Recent Winners</h2>
-            <div id="past-winners-grid">
-                <!-- This can be populated dynamically later -->
-                <div class="winner-card placeholder">Loading winner stories...</div>
             </div>
         </section>
         

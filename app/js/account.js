@@ -19,26 +19,29 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
+  collection,
   collectionGroup,
   query,
   where,
-  getDocs
-  // , orderBy // uncomment if you add ordering and an index
+  getDocs,
+  orderBy,
+  documentId
 } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
 
 // --- Firebase singletons ---
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-// --- DOM hooks (all optional; code no-ops if missing) ---
-const elName           = document.getElementById('account-user-name');
-const elEmail          = document.getElementById('account-user-email');
-const elAvatar         = document.getElementById('account-user-avatar'); // <img> or <div data-initials>
-const elSignOut        = document.getElementById('sign-out-btn');        // button
-const elMarketingTgl   = document.getElementById('marketing-toggle');    // input[type="checkbox"] for “I’d like to receive marketing…”
-const elEntriesList    = document.getElementById('entries-list');        // container to render rows/cards
-const elEntriesError   = document.getElementById('entries-error');       // optional error placeholder
-const elEntriesEmpty   = document.getElementById('entries-empty');       // optional empty-state node
+// --- DOM hooks from your account.html ---
+const elUserName = document.getElementById('account-user-name');
+const elUserEmail = document.getElementById('account-user-email');
+const elUserAvatar = document.getElementById('account-user-avatar');
+const elSignOut = document.getElementById('sign-out-btn');
+const elMarketingTgl = document.getElementById('marketing-consent');
+const elMarketingFeedback = document.getElementById('preference-feedback');
+const elEntriesList = document.getElementById('entries-list');
+const elAdminContainer = document.getElementById('admin-panel-container');
+
 
 // --- Utility: safe text setter ---
 function setText(el, text) {
@@ -46,251 +49,193 @@ function setText(el, text) {
   el.textContent = text ?? '';
 }
 
-// --- Utility: avatar renderer (initials fallback) ---
+// --- Utility: avatar renderer ---
 function renderAvatar(el, user) {
   if (!el || !user) return;
+  if (user.photoURL) {
+      el.src = user.photoURL;
+      el.alt = user.displayName || 'User Avatar';
+  } else {
+      el.src = `https://i.pravatar.cc/150?u=${user.email}`;
+      el.alt = 'User Avatar';
+  }
+}
 
-  const asImg = el.tagName?.toLowerCase() === 'img';
-  const photo = user.photoURL;
+// --- NEW RENDER LOGIC: Renders a single "Trophy Card" for a competition ---
+function createCompetitionGroupHTML(compData, entries, currentUid) {
+    let statusText = compData.status.toUpperCase();
+    let statusClass = `status-${compData.status}`;
 
-  if (asImg) {
-    if (photo) {
-      el.src = photo;
-      el.alt = user.displayName || user.email || 'User';
-    } else {
-      // no photo – show a generated initial via data URI (simple coloured circle with initial)
-      const initial = (user.displayName || user.email || 'U').trim().charAt(0).toUpperCase();
-      const size = 128;
-      const canvas = document.createElement('canvas');
-      canvas.width = size; canvas.height = size;
-      const ctx = canvas.getContext('2d');
-      // background circle
-      ctx.fillStyle = '#0E1116';
-      ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill();
-      // initial
-      ctx.fillStyle = '#E0E3E7';
-      ctx.font = 'bold 64px system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(initial, size/2, size/2 + 4);
-      el.src = canvas.toDataURL('image/png');
-      el.alt = initial;
+    // Check for a main prize win
+    if (compData.status === 'drawn' && compData.winnerId && compData.winnerId === currentUid) {
+        statusText = 'YOU WON THE MAIN PRIZE!';
+        statusClass = 'status-won';
     }
-    return;
-  }
 
-  // Non-IMG avatar element (e.g., a circle div) – prefer initials
-  const initial = (user.displayName || user.email || 'U').trim().charAt(0).toUpperCase();
-  el.setAttribute('data-initials', initial);
-  if (photo) el.style.backgroundImage = `url("${photo}")`;
+    // Generate the HTML for each individual entry row within this group
+    const entryRowsHTML = entries.map(entry => {
+        let instantWinTag = '';
+        if (entry.instantWins && entry.instantWins.length > 0) {
+            const totalWinnings = entry.instantWins.reduce((sum, prize) => sum + prize.prizeValue, 0);
+            instantWinTag = `<span class="instant-win-tag">⚡️ £${totalWinnings.toFixed(2)} WIN</span>`;
+        }
+        
+        const entryDate = entry.enteredAt?.toDate ? entry.enteredAt.toDate().toLocaleDateString() : 'N/A';
+        
+        return `
+            <div class="entry-list-item">
+                <span class="entry-date">${entryDate}</span>
+                <span class="entry-tickets">${entry.ticketsBought} Ticket${entry.ticketsBought > 1 ? 's' : ''}</span>
+                <span class="entry-numbers">#${entry.ticketStart} - #${entry.ticketEnd}</span>
+                ${instantWinTag}
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="competition-entry-group">
+            <div class="competition-group-header">
+                <img src="${compData.prizeImage}" alt="${compData.title}" class="group-header-image">
+                <div class="group-header-details">
+                    <h4>${compData.title}</h4>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+            </div>
+            <div class="entry-list-container">
+                ${entryRowsHTML}
+            </div>
+        </div>
+    `;
 }
 
-// --- Utility: date formatting ---
-function fmtDate(ts) {
-  // Accepts JS Date, Firestore Timestamp or ISO string
-  try {
-    const d = ts?.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
-    return isNaN(d.getTime()) ? '' : d.toLocaleString();
-  } catch {
-    return '';
-  }
-}
-
-// --- Render: single entry row/card ---
-function renderEntryRow(entry) {
-  const when = fmtDate(entry.createdAt);
-  const title = entry.compTitle || entry.compName || entry.compId || 'Competition';
-  const tickets = entry.tickets ?? entry.quantity ?? entry.ticketCount ?? 1;
-  const numbers = Array.isArray(entry.ticketNumbers) ? entry.ticketNumbers.join(', ') : (entry.ticketNumber ?? '');
-
-  return `
-    <div class="entry-row">
-      <div class="entry-main">
-        <div class="entry-title">${escapeHtml(title)}</div>
-        ${numbers ? `<div class="entry-numbers">Ticket(s): ${escapeHtml(numbers)}</div>` : ''}
-      </div>
-      <div class="entry-meta">
-        <div class="entry-tickets">${tickets} ticket${tickets === 1 ? '' : 's'}</div>
-        <div class="entry-date">${when}</div>
-      </div>
-    </div>
-  `;
-}
-
-// --- Simple HTML escaper for dynamic content ---
-function escapeHtml(str) {
-  if (str == null) return '';
-  return String(str)
-    .replace(/&/g,  '&amp;')
-    .replace(/</g,  '&lt;')
-    .replace(/>/g,  '&gt;')
-    .replace(/"/g,  '&quot;')
-    .replace(/'/g,  '&#039;');
-}
-
-// --- Entries: fetch and render for current user ---
-async function loadUserEntries(uid, { alsoOrderByCreatedAt = false } = {}) {
+// --- NEW DATA LOGIC: Fetches and groups all user entries ---
+async function loadUserEntries(user) {
   if (!elEntriesList) return;
-
-  // Loading state (lightweight; replace with your skeleton markup if desired)
-  elEntriesList.innerHTML = `
-    <div class="entries-loading">Loading your entries…</div>
-  `;
-  if (elEntriesError) elEntriesError.style.display = 'none';
-  if (elEntriesEmpty) elEntriesEmpty.style.display = 'none';
+  elEntriesList.innerHTML = `<div class="placeholder">Loading your entries...</div>`;
 
   try {
-    // Build the collectionGroup query that matches security rules:
-    // where('userId','==', uid)
-    let q = query(
+    // Ensure auth token is fresh before this complex query
+    await user.getIdToken(true);
+
+    const entriesQuery = query(
       collectionGroup(db, 'entries'),
-      where('userId', '==', uid)
+      where('userId', '==', user.uid),
+      orderBy('enteredAt', 'desc')
     );
+    const entriesSnapshot = await getDocs(entriesQuery);
 
-    // If you want ordering, uncomment both this block AND add an index in Firestore:
-    // q = query(
-    //   collectionGroup(db, 'entries'),
-    //   where('userId', '==', uid),
-    //   orderBy('createdAt', 'desc')
-    // );
-
-    const snap = await getDocs(q);
-
-    if (snap.empty) {
-      elEntriesList.innerHTML = '';
-      if (elEntriesEmpty) {
-        elEntriesEmpty.style.display = '';
-      } else {
-        elEntriesList.innerHTML = `<div class="entries-empty">No entries yet.</div>`;
-      }
+    if (entriesSnapshot.empty) {
+      elEntriesList.innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
       return;
     }
 
-    const rows = [];
-    snap.forEach(docSnap => {
-      const data = docSnap.data();
-      rows.push(renderEntryRow(data));
+    // Group entries by their parent competition ID
+    const groupedEntries = {};
+    entriesSnapshot.docs.forEach(doc => {
+        const entryData = doc.data();
+        const compId = doc.ref.parent.parent.id;
+        if (!groupedEntries[compId]) {
+            groupedEntries[compId] = [];
+        }
+        groupedEntries[compId].push(entryData);
     });
+    
+    // Fetch the data for all the competitions these entries belong to
+    const competitionIds = Object.keys(groupedEntries);
+    const competitionsMap = new Map();
+    if (competitionIds.length > 0) {
+        for (let i = 0; i < competitionIds.length; i += 10) {
+            const chunk = competitionIds.slice(i, i + 10);
+            const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
+            const compsSnapshot = await getDocs(compsQuery);
+            compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
+        }
+    }
+    
+    // Render the final grouped HTML
+    let finalHTML = '';
+    for (const compId of competitionIds) {
+        const compData = competitionsMap.get(compId);
+        const entriesForComp = groupedEntries[compId];
+        if (compData && entriesForComp) {
+            finalHTML += createCompetitionGroupHTML(compData, entriesForComp, user.uid);
+        }
+    }
+    elEntriesList.innerHTML = finalHTML;
 
-    elEntriesList.innerHTML = rows.join('');
   } catch (err) {
     console.error('[Entries] Failed to load user entries:', err);
-    if (elEntriesList) {
-      elEntriesList.innerHTML = `<div class="error">Could not load your entries. ${escapeHtml(err.code || err.message || 'Error')}.</div>`;
-    }
-    if (elEntriesError) elEntriesError.style.display = '';
+    elEntriesList.innerHTML = `<div class="placeholder" style="color:red;">Could not load your entries. Please try again.</div>`;
   }
 }
 
 // --- Profile: create (if missing) and load user's profile doc ---
 async function ensureAndLoadUserProfile(user) {
   const userRef = doc(db, 'users', user.uid);
-
   try {
     const snap = await getDoc(userRef);
-
     if (!snap.exists()) {
-      // Create a minimal profile; do NOT allow client to set isAdmin
       const payload = {
-        uid: user.uid,
-        email: user.email || null,
-        displayName: user.displayName || null,
-        photoURL: user.photoURL || null,
-        isAdmin: false,
-        marketingOptIn: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL,
+        isAdmin: false, marketingConsent: false, createdAt: serverTimestamp(),
       };
-      await setDoc(userRef, payload, { merge: true });
+      await setDoc(userRef, payload);
       return payload;
     }
-
     return snap.data();
   } catch (err) {
     console.error('[Profile] Failed to load/create user profile:', err);
-    throw err;
+    // Return a basic profile object so the page doesn't break
+    return { displayName: user.displayName, email: user.email, photoURL: user.photoURL, marketingConsent: false };
   }
 }
 
-// --- Marketing toggle wiring ---
-function wireMarketingToggle(user, profile) {
-  if (!elMarketingTgl) return;
+// --- Marketing and Sign Out Event Listeners ---
+function setupEventListeners(user, profile) {
+  if (elMarketingTgl) {
+    elMarketingTgl.checked = !!profile?.marketingConsent;
+    elMarketingTgl.addEventListener('change', async (e) => {
+      const checked = !!e.currentTarget.checked;
+      setText(elMarketingFeedback, 'Saving...');
+      try {
+        await updateDoc(doc(db, 'users', user.uid), { marketingConsent: checked });
+        setText(elMarketingFeedback, 'Preferences Saved!');
+      } catch (err) {
+        console.error('[Marketing] Failed to update preference:', err);
+        setText(elMarketingFeedback, 'Error saving.');
+      } finally {
+        setTimeout(() => setText(elMarketingFeedback, ''), 2000);
+      }
+    });
+  }
 
-  // Initial state from profile
-  const initial = !!profile?.marketingOptIn;
-  elMarketingTgl.checked = initial;
-
-  elMarketingTgl.addEventListener('change', async (e) => {
-    const checked = !!e.currentTarget.checked;
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        marketingOptIn: checked,
-        updatedAt: serverTimestamp()
-      });
-      // Optional: reflect success
-    } catch (err) {
-      console.error('[Marketing] Failed to update preference:', err);
-      // Roll back UI state on failure
-      try { e.currentTarget.checked = !checked; } catch {}
-      alert('Could not update your communication preferences. Please try again.');
-    }
-  });
+  if (elSignOut) {
+    elSignOut.addEventListener('click', () => signOut(auth));
+  }
 }
 
-// --- Sign out wiring ---
-function wireSignOut() {
-  if (!elSignOut) return;
-  elSignOut.addEventListener('click', async () => {
-    try {
-      await signOut(auth);
-      window.location.replace('/login.html');
-    } catch (err) {
-      console.error('[Auth] Sign-out failed:', err);
-      alert('Sign out failed. Please try again.');
-    }
-  });
-}
 
 // --- Auth gate and page boot ---
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    // Not signed in; kick to login
-    window.location.replace('/login.html');
+    window.location.replace('login.html');
     return;
   }
 
-  // Basic header/profile fill
-  setText(elName, user.displayName || 'My Account');
-  setText(elEmail, user.email || '');
-  renderAvatar(elAvatar, user);
-
   // Ensure Firestore profile exists & load it
-  let profile;
-  try {
-    profile = await ensureAndLoadUserProfile(user);
-  } catch {
-    // if this fails, we still want to try entries to avoid blanking the whole page
+  const profile = await ensureAndLoadUserProfile(user);
+
+  // Render basic user info into the profile card
+  setText(elUserName, profile.displayName || 'My Account');
+  setText(elUserEmail, user.email || '');
+  renderAvatar(elUserAvatar, user);
+  if (elAdminContainer && profile.isAdmin) {
+      elAdminContainer.innerHTML = `<a href="admin.html" class="btn">Admin Panel</a>`;
   }
 
-  // Wire marketing toggle
-  wireMarketingToggle(user, profile);
+  // Wire up event listeners
+  setupEventListeners(user, profile);
 
-  // Load entries for this user
-  await loadUserEntries(user.uid);
-
-  // Wire sign-out
-  wireSignOut();
-
-  // Optional: ensure auth displayName stays in sync with profile displayName
-  try {
-    if (profile?.displayName && profile.displayName !== user.displayName) {
-      await updateProfile(user, { displayName: profile.displayName });
-      setText(elName, profile.displayName);
-    }
-  } catch (err) {
-    // Non-fatal; log only
-    console.debug('[Profile] Skipped auth profile sync:', err?.message);
-  }
+  // Load and render all the user's entries
+  await loadUserEntries(user);
 });
-
-// --- End of file ---

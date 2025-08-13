@@ -1,84 +1,83 @@
-import { getFirestore, collection, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js'; // Import the initialized app
 
 const db = getFirestore(app);
 
 document.addEventListener('DOMContentLoaded', () => {
-    loadLiveCompetitions();
-    loadPastWinners(); // Add this function call
+    loadAllCompetitions();
 });
 
-const loadLiveCompetitions = async () => {
-    const grid = document.getElementById('competition-grid');
-    if (!grid) return;
+const loadAllCompetitions = async () => {
+    // Get references to BOTH new grid containers
+    const instantWinGrid = document.getElementById('instant-win-grid');
+    const regularGrid = document.getElementById('competition-grid');
+
+    if (!instantWinGrid || !regularGrid) {
+        console.error("Missing a required grid container in the HTML.");
+        return;
+    }
 
     try {
+        // A single, efficient query to get all live competitions
         const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("endDate", "asc"));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            grid.innerHTML = '<div class="hawk-card placeholder">No live competitions right now. Check back soon!</div>';
+            instantWinGrid.innerHTML = '<div class="hawk-card placeholder">No Instant Win games are live right now. Check back soon!</div>';
+            regularGrid.innerHTML = '<div class="hawk-card placeholder">No other competitions are live right now.</div>';
             return;
         }
 
-        grid.innerHTML = ''; // Clear placeholder
+        // --- NEW LOGIC: Separate competitions into two lists ---
+        const instantWinComps = [];
+        const regularComps = [];
+
         querySnapshot.forEach((doc) => {
-            grid.innerHTML += createCompetitionCard(doc.data(), doc.id);
+            const compData = { id: doc.id, ...doc.data() };
+            // Check if the competition has instant wins enabled
+            if (compData.instantWinsConfig && compData.instantWinsConfig.enabled === true) {
+                instantWinComps.push(compData);
+            } else {
+                regularComps.push(compData);
+            }
         });
 
+        // --- Render the Instant Win Grid ---
+        if (instantWinComps.length > 0) {
+            instantWinGrid.innerHTML = instantWinComps.map(comp => createCompetitionCard(comp)).join('');
+        } else {
+            instantWinGrid.innerHTML = '<div class="hawk-card placeholder">No Instant Win games are live right now. Check back soon!</div>';
+        }
+
+        // --- Render the Regular Competitions Grid ---
+        if (regularComps.length > 0) {
+            regularGrid.innerHTML = regularComps.map(comp => createCompetitionCard(comp)).join('');
+        } else {
+            regularGrid.innerHTML = '<div class="hawk-card placeholder">No other competitions are live right now.</div>';
+        }
+
+        // This function works on all rendered cards, regardless of their grid
         startAllCountdowns();
 
     } catch (error) {
         console.error("Error loading competitions:", error);
-        grid.innerHTML = '<div class="hawk-card placeholder" style="color:red;">Could not load competitions.</div>';
+        instantWinGrid.innerHTML = '<div class="hawk-card placeholder" style="color:red;">Could not load competitions.</div>';
+        regularGrid.innerHTML = ''; // Hide the second grid on a major error
     }
 };
 
-// NEW FUNCTION to load past winners for social proof
-const loadPastWinners = async () => {
-    const grid = document.getElementById('past-winners-grid');
-    if (!grid) return;
-
-    try {
-        // Fetch the 4 most recent winners from the 'pastWinners' collection
-        const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"), limit(4));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            grid.innerHTML = '<div class="winner-card placeholder">Be our first winner!</div>';
-            return;
-        }
-
-        grid.innerHTML = ''; // Clear placeholder
-        querySnapshot.forEach((doc) => {
-            const winnerData = doc.data();
-            grid.innerHTML += `
-                <div class="winner-card">
-                    <img src="${winnerData.winnerPhotoURL || 'https://i.pravatar.cc/100'}" alt="Winner">
-                    <h4>${winnerData.winnerDisplayName}</h4>
-                    <p>Won the ${winnerData.prizeTitle}</p>
-                </div>
-            `;
-        });
-    } catch (error) {
-        console.error("Error loading past winners:", error);
-        grid.innerHTML = '<div class="winner-card placeholder" style="color:red;">Could not load winners.</div>';
-    }
-}
-
-
-function createCompetitionCard(compData, compId) {
+function createCompetitionCard(compData) { // Now accepts the whole object
     const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
     const endDate = compData.endDate.toDate();
-    // Use the first ticket tier for the main price display
     const price = compData.ticketTiers?.[0]?.price || 0.00;
 
+    // This logic remains the same and works perfectly!
     const instantWinBadge = compData.instantWinsConfig?.enabled 
         ? `<div class="hawk-card__instant-win-badge">⚡️ Instant Wins</div>` 
         : '';
 
     return `
-        <a href="competition.html?id=${compId}" class="hawk-card">
+        <a href="competition.html?id=${compData.id}" class="hawk-card">
             ${instantWinBadge}
             <img src="${compData.prizeImage || 'https://via.placeholder.com/600x400.png?text=Prize'}" alt="${compData.title}" class="hawk-card__image">
             <div class="hawk-card__content">
@@ -105,7 +104,6 @@ function startAllCountdowns() {
 
     const updateTimers = () => {
         timerElements.forEach(timer => {
-            // Prevent error if timer is removed from DOM
             if (!timer.dataset.endDate) return;
             const endDate = new Date(timer.dataset.endDate);
             const now = new Date();
@@ -124,9 +122,6 @@ function startAllCountdowns() {
         });
     };
     
-    // Initial call
     updateTimers(); 
-    
-    // Set interval and store its ID so we can clear it if needed
-    const timerInterval = setInterval(updateTimers, 60000); // Update every minute
+    const timerInterval = setInterval(updateTimers, 60000);
 }

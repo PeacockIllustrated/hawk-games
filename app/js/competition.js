@@ -23,9 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-
 // --- Core Functions ---
-
 async function loadCompetitionDetails(id) {
     const container = document.getElementById('competition-container');
     const competitionRef = doc(db, 'competitions', id);
@@ -69,32 +67,27 @@ function setupEntryLogic(correctAnswer) {
 
     entryButton.addEventListener('click', () => {
         if (!auth.currentUser) {
-            openModal('modal-container', `<h2>Login Required</h2><p>Please log in or register to enter.</p><a href="login.html" class="btn">Login</a>`);
+            openModal(`<h2>Login Required</h2><p>Please log in or register to enter.</p><a href="login.html" class="btn">Login</a>`);
             return;
         }
         if (!isAnswerCorrect) {
-            openModal('modal-container', `<h2>Incorrect Answer</h2><p>You must select the correct answer to enter.</p><button data-close-modal class="btn">Try Again</button>`);
+            openModal(`<h2>Incorrect Answer</h2><p>You must select the correct answer to enter.</p><button data-close-modal class="btn">Try Again</button>`);
             return;
         }
-        
-        // This function now handles ALL entry types
         showConfirmationModal();
     });
 }
 
-
-// --- Universal Entry Flow ---
-
 function showConfirmationModal() {
     const selectedTicket = document.querySelector('.ticket-option.selected');
     if (!selectedTicket) {
-        openModal('modal-container', `<h2>Select Tickets</h2><p>Please choose a ticket bundle.</p><button data-close-modal class="btn">OK</button>`);
+        openModal(`<h2>Select Tickets</h2><p>Please choose a ticket bundle.</p><button data-close-modal class="btn">OK</button>`);
         return;
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
     const price = parseFloat(selectedTicket.dataset.price).toFixed(2);
     
-    openModal('modal-container', `
+    openModal(`
         <h2>Confirm Your Entry</h2>
         <p>You are about to purchase <strong>${tickets}</strong> entries for <strong>£${price}</strong>.</p>
         <div class="modal-actions">
@@ -108,69 +101,53 @@ function showConfirmationModal() {
 }
 
 async function handleEntry(ticketsBought) {
-    openModal('modal-container', `<h2>Processing Entry...</h2><p>Please wait.</p>`);
+    openModal(`<h2>Processing Entry...</h2><p>Please wait.</p>`);
     try {
-        // We now call our new, universal 'allocateTicketsAndAwardTokens' function
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
         const result = await allocateTicketsAndAwardTokens({ compId: competitionId, ticketsBought });
         const data = result.data;
         
         let successMessage = `<p>Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} are registered. Good luck!</p>`;
         
-        // Check if tokens were awarded and add a special message and call-to-action
+        // Check if tokens were awarded and add a special message.
         if (data.awardedTokens && data.awardedTokens.length > 0) {
-            const tokenCount = data.awardedTokens.length;
             successMessage += `
-                <div class="token-award-banner">
-                    <h3>You've earned ${tokenCount} Spin Token${tokenCount > 1 ? 's' : ''}!</h3>
-                    <p>Visit the Instant Win Games page to spend them for a chance to win now!</p>
-                    <a href="instant-games.html" class="btn">Spend Tokens</a>
-                </div>
+                <h3 style="margin-top:1.5rem;color:var(--primary-gold);">🎉 You've earned ${data.awardedTokens.length} Spin Token(s)!</h3>
+                <p>Visit the Instant Win Games page to spend them.</p>
+                <a href="instant-games.html" class="btn" style="margin-top:1rem;">Go to Games</a>
             `;
         }
 
-        openModal('modal-container', `
+        openModal(`
             <h2>Entry Successful!</h2>
             ${successMessage}
-            <button data-close-modal class="btn btn-secondary" onclick="window.location.reload()">Done</button>
+            <button data-close-modal class="btn btn-secondary" style="margin-top:1rem;" onclick="window.location.reload()">Done</button>
         `);
     } catch (error) {
         console.error("Entry failed:", error);
-        openModal('modal-container', `<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
+        openModal(`<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
     }
 }
 
-
-// --- UTILITY FUNCTIONS (Modal, Countdown, HTML) ---
-// (These are unchanged, but included for completeness)
-
-function openModal(modalId, content) {
-    let modal, modalContent;
-    modal = document.getElementById(modalId);
-    if (!modal) return;
-    
-    modalContent = modal.querySelector('.modal-content');
-    if (content) modalContent.innerHTML = content;
-    
+// --- UTILITY FUNCTIONS ---
+function openModal(content) {
+    const modal = document.getElementById('modal-container');
+    const modalContent = document.getElementById('modal-content');
+    if (!modal || !modalContent) return;
+    modalContent.innerHTML = content;
     modal.classList.add('show');
 }
 
-function closeModal(modalId) {
-    const modalToClose = modalId ? document.getElementById(modalId) : document.querySelector('.modal-container.show');
-    if (modalToClose) modalToClose.classList.remove('show');
+function closeModal() {
+    const modal = document.querySelector('.modal-container.show');
+    if (modal) modal.classList.remove('show');
 }
 
-// Universal listener to close modals
 document.addEventListener('click', (e) => {
     if (e.target.matches('[data-close-modal]')) {
         closeModal();
     }
-    // Also close if the modal overlay background is clicked
-    if (e.target.matches('.modal-container.show')) {
-        closeModal();
-    }
 });
-
 
 function createCompetitionHTML(data) {
     const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');

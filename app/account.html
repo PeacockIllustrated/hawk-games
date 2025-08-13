@@ -15,13 +15,19 @@
     <main class="container">
         <h2 class="section-title">My Account</h2>
         <div class="account-layout">
-            <aside id="profile-card" class="profile-card">
-                <!-- JS populates this -->
-                <div class="placeholder">Loading Profile...</div>
+            <!-- This is the updated profile card structure -->
+            <aside class="profile-card">
+                <img id="account-user-avatar" class="profile-avatar" alt="User Avatar" src="https://i.pravatar.cc/150">
+                <h2 id="account-user-name" class="profile-name">Loading...</h2>
+                <p id="account-user-email" class="profile-email">...</p>
+                <div id="admin-panel-container"></div> <!-- Admin button will be injected here -->
+                <div class="profile-actions">
+                    <button id="sign-out-btn" class="btn">Sign Out</button>
+                </div>
             </aside>
 
             <div class="account-main-content">
-                <!-- GDPR Marketing Consent Section -->
+                <!-- Communication Preferences -->
                 <div class="content-panel">
                     <h3>Communication Preferences</h3>
                     <div class="preference-row">
@@ -37,6 +43,7 @@
                 <!-- User Entries Section -->
                 <div class="content-panel">
                     <h3>Your Competition Entries</h3>
+                    <!-- The new account.js will fill this div -->
                     <div id="entries-list">
                         <div class="placeholder">Loading your entries...</div>
                     </div>
@@ -47,7 +54,10 @@
 
     <footer class="main-footer"></footer>
 
-    <script type="module" src="js/auth.js"></script>
+    <!-- Load the final, corrected account script -->
     <script type="module" src="js/account.js"></script>
+    
+    <!-- Auth script is needed for header/footer rendering -->
+    <script type="module" src="js/auth.js"></script>
 </body>
 </html>

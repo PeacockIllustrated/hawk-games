@@ -77,140 +77,15 @@ function setupEntryLogic(correctAnswer) {
             return;
         }
         
-        // This is the new branching logic for the "Spin the Wheel" experience
-        const isInstantWinComp = currentCompetitionData?.instantWinsConfig?.enabled;
-        if (isInstantWinComp) {
-            handleInstantWinEntry();
-        } else {
-            showStandardConfirmationModal();
-        }
+        // This function now handles ALL entry types
+        showConfirmationModal();
     });
 }
 
 
-// --- NEW: Instant Win Wheel Logic ---
+// --- Universal Entry Flow ---
 
-function handleInstantWinEntry() {
-    const selectedTicket = document.querySelector('.ticket-option.selected');
-    if (!selectedTicket) {
-        openModal('modal-container', `<h2>Select Tickets</h2><p>Please choose a ticket bundle.</p><button data-close-modal class="btn">OK</button>`);
-        return;
-    }
-    const ticketsBought = parseInt(selectedTicket.dataset.amount);
-
-    // 1. Build the wheel dynamically from competition data
-    const prizes = currentCompetitionData.instantWinsConfig.prizes || [];
-    const wheel = document.getElementById('wheel');
-    
-    // Create a list of all individual prizes
-    const allPrizeValues = [];
-    prizes.forEach(tier => {
-        for (let i = 0; i < tier.count; i++) {
-            allPrizeValues.push(tier.value);
-        }
-    });
-
-    // For a better user experience, we ensure there are always some "No Win" slices.
-    const numberOfSlices = Math.max(12, allPrizeValues.length * 2);
-    const noWinSlices = numberOfSlices - allPrizeValues.length;
-
-    let wheelSlices = [...allPrizeValues];
-    for(let i = 0; i < noWinSlices; i++) {
-        wheelSlices.push(0); // 0 represents "No Win"
-    }
-
-    // Shuffle the slices so prize positions are random on the wheel
-    wheelSlices.sort(() => Math.random() - 0.5);
-
-    // Generate the CSS and HTML for the wheel
-    const sliceAngle = 360 / numberOfSlices;
-    let gradientParts = [];
-    let htmlSegments = '';
-    const colors = ['#333', '#444']; // Alternating background colors for slices
-
-    wheelSlices.forEach((prizeValue, i) => {
-        const startAngle = i * sliceAngle;
-        const endAngle = (i + 1) * sliceAngle;
-        gradientParts.push(`${colors[i % 2]} ${startAngle}deg ${endAngle}deg`);
-
-        const labelAngle = startAngle + (sliceAngle / 2);
-        const labelText = prizeValue > 0 ? `£${prizeValue}` : 'Try Again';
-        
-        htmlSegments += `
-            <div class="wheel-segment" style="transform: rotate(${labelAngle}deg);">
-                <span class="segment-label">${labelText}</span>
-            </div>
-        `;
-    });
-    
-    wheel.style.background = `conic-gradient(${gradientParts.join(', ')})`;
-    wheel.innerHTML = htmlSegments;
-
-    // 2. Show the modal and wire up the spin button
-    const spinButton = document.getElementById('spin-button');
-    const spinResultContainer = document.getElementById('spin-result');
-
-    // Reset UI from any previous spin
-    spinResultContainer.innerHTML = '';
-    spinButton.disabled = false;
-    spinButton.style.display = 'block';
-    wheel.style.transition = 'transform 5s cubic-bezier(0.25, 0.1, 0.25, 1)';
-    wheel.style.transform = `rotate(0deg)`;
-
-    openModal('instant-win-modal');
-
-    spinButton.addEventListener('click', async () => {
-        spinButton.disabled = true;
-        spinButton.textContent = 'SPINNING...';
-
-        try {
-            // 3. Call the secure Cloud Function to get the REAL result
-            const allocateTicketsAndCheckWins = httpsCallable(functions, 'allocateTicketsAndCheckWins');
-            const result = await allocateTicketsAndCheckWins({ compId: competitionId, ticketsBought });
-            const data = result.data;
-            
-            // 4. Determine the outcome and calculate the target slice
-            const totalWinnings = data.wonPrizes.reduce((sum, prize) => sum + prize.prizeValue, 0);
-            let targetSliceIndex = wheelSlices.findIndex(sliceValue => sliceValue === (totalWinnings > 0 ? totalWinnings : 0));
-            
-            // Failsafe if the exact prize value isn't on the wheel (e.g., multiple small wins)
-            if (targetSliceIndex === -1) {
-                targetSliceIndex = wheelSlices.findIndex(sliceValue => sliceValue === 0);
-            }
-
-            // 5. Calculate the spin angle
-            const sliceCenterAngle = (targetSliceIndex * sliceAngle) + (sliceAngle / 2);
-            // Add multiple full rotations for visual effect, plus a random offset within the slice
-            const randomOffset = (Math.random() - 0.5) * (sliceAngle * 0.8);
-            const finalAngle = (360 * 5) + sliceCenterAngle + randomOffset;
-            
-            // 6. SPIN!
-            wheel.style.transform = `rotate(${finalAngle}deg)`;
-
-            // 7. Handle the result after the animation finishes
-            setTimeout(() => {
-                let resultHTML = '';
-                if (totalWinnings > 0) {
-                    resultHTML = `<h2>Congratulations!</h2><p>You won £${totalWinnings.toFixed(2)} instantly!</p>`;
-                } else {
-                    resultHTML = `<h2>Better Luck Next Time!</h2><p>Your tickets are still in the main prize draw.</p>`;
-                }
-                resultHTML += `<button data-close-modal class="btn" onclick="window.location.reload()">Continue</button>`;
-                spinResultContainer.innerHTML = resultHTML;
-                spinButton.style.display = 'none';
-            }, 5500); // 500ms after the spin animation ends
-
-        } catch (error) {
-            console.error("Entry failed:", error);
-            closeModal('instant-win-modal');
-            openModal('modal-container', `<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
-        }
-    }, { once: true });
-}
-
-// --- Standard (Non-Instant Win) Entry Flow ---
-
-function showStandardConfirmationModal() {
+function showConfirmationModal() {
     const selectedTicket = document.querySelector('.ticket-option.selected');
     if (!selectedTicket) {
         openModal('modal-container', `<h2>Select Tickets</h2><p>Please choose a ticket bundle.</p><button data-close-modal class="btn">OK</button>`);
@@ -224,25 +99,40 @@ function showStandardConfirmationModal() {
         <p>You are about to purchase <strong>${tickets}</strong> entries for <strong>£${price}</strong>.</p>
         <div class="modal-actions">
             <button data-close-modal class="btn btn-secondary">Cancel</button>
-            <button id="confirm-standard-entry-btn" class="btn">Confirm & Pay</button>
+            <button id="confirm-entry-btn" class="btn">Confirm & Pay</button>
         </div>
     `);
     
-    const confirmBtn = document.getElementById('confirm-standard-entry-btn');
-    confirmBtn.addEventListener('click', () => handleStandardEntry(tickets), { once: true });
+    const confirmBtn = document.getElementById('confirm-entry-btn');
+    confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
 }
 
-async function handleStandardEntry(ticketsBought) {
+async function handleEntry(ticketsBought) {
     openModal('modal-container', `<h2>Processing Entry...</h2><p>Please wait.</p>`);
     try {
-        const allocateTicketsAndCheckWins = httpsCallable(functions, 'allocateTicketsAndCheckWins');
-        const result = await allocateTicketsAndCheckWins({ compId: competitionId, ticketsBought });
+        // We now call our new, universal 'allocateTicketsAndAwardTokens' function
+        const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
+        const result = await allocateTicketsAndAwardTokens({ compId: competitionId, ticketsBought });
         const data = result.data;
         
+        let successMessage = `<p>Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} are registered. Good luck!</p>`;
+        
+        // Check if tokens were awarded and add a special message and call-to-action
+        if (data.awardedTokens && data.awardedTokens.length > 0) {
+            const tokenCount = data.awardedTokens.length;
+            successMessage += `
+                <div class="token-award-banner">
+                    <h3>You've earned ${tokenCount} Spin Token${tokenCount > 1 ? 's' : ''}!</h3>
+                    <p>Visit the Instant Win Games page to spend them for a chance to win now!</p>
+                    <a href="instant-games.html" class="btn">Spend Tokens</a>
+                </div>
+            `;
+        }
+
         openModal('modal-container', `
             <h2>Entry Successful!</h2>
-            <p>Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} are registered. Good luck!</p>
-            <button data-close-modal class="btn" onclick="window.location.reload()">Done</button>
+            ${successMessage}
+            <button data-close-modal class="btn btn-secondary" onclick="window.location.reload()">Done</button>
         `);
     } catch (error) {
         console.error("Entry failed:", error);
@@ -256,14 +146,13 @@ async function handleStandardEntry(ticketsBought) {
 
 function openModal(modalId, content) {
     let modal, modalContent;
-    if (modalId === 'modal-container') {
-        modal = document.getElementById(modalId);
-        modalContent = modal.querySelector('.modal-content');
-        if (content) modalContent.innerHTML = content;
-    } else {
-        modal = document.getElementById(modalId);
-    }
-    if (modal) modal.classList.add('show');
+    modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    modalContent = modal.querySelector('.modal-content');
+    if (content) modalContent.innerHTML = content;
+    
+    modal.classList.add('show');
 }
 
 function closeModal(modalId) {
@@ -271,8 +160,13 @@ function closeModal(modalId) {
     if (modalToClose) modalToClose.classList.remove('show');
 }
 
+// Universal listener to close modals
 document.addEventListener('click', (e) => {
     if (e.target.matches('[data-close-modal]')) {
+        closeModal();
+    }
+    // Also close if the modal overlay background is clicked
+    if (e.target.matches('.modal-container.show')) {
         closeModal();
     }
 });

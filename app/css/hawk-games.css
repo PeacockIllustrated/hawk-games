@@ -241,3 +241,89 @@ input:checked + .slider:before { transform: translateX(26px); }
     color: #ccc;
     font-size: 0.9rem;
 }
+
+/* --- 10. Account Page - Competition Entry Group Styles --- */
+
+/* This replaces the old .entry-item styles */
+.competition-entry-group {
+    background-color: var(--dark-bg); /* Darker than the panel bg for contrast */
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    margin-bottom: 1.5rem;
+    overflow: hidden; /* Ensures child border-radius is respected */
+}
+
+.competition-group-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: #222; /* Slightly lighter header */
+    border-bottom: 1px solid var(--border-color);
+}
+
+.group-header-image {
+    width: 100px;
+    height: 65px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.group-header-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.group-header-details h4 {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.entry-list-container {
+    padding: 0.5rem 1rem 1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.entry-list-item {
+    display: grid;
+    grid-template-columns: 1fr 1fr 2fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.entry-list-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0.25rem;
+}
+
+.entry-date {
+    color: #aaa;
+}
+
+.entry-tickets {
+    font-weight: 700;
+}
+
+.entry-numbers {
+    color: #ccc;
+    font-family: monospace;
+}
+
+.instant-win-tag {
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    justify-self: end; /* Aligns the tag to the right */
+}

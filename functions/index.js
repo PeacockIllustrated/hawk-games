@@ -7,39 +7,30 @@ const { createHash } = require("crypto");
 initializeApp();
 const db = getFirestore();
 
-// Helper to check if the caller is an admin.
+// --- Helpers (Unchanged) ---
 const assertIsAdmin = async (context) => {
     if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
     const userDoc = await db.collection('users').doc(context.auth.uid).get();
     if (!userDoc.exists || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'Admin privileges required.');
 };
-
-// Helper to check for authentication.
 const assertIsAuthenticated = (context) => {
     if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
 };
-
 const functionOptions = {
     region: "us-central1",
-    cors: [
-        "https://the-hawk-games-64239.web.app",
-        "https://the-hawk-games.co.uk",
-        /the-hawk-games\.co\.uk$/,
-        "http://localhost:5000",
-        "http://127.0.0.1:5000"
-    ]
+    cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
 };
 
+// --- seedInstantWins (Unchanged) ---
 exports.seedInstantWins = onCall(functionOptions, async (request) => {
+    // This function's logic remains the same.
     await assertIsAdmin(request);
     const { compId, instantWinPrizes, totalTickets } = request.data;
     if (!compId || !instantWinPrizes || !totalTickets) throw new HttpsError('invalid-argument', 'Missing parameters.');
     const totalPrizeCount = instantWinPrizes.reduce((sum, tier) => sum + tier.count, 0);
     if (totalPrizeCount > totalTickets) throw new HttpsError('invalid-argument', 'Too many prizes for the number of tickets.');
     const winningPicks = new Set();
-    while (winningPicks.size < totalPrizeCount) {
-        winningPicks.add(crypto.randomInt(0, totalTickets));
-    }
+    while (winningPicks.size < totalPrizeCount) { winningPicks.add(crypto.randomInt(0, totalTickets)); }
     const sortedWinningNumbers = Array.from(winningPicks).sort((a, b) => a - b);
     const salt = crypto.randomBytes(16).toString('hex');
     const positionsToHash = JSON.stringify(sortedWinningNumbers);
@@ -62,9 +53,9 @@ exports.seedInstantWins = onCall(functionOptions, async (request) => {
     return { success: true, positionsHash: hash };
 });
 
-// REPLACE the existing allocateTicketsAndCheckWins function in /functions/index.js
-
-exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) => {
+// --- allocateTicketsAndCheckWins is now allocateTicketsAndAwardTokens ---
+// THIS IS THE MAJORLY UPGRADED FUNCTION
+exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
     const { compId, ticketsBought } = request.data;
@@ -83,7 +74,6 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         const userData = userDoc.data();
 
         if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
-        if (compData.endDate && compData.endDate.toDate() < new Date()) throw new HttpsError('failed-precondition', 'Competition has ended.');
         
         const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
         const limit = compData.userEntryLimit || 75;
@@ -94,89 +84,73 @@ exports.allocateTicketsAndCheckWins = onCall(functionOptions, async (request) =>
         
         const ticketStartNumber = ticketsSoldBefore;
         
-        const instantWinsRef = compRef.collection('instant_wins');
-        const potentialWinDocsRefs = [];
-        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
-            for (let i = 0; i < ticketsBought; i++) {
-                const currentTicketNumber = ticketStartNumber + i;
-                potentialWinDocsRefs.push(instantWinsRef.doc(String(currentTicketNumber)));
-            }
-        }
+        // --- ALL WRITES HAPPEN LAST ---
         
-        const potentialWinDocs = potentialWinDocsRefs.length > 0 ? await transaction.getAll(...potentialWinDocsRefs) : [];
-        
-        const wonPrizes = [];
-        potentialWinDocs.forEach(winDoc => {
-            if (winDoc.exists && winDoc.data().claimed === false) {
-                wonPrizes.push({ ticketNumber: winDoc.data().ticketNumber, prizeValue: winDoc.data().prizeValue });
-            }
-        });
-        
+        // Write #1 & #2: Update competition and user entry counts
         transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
         transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
         
+        // Write #3: Create the user's entry document
         const entryRef = compRef.collection('entries').doc();
-        // **THE NEW PART**: We now add the `wonPrizes` array to the entry document.
         transaction.set(entryRef, {
-            userId: uid,
-            userDisplayName: userData.displayName || "N/A",
-            ticketsBought,
-            ticketStart: ticketStartNumber,
-            ticketEnd: ticketStartNumber + ticketsBought - 1,
-            enteredAt: FieldValue.serverTimestamp(),
-            entryType: 'paid',
-            instantWins: wonPrizes // Store the wins here!
+            userId: uid, userDisplayName: userData.displayName || "N/A",
+            ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
+            enteredAt: FieldValue.serverTimestamp(), entryType: 'paid',
+            instantWins: [] // This field is now for prizes won from tokens, not at purchase
         });
         
-        // Claim the wins *after* recording them on the entry
-        wonPrizes.forEach(prize => {
-            const winDocRef = instantWinsRef.doc(String(prize.ticketNumber));
-            transaction.update(winDocRef, { claimed: true, claimedBy: uid, claimedAt: FieldValue.serverTimestamp() });
-        });
+        // --- NEW LOGIC: Award Spin Tokens if it's an Instant Win competition ---
+        let newTokens = [];
+        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
+            for (let i = 0; i < ticketsBought; i++) {
+                newTokens.push({
+                    tokenId: crypto.randomBytes(16).toString('hex'), // A unique, unguessable ID
+                    compId: compId,
+                    compTitle: compData.title,
+                    earnedAt: FieldValue.serverTimestamp() // Use server time for accuracy
+                });
+            }
+            // Write #4: Atomically add the new tokens to the user's token array
+            transaction.update(userRef, {
+                spinTokens: FieldValue.arrayUnion(...newTokens)
+            });
+        }
         
-        return { success: true, ticketStart: ticketStartNumber, ticketsBought, wonPrizes };
+        // Return a success message and include the new tokens for immediate UI update
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens };
     });
 });
 
+// --- drawWinner (Unchanged) ---
 exports.drawWinner = onCall(functionOptions, async (request) => {
+    // This function's logic remains the same.
     await assertIsAdmin(request);
     const { compId } = request.data;
     if (!compId) throw new HttpsError('invalid-argument', 'Competition ID is required.');
-    
     const compRef = db.collection('competitions').doc(compId);
     const entriesRef = compRef.collection('entries');
-    
     const compDocForCheck = await compRef.get();
     if (!compDocForCheck.exists) throw new HttpsError('not-found', 'Competition not found.');
     const compDataForCheck = compDocForCheck.data();
-
     if (compDataForCheck.status !== 'ended') throw new HttpsError('failed-precondition', 'Competition must be ended.');
     if (compDataForCheck.winnerId) throw new HttpsError('failed-precondition', 'Winner already drawn.');
     if (!compDataForCheck.ticketsSold || compDataForCheck.ticketsSold === 0) throw new HttpsError('failed-precondition', 'No entries to draw from.');
-
     const winningTicketNumber = crypto.randomInt(0, compDataForCheck.ticketsSold);
-    
     const winnerQuery = entriesRef.where('ticketStart', '<=', winningTicketNumber).orderBy('ticketStart', 'desc').limit(1);
     const winnerSnapshot = await winnerQuery.get();
-    
     if (winnerSnapshot.empty) throw new HttpsError('internal', `Could not find owner for ticket #${winningTicketNumber}.`);
-    
     const winnerEntryDoc = winnerSnapshot.docs[0];
     const winnerData = winnerEntryDoc.data();
     const winnerId = winnerData.userId;
-    
     return await db.runTransaction(async (transaction) => {
         const compDoc = await transaction.get(compRef); 
         const compData = compDoc.data();
-        
         const winnerUserDocSnap = await db.collection('users').doc(winnerId).get();
         const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
         const winnerDisplayName = winnerData.userDisplayName;
-
         transaction.update(compRef, { status: 'drawn', winnerId, winnerDisplayName, winningTicketNumber, drawnAt: FieldValue.serverTimestamp() });
         const pastWinnerRef = db.collection('pastWinners').doc(compId);
         transaction.set(pastWinnerRef, { prizeTitle: compData.title, prizeImage: compData.prizeImage, winnerId, winnerDisplayName, winnerPhotoURL, winningTicketNumber, drawDate: FieldValue.serverTimestamp() });
-        
         return { success: true, winnerDisplayName, winningTicketNumber };
     });
 });

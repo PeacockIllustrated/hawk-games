@@ -440,3 +440,25 @@ input:checked + .slider:before { transform: translateX(26px); }
     font-size: 1.2rem;
     font-weight: bold;
 }
+
+/* --- 13. Spin Token Balance Indicator --- */
+.spin-token-balance {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: rgba(224, 169, 74, 0.1); /* Faint gold background */
+    border: 1px solid var(--primary-gold);
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--primary-gold);
+    transition: all 0.2s ease-in-out;
+}
+.spin-token-balance:hover {
+    background-color: rgba(224, 169, 74, 0.2);
+    box-shadow: 0 0 10px rgba(224, 169, 74, 0.5);
+}
+.token-icon {
+    font-size: 1rem;
+}

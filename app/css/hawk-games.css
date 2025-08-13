@@ -327,3 +327,25 @@ input:checked + .slider:before { transform: translateX(26px); }
     font-size: 0.8rem;
     justify-self: end; /* Aligns the tag to the right */
 }
+
+/* --- 11. Homepage - Section Enhancements --- */
+
+.section-subtitle {
+    font-size: 1.1rem;
+    color: #ccc;
+    text-align: center;
+    max-width: 800px;
+    margin: -2.5rem auto 3rem auto; /* Pulls it up under the title */
+    line-height: 1.7;
+}
+
+.competition-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 2.5rem;
+}
+
+/* Add some extra space between homepage sections */
+#instant-win-section, #live-competitions-section {
+    padding: 4rem 0;
+}

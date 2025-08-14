@@ -111,7 +111,7 @@ function renderHeader(isLoggedIn) {
     const headerHTML = `
         <div class="container">
             <a href="index.html" class="logo">
-                <img src="assets/logo.png" alt="The Hawk Games">
+                <img src="assets/logo-icon.png" alt="The Hawk Games">
             </a>
             <nav class="main-nav">${navLinks}</nav>
         </div>

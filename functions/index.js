@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, HttpsError } = require("firebase-functions/v2/oncall");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
@@ -52,7 +52,7 @@ exports.seedInstantWins = onCall(functionOptions, async (request) => {
     return { success: true, positionsHash: hash };
 });
 
-// --- allocateTicketsAndAwardTokens (Minor Improvement) ---
+// --- allocateTicketsAndAwardTokens (FIXED) ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -88,7 +88,8 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         
         let newTokens = [];
         if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
-            const earnedAt = FieldValue.serverTimestamp(); // **IMPROVEMENT**: Use a single timestamp for all tokens in a batch
+            // FIX: Use a concrete Date object instead of a FieldValue placeholder
+            const earnedAt = new Date();
             for (let i = 0; i < ticketsBought; i++) {
                 newTokens.push({
                     tokenId: crypto.randomBytes(16).toString('hex'),
@@ -104,7 +105,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
 });
 
 
-// --- NEW FUNCTION: spendSpinToken ---
+// --- spendSpinToken (Unchanged) ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;

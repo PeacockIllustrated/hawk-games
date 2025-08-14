@@ -52,99 +52,56 @@ exports.seedInstantWins = onCall(functionOptions, async (request) => {
     return { success: true, positionsHash: hash };
 });
 
-// --- allocateTicketsAndAwardTokens (INSTRUMENTED FOR DEBUGGING) ---
+// --- allocateTicketsAndAwardTokens ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
-    console.log("[DEBUG] allocateTicketsAndAwardTokens invoked.");
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const { compId, ticketsBought } = request.data;
+    if (!compId || !ticketsBought || ticketsBought <= 0) throw new HttpsError('invalid-argument', 'Invalid parameters.');
+    const compRef = db.collection('competitions').doc(compId);
+    const userRef = db.collection('users').doc(uid);
     
-    try {
-        assertIsAuthenticated(request);
-        const uid = request.auth.uid;
-        const { compId, ticketsBought } = request.data;
+    return await db.runTransaction(async (transaction) => {
+        const compDoc = await transaction.get(compRef);
+        const userDoc = await transaction.get(userRef);
+        if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+        const compData = compDoc.data();
+        const userData = userDoc.data();
+        if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
+        const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
+        const limit = compData.userEntryLimit || 75;
+        if (userEntryCount + ticketsBought > limit) throw new HttpsError('failed-precondition', `Entry limit exceeded.`);
+        const ticketsSoldBefore = compData.ticketsSold || 0;
+        if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available.`);
+        const ticketStartNumber = ticketsSoldBefore;
 
-        console.log(`[DEBUG] Received request for user UID: ${uid}, compId: ${compId}, ticketsBought: ${ticketsBought}`);
-
-        if (!compId || !ticketsBought || ticketsBought <= 0) {
-            console.error("[DEBUG] Invalid parameters received.");
-            throw new HttpsError('invalid-argument', 'Invalid parameters.');
-        }
-
-        const compRef = db.collection('competitions').doc(compId);
-        const userRef = db.collection('users').doc(uid);
-        
-        return await db.runTransaction(async (transaction) => {
-            console.log("[DEBUG] Starting Firestore transaction.");
-            const compDoc = await transaction.get(compRef);
-            const userDoc = await transaction.get(userRef);
-
-            if (!compDoc.exists) {
-                 console.error(`[DEBUG] Competition document not found for compId: ${compId}`);
-                 throw new HttpsError('not-found', 'Competition not found.');
-            }
-            if (!userDoc.exists) {
-                console.error(`[DEBUG] User document not found for UID: ${uid}`);
-                throw new HttpsError('not-found', 'User profile not found.');
-            }
-            
-            const compData = compDoc.data();
-            const userData = userDoc.data();
-            console.log("[DEBUG] Fetched compData and userData successfully.");
-            // Log potentially problematic fields
-            console.log(`[DEBUG] User's current spinTokens field type: ${typeof userData.spinTokens}, isArray: ${Array.isArray(userData.spinTokens)}`);
-
-
-            if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
-            const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
-            const limit = compData.userEntryLimit || 75;
-            if (userEntryCount + ticketsBought > limit) throw new HttpsError('failed-precondition', `Entry limit exceeded.`);
-            const ticketsSoldBefore = compData.ticketsSold || 0;
-            if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available.`);
-            
-            console.log("[DEBUG] Pre-flight checks passed. Proceeding with writes.");
-            
-            const ticketStartNumber = ticketsSoldBefore;
-
-            transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
-            transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
-            
-            const entryRef = compRef.collection('entries').doc();
-            transaction.set(entryRef, {
-                userId: uid, userDisplayName: userData.displayName || "N/A",
-                ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
-                enteredAt: FieldValue.serverTimestamp(), entryType: 'paid',
-                instantWins: []
-            });
-            
-            let newTokens = [];
-            if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
-                console.log("[DEBUG] Instant wins are enabled. Generating tokens.");
-                const earnedAt = new Date();
-                for (let i = 0; i < ticketsBought; i++) {
-                    newTokens.push({
-                        tokenId: crypto.randomBytes(16).toString('hex'),
-                        compId: compId,
-                        compTitle: compData.title,
-                        earnedAt: earnedAt 
-                    });
-                }
-                
-                console.log(`[DEBUG] Generated ${newTokens.length} new tokens. Preparing to update user document.`);
-                transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
-                console.log("[DEBUG] User spinTokens update added to transaction.");
-            }
-
-            console.log("[DEBUG] Transaction operations queued. Committing.");
-            return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens.length };
+        transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
+        transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
+        const entryRef = compRef.collection('entries').doc();
+        transaction.set(entryRef, {
+            userId: uid, userDisplayName: userData.displayName || "N/A",
+            ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
+            enteredAt: FieldValue.serverTimestamp(), entryType: 'paid',
+            instantWins: []
         });
-
-    } catch (error) {
-        console.error("!!! CRITICAL ERROR in allocateTicketsAndAwardTokens !!!", error);
-        if (error instanceof HttpsError) {
-            throw error;
+        
+        let newTokens = [];
+        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
+            const earnedAt = new Date();
+            for (let i = 0; i < ticketsBought; i++) {
+                newTokens.push({
+                    tokenId: crypto.randomBytes(16).toString('hex'),
+                    compId: compId,
+                    compTitle: compData.title,
+                    earnedAt: earnedAt 
+                });
+            }
+            transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
         }
-        throw new HttpsError('internal', 'An unexpected error occurred.', { originalError: error.message });
-    }
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens.length };
+    });
 });
-
 
 // --- spendSpinToken ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
@@ -193,6 +150,45 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
+// --- purchaseSpinTokens (FIXED) ---
+exports.purchaseSpinTokens = onCall(functionOptions, async (request) => {
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const { compId, amount, price } = request.data;
+
+    if (!compId || !amount || !price) {
+        throw new HttpsError('invalid-argument', 'Missing parameters for token purchase.');
+    }
+
+    const userRef = db.collection('users').doc(uid);
+    const compRef = db.collection('competitions').doc(compId);
+
+    const compSnap = await compRef.get();
+    // ========= THIS IS THE FIX =========
+    // Changed compSnap.exists() to compSnap.exists
+    if (!compSnap.exists) {
+    // ===================================
+        throw new HttpsError('not-found', 'The competition associated with this prize pool is no longer available.');
+    }
+    const compData = compSnap.data();
+
+    let newTokens = [];
+    const earnedAt = new Date();
+    for (let i = 0; i < amount; i++) {
+        newTokens.push({
+            tokenId: crypto.randomBytes(16).toString('hex'),
+            compId: compId,
+            compTitle: compData.title,
+            earnedAt: earnedAt
+        });
+    }
+
+    await userRef.update({
+        spinTokens: FieldValue.arrayUnion(...newTokens)
+    });
+
+    return { success: true, tokensAdded: newTokens.length };
+});
 
 // --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {
@@ -225,46 +221,4 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
         transaction.set(pastWinnerRef, { prizeTitle: compData.title, prizeImage: compData.prizeImage, winnerId, winnerDisplayName, winnerPhotoURL, winningTicketNumber, drawDate: FieldValue.serverTimestamp() });
         return { success: true, winnerDisplayName, winningTicketNumber };
     });
-});
-
-// Add this to the end of functions/index.js
-
-exports.purchaseSpinTokens = onCall(functionOptions, async (request) => {
-    assertIsAuthenticated(request);
-    const uid = request.auth.uid;
-    const { compId, amount, price } = request.data;
-
-    // In a real-world scenario, you would process a payment with Stripe here.
-    // For now, we will simulate a successful payment and award the tokens.
-    if (!compId || !amount || !price) {
-        throw new HttpsError('invalid-argument', 'Missing parameters for token purchase.');
-    }
-
-    const userRef = db.collection('users').doc(uid);
-    const compRef = db.collection('competitions').doc(compId);
-
-    const compSnap = await compRef.get();
-    if (!compSnap.exists()) {
-        throw new HttpsError('not-found', 'The competition associated with this prize pool is no longer available.');
-    }
-    const compData = compSnap.data();
-
-    let newTokens = [];
-    const earnedAt = new Date();
-    for (let i = 0; i < amount; i++) {
-        newTokens.push({
-            tokenId: crypto.randomBytes(16).toString('hex'),
-            compId: compId,
-            compTitle: compData.title,
-            earnedAt: earnedAt
-        });
-    }
-
-    await userRef.update({
-        spinTokens: FieldValue.arrayUnion(...newTokens)
-    });
-
-    // You would also record the transaction in a separate 'orders' collection here.
-
-    return { success: true, tokensAdded: newTokens.length };
 });

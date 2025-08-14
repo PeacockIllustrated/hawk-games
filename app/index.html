@@ -6,24 +6,46 @@
     <title>Competitions | The Hawk Games</title>
     <link rel="stylesheet" href="css/hawk-games.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <header class="main-header"></header>
     
     <main>
-        <!-- This section structure will be populated by main.js -->
+        <!-- HERO SECTION -->
         <section class="hero-home">
             <div class="hero-overlay"></div>
             <div class="container hero-content">
-                <h1>Win Prizes Instantly</h1>
-                <p>Enter our skill-based competitions for a chance to win life-changing prizes. Cars, cash, tech, and more.</p>
-                <a href="#instant-win-section" class="btn">View Instant Win Games</a>
+                <h1>Your Chance to Win Life-Changing Prizes</h1>
+                <p>Enter our skill-based competitions and you could win cars, cash, luxury holidays, and the latest tech. Your next win is just a click away.</p>
+                <a href="#live-competitions-section" class="btn">View Competitions</a>
             </div>
         </section>
 
-        <!-- NEW: Dedicated Instant Win Section -->
+        <!-- HOW IT WORKS SECTION -->
+        <section id="how-it-works-section" class="container">
+            <h2 class="section-title">How It Works</h2>
+            <div class="how-it-works-grid">
+                <div class="step-card">
+                    <div class="step-icon">1</div>
+                    <h3>Pick Your Prize</h3>
+                    <p>Browse our live competitions and choose the prize you want to win.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">2</div>
+                    <h3>Answer The Question</h3>
+                    <p>Use your skill and knowledge to correctly answer the qualifying question.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">3</div>
+                    <h3>Get Your Tickets</h3>
+                    <p>Select your number of entries and complete your purchase to be in the draw.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- INSTANT WIN COMPETITIONS SECTION -->
         <section id="instant-win-section" class="container">
             <h2 class="section-title">Instant Win Games</h2>
             <p class="section-subtitle">
@@ -34,7 +56,7 @@
             </div>
         </section>
 
-        <!-- Regular Competitions Section -->
+        <!-- REGULAR COMPETITIONS SECTION -->
         <section id="live-competitions-section" class="container">
             <h2 class="section-title">More Live Competitions</h2>
             <div id="competition-grid" class="competition-grid-container">
@@ -42,6 +64,14 @@
             </div>
         </section>
         
+        <!-- PAST WINNERS SECTION -->
+        <section id="past-winners-section" class="container">
+            <h2 class="section-title">See Our Latest Winners</h2>
+            <div id="past-winners-grid">
+                <div class="placeholder">Loading winner stories...</div>
+            </div>
+        </section>
+
     </main>
 
     <footer class="main-footer"></footer>

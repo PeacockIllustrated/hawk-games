@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 const loadAllCompetitions = async () => {
-    // Get references to BOTH new grid containers
     const instantWinGrid = document.getElementById('instant-win-grid');
     const regularGrid = document.getElementById('competition-grid');
 
@@ -19,7 +18,6 @@ const loadAllCompetitions = async () => {
     }
 
     try {
-        // A single, efficient query to get all live competitions
         const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("endDate", "asc"));
         const querySnapshot = await getDocs(q);
 
@@ -29,13 +27,11 @@ const loadAllCompetitions = async () => {
             return;
         }
 
-        // --- Separate competitions into two lists ---
         const instantWinComps = [];
         const regularComps = [];
 
         querySnapshot.forEach((doc) => {
             const compData = { id: doc.id, ...doc.data() };
-            // Check if the competition has instant wins enabled
             if (compData.instantWinsConfig && compData.instantWinsConfig.enabled === true) {
                 instantWinComps.push(compData);
             } else {
@@ -43,45 +39,49 @@ const loadAllCompetitions = async () => {
             }
         });
 
-        // --- Render the Instant Win Grid ---
         if (instantWinComps.length > 0) {
             instantWinGrid.innerHTML = instantWinComps.map(comp => createCompetitionCard(comp)).join('');
         } else {
             instantWinGrid.innerHTML = '<div class="hawk-card placeholder">No Instant Win games are live right now. Check back soon!</div>';
         }
 
-        // --- Render the Regular Competitions Grid ---
         if (regularComps.length > 0) {
             regularGrid.innerHTML = regularComps.map(comp => createCompetitionCard(comp)).join('');
         } else {
             regularGrid.innerHTML = '<div class="hawk-card placeholder">No other competitions are live right now.</div>';
         }
 
-        // This function works on all rendered cards, regardless of their grid
         startAllCountdowns();
 
     } catch (error) {
         console.error("Error loading competitions:", error);
         instantWinGrid.innerHTML = '<div class="hawk-card placeholder" style="color:red;">Could not load competitions.</div>';
-        regularGrid.innerHTML = ''; // Hide the second grid on a major error
+        regularGrid.innerHTML = '';
     }
 };
 
-// --- Load Past Winners ---
+// --- CORRECTED FUNCTION: Load Past Winners ---
 const loadPastWinners = async () => {
     const winnersGrid = document.getElementById('past-winners-grid');
     if (!winnersGrid) return;
 
     try {
-        const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"), where("winnerDisplayName", "!=", null));
+        // STEP 1: Simplify the query. Just order by the date.
+        const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"));
         const querySnapshot = await getDocs(q);
 
-        if (querySnapshot.empty) {
+        // STEP 2: Filter the results here in the code.
+        const validWinners = querySnapshot.docs
+            .map(doc => doc.data())
+            .filter(winner => winner.winnerDisplayName); // This ensures the winner has a name.
+
+        if (validWinners.length === 0) {
             winnersGrid.innerHTML = '<div class="placeholder">Our first winners will be announced soon!</div>';
             return;
         }
         
-        winnersGrid.innerHTML = querySnapshot.docs.map(doc => createWinnerCard(doc.data())).join('');
+        // STEP 3: Map over the *filtered* results.
+        winnersGrid.innerHTML = validWinners.map(winner => createWinnerCard(winner)).join('');
 
     } catch (error) {
         console.error("Error loading past winners:", error);
@@ -89,7 +89,6 @@ const loadPastWinners = async () => {
     }
 };
 
-// --- Create HTML for a single winner card ---
 function createWinnerCard(winnerData) {
     const avatar = winnerData.winnerPhotoURL || 'https://i.pravatar.cc/150?u=' + winnerData.winnerId;
     return `

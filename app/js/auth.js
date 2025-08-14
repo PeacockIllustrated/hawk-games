@@ -1,3 +1,5 @@
+// /app/js/auth.js
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
 import { 
     getAuth, 
@@ -14,10 +16,10 @@ import {
     getDoc, 
     setDoc, 
     serverTimestamp,
-    onSnapshot // NEW: Import for real-time updates
+    onSnapshot // For real-time updates
 } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-// Your web app's CORRECT Firebase configuration
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCHnYCOB-Y4tA1_ikShsBZJVD0KJfJJMdU",
   authDomain: "the-hawk-games-64239.firebaseapp.com",
@@ -47,7 +49,7 @@ onAuthStateChanged(auth, (user) => {
             userProfileUnsubscribe();
         }
 
-        // NEW: Listen for real-time changes to the user's profile (like spinTokens)
+        // Listen for real-time changes to the user's profile (like spinTokens)
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             const tokenBalanceEl = document.getElementById('spin-token-balance');
@@ -80,7 +82,7 @@ const createUserProfileIfNotExists = async (user) => {
             uid: user.uid, email: user.email, displayName: user.displayName,
             photoURL: user.photoURL, createdAt: serverTimestamp(),
             isAdmin: false, entryCount: {}, marketingConsent: false,
-            spinTokens: [] // NEW: Initialize with an empty array
+            spinTokens: [] // Initialize with an empty array for the new token economy
         };
         try {
             await setDoc(userRef, userData);

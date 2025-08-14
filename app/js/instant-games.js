@@ -12,8 +12,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app);
 let userTokens = [];
-let currentCompPrizes = [];
 let selectedTokenId = null;
+let selectedCompId = null;
 let isSpinning = false;
 let userProfileUnsubscribe = null;
 
@@ -24,11 +24,14 @@ const spinGameContainer = document.getElementById('spin-game-container');
 const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
 const spinResultContainer = document.getElementById('spin-result');
+const purchaseSection = document.getElementById('purchase-tokens-section');
+const bundlesContainer = document.getElementById('token-bundles-container');
+
 
 // --- Auth Gate ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        if (userProfileUnsubscribe) userProfileUnsubscribe(); // Unsubscribe from old listener if exists
+        if (userProfileUnsubscribe) userProfileUnsubscribe();
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -48,12 +51,10 @@ function renderTokenList() {
         tokenListContainer.innerHTML = `<div class="placeholder">You have no Spin Tokens. Enter Instant Win competitions to earn them!</div>`;
         return;
     }
-
     const groupedTokens = userTokens.reduce((acc, token) => {
         (acc[token.compId] = acc[token.compId] || []).push(token);
         return acc;
     }, {});
-
     let html = '';
     for (const compId in groupedTokens) {
         const tokens = groupedTokens[compId];
@@ -66,28 +67,23 @@ function renderTokenList() {
     tokenListContainer.innerHTML = html;
 }
 
-async function renderWheel(prizes) {
-    if (!wheel || prizes.length === 0) return;
-    
-    // Create a representative prize pool for the wheel visual
-    const wheelSegments = [...prizes];
-    while (wheelSegments.length < 12) { // Ensure a minimum number of segments for visual appeal
-        wheelSegments.push({ prizeValue: 0 }); // Add "Better Luck" segments
-    }
-    wheelSegments.sort(() => Math.random() - 0.5); // Shuffle for display
+function renderWheel(prizes) {
+    if (!wheel) return;
+    wheel.innerHTML = ''; // Clear old segments
+    const prizeSegments = prizes.length > 0 ? prizes : Array(12).fill({ prizeValue: 0 }); // Use real prizes or fall back to "Try Again"
+    while (prizeSegments.length < 12) { prizeSegments.push({ prizeValue: 0 }); } // Pad for visuals
+    prizeSegments.sort(() => Math.random() - 0.5); // Shuffle
 
-    const segmentAngle = 360 / wheelSegments.length;
-    const colors = ['#333', '#444'];
-    wheel.innerHTML = wheelSegments.map((prize, i) => {
-        const rotation = i * segmentAngle;
-        const clipPath = `polygon(50% 50%, 50% 0, ${50 + 50 * Math.tan(segmentAngle * Math.PI / 180)}% 0, 50% 50%)`;
-        const labelRotation = segmentAngle / 2;
+    const segmentAngle = 360 / prizeSegments.length;
+    prizeSegments.forEach((prize, i) => {
+        const labelRotation = (i * segmentAngle) + (segmentAngle / 2);
         const labelText = prize.prizeValue > 0 ? `£${prize.prizeValue}` : 'Try Again';
-
-        return `<div class="wheel-segment" style="transform: rotate(${rotation}deg); clip-path: ${clipPath}; background-color: ${colors[i % 2]};">
-                    <div class="segment-label" style="transform: translateX(-50%) rotate(${labelRotation}deg);">${labelText}</div>
-                </div>`;
-    }).join('');
+        const label = document.createElement('div');
+        label.className = 'segment-label';
+        label.textContent = labelText;
+        label.style.transform = `rotate(${labelRotation}deg) translate(0, -110px)`;
+        wheel.appendChild(label);
+    });
 
     gamePlaceholder.style.display = 'none';
     spinGameContainer.style.display = 'block';
@@ -96,21 +92,20 @@ async function renderWheel(prizes) {
     spinResultContainer.innerHTML = '';
 }
 
-// --- Data Fetching ---
-async function getCompetitionPrizes(compId) {
-    try {
-        const compRef = doc(db, 'competitions', compId);
-        const compSnap = await getDoc(compRef);
-        if (compSnap.exists() && compSnap.data().instantWinsConfig?.prizes) {
-            // Flatten the prize tiers into a simple list of values
-            const prizes = compSnap.data().instantWinsConfig.prizes;
-            return prizes.flatMap(tier => Array(tier.count).fill({ prizeValue: tier.value }));
-        }
-        return [];
-    } catch (error) {
-        console.error("Error fetching competition prizes:", error);
-        return [];
-    }
+function renderPurchaseBundles(compId) {
+    purchaseSection.style.display = 'block';
+    // Dummy bundles. In a real app, this would come from the competition config.
+    const bundles = [
+        { amount: 5, price: 4.50 },
+        { amount: 10, price: 8.00 },
+        { amount: 25, price: 15.00 },
+    ];
+    bundlesContainer.innerHTML = bundles.map(b => `
+        <button class="btn bundle-btn" data-comp-id="${compId}" data-amount="${b.amount}" data-price="${b.price}">
+            <span class="bundle-amount">${b.amount} Tokens</span>
+            <span class="bundle-price">£${b.price.toFixed(2)}</span>
+        </button>
+    `).join('');
 }
 
 // --- Event Handlers ---
@@ -118,19 +113,46 @@ tokenListContainer.addEventListener('click', async (e) => {
     const button = e.target.closest('.token-btn');
     if (!button || isSpinning) return;
 
-    // Deselect previous
     document.querySelectorAll('.token-btn.selected').forEach(btn => btn.classList.remove('selected'));
-    // Select new
     button.classList.add('selected');
     
     selectedTokenId = button.dataset.tokenId;
-    const compId = button.dataset.compId;
+    selectedCompId = button.dataset.compId;
 
     spinButton.disabled = true;
-    spinButton.textContent = 'Loading Prizes...';
+    spinButton.textContent = 'Loading Game...';
     
-    currentCompPrizes = await getCompetitionPrizes(compId);
-    await renderWheel(currentCompPrizes);
+    // In this new model, we just need to confirm the game can be played.
+    // The prize pool is handled entirely on the server.
+    const prizes = [{ prizeValue: 100 }, { prizeValue: 50 }, { prizeValue: 10 }]; // Dummy for visual
+    renderWheel(prizes);
+    renderPurchaseBundles(selectedCompId);
+});
+
+// NEW: Handle token purchase clicks
+bundlesContainer.addEventListener('click', async (e) => {
+    const button = e.target.closest('.bundle-btn');
+    if (!button) return;
+
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = 'Processing...';
+
+    const purchaseTokenFunc = httpsCallable(functions, 'purchaseSpinTokens');
+    try {
+        await purchaseTokenFunc({
+            compId: button.dataset.compId,
+            amount: parseInt(button.dataset.amount),
+            price: parseFloat(button.dataset.price)
+        });
+        // Success! The onSnapshot listener will update the token list automatically.
+    } catch (error) {
+        console.error("Token purchase failed:", error);
+        alert(`Purchase failed: ${error.message}`);
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
 });
 
 spinButton.addEventListener('click', async () => {
@@ -140,56 +162,50 @@ spinButton.addEventListener('click', async () => {
     spinButton.disabled = true;
     spinButton.textContent = 'SPINNING...';
     spinResultContainer.innerHTML = '';
-    wheel.style.transition = 'transform 6s cubic-bezier(0.25, 0.1, 0.25, 1)';
+
+    // Reset animation properties for a fresh spin
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
     
+    // Force browser to repaint before starting animation
+    void wheel.offsetWidth; 
+
+    wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
+
     try {
         const result = await spendTokenFunc({ tokenId: selectedTokenId });
         const { won, prizeValue } = result.data;
 
-        // --- Calculate Spin Result ---
-        const segmentCount = wheel.children.length;
+        // More satisfying spin calculation
+        const baseRotation = 360 * 8; 
+        const segmentCount = 12;
         const segmentAngle = 360 / segmentCount;
-        let targetSegmentIndex = -1;
+        let targetSegmentIndex = Math.floor(Math.random() * segmentCount); // Pick a random segment to land on
 
-        if (won) {
-            // Find a segment on the wheel that matches the prize value
-            const prizeSegments = Array.from(wheel.querySelectorAll('.segment-label')).map((el, i) => ({ text: el.textContent, index: i }));
-            const matchingSegment = prizeSegments.find(s => s.text === `£${prizeValue}`);
-            targetSegmentIndex = matchingSegment ? matchingSegment.index : 0;
-        } else {
-            // Find a "Try Again" segment
-             const prizeSegments = Array.from(wheel.querySelectorAll('.segment-label')).map((el, i) => ({ text: el.textContent, index: i }));
-            const matchingSegment = prizeSegments.find(s => s.text === 'Try Again');
-            targetSegmentIndex = matchingSegment ? matchingSegment.index : 0;
-        }
-        
-        // Complex rotation calculation for a realistic spin
-        const baseRotation = 360 * 5; // 5 full spins
-        const targetAngle = (targetSegmentIndex * segmentAngle) + (segmentAngle / 2); // Center of the segment
+        const targetAngle = (targetSegmentIndex * segmentAngle) + (segmentAngle / 2);
         const randomOffset = (Math.random() - 0.5) * (segmentAngle * 0.8);
         const finalAngle = baseRotation - targetAngle - randomOffset;
 
         wheel.style.transform = `rotate(${finalAngle}deg)`;
 
-        // --- Handle Result After Animation ---
         setTimeout(() => {
             if (won) {
                 spinResultContainer.innerHTML = `<p style="color:var(--primary-gold)">🎉 YOU WON £${prizeValue.toFixed(2)}! 🎉</p>`;
             } else {
                 spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
             }
+             // Let user spin again
+            spinButton.disabled = false;
+            spinButton.textContent = 'SPIN THE WHEEL';
             isSpinning = false;
-            // The onSnapshot listener will automatically remove the spent token from the UI.
-            selectedTokenId = null; 
-            document.querySelectorAll('.token-btn.selected').forEach(btn => btn.classList.remove('selected'));
-        }, 6500); // A bit longer than the spin animation
+        }, 8500); // Match timeout to animation duration
 
     } catch (error) {
         console.error("Error spending token:", error);
         spinResultContainer.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
-        isSpinning = false;
         spinButton.disabled = false;
         spinButton.textContent = 'SPIN THE WHEEL';
+        isSpinning = false;
     }
 });

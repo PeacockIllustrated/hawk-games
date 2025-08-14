@@ -226,3 +226,45 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
         return { success: true, winnerDisplayName, winningTicketNumber };
     });
 });
+
+// Add this to the end of functions/index.js
+
+exports.purchaseSpinTokens = onCall(functionOptions, async (request) => {
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const { compId, amount, price } = request.data;
+
+    // In a real-world scenario, you would process a payment with Stripe here.
+    // For now, we will simulate a successful payment and award the tokens.
+    if (!compId || !amount || !price) {
+        throw new HttpsError('invalid-argument', 'Missing parameters for token purchase.');
+    }
+
+    const userRef = db.collection('users').doc(uid);
+    const compRef = db.collection('competitions').doc(compId);
+
+    const compSnap = await compRef.get();
+    if (!compSnap.exists()) {
+        throw new HttpsError('not-found', 'The competition associated with this prize pool is no longer available.');
+    }
+    const compData = compSnap.data();
+
+    let newTokens = [];
+    const earnedAt = new Date();
+    for (let i = 0; i < amount; i++) {
+        newTokens.push({
+            tokenId: crypto.randomBytes(16).toString('hex'),
+            compId: compId,
+            compTitle: compData.title,
+            earnedAt: earnedAt
+        });
+    }
+
+    await userRef.update({
+        spinTokens: FieldValue.arrayUnion(...newTokens)
+    });
+
+    // You would also record the transaction in a separate 'orders' collection here.
+
+    return { success: true, tokensAdded: newTokens.length };
+});

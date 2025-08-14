@@ -590,3 +590,66 @@ input:checked + .slider:before { transform: translateX(26px); }
     color: #ccc;
     font-size: 0.9rem;
 }
+
+/* === HEADER & NAVBAR FIXES (NEW) === */
+.logo img {
+    height: 35px; /* Control the height of your logo */
+    display: block;
+}
+
+.main-nav {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem; /* Adds space between nav items */
+}
+
+/* === HERO SECTION STYLES (UPDATED) === */
+.hero-home {
+    position: relative;
+    min-height: 60vh; 
+    background-color: var(--dark-bg); /* Use solid color instead of image */
+    background-image: none; /* Explicitly remove the old background image */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+    padding: 3rem 0;
+}
+
+.hero-content h1 {
+    font-family: var(--font-heading);
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: none; /* Remove shadow for flat design */
+}
+.hero-content p {
+    font-size: 1.2rem;
+    max-width: 600px;
+    margin: 1rem auto 2rem;
+    color: #aaa;
+}
+
+/* === SPIN TOKEN INDICATOR UPDATE (UPDATED) === */
+.spin-token-balance {
+    background-color: #2a2a2a; /* Darker background */
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 6px; /* Less rounded corners */
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--light-white); /* White text */
+    transition: all 0.2s ease-in-out;
+}
+.spin-token-balance:hover {
+    border-color: #555;
+    box-shadow: none;
+}
+.token-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background-color: #ff4d6d; /* Pinkish-red icon color from screenshot */
+    border-radius: 3px;
+}

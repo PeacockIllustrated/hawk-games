@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/oncall");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
@@ -21,7 +21,7 @@ const functionOptions = {
     cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
 };
 
-// --- seedInstantWins (Unchanged) ---
+// --- seedInstantWins ---
 exports.seedInstantWins = onCall(functionOptions, async (request) => {
     await assertIsAdmin(request);
     const { compId, instantWinPrizes, totalTickets } = request.data;
@@ -137,10 +137,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         });
 
     } catch (error) {
-        // This is the most important part. It will log the *actual* server-side error.
         console.error("!!! CRITICAL ERROR in allocateTicketsAndAwardTokens !!!", error);
-        
-        // Rethrow so the client still gets a proper HttpsError
         if (error instanceof HttpsError) {
             throw error;
         }

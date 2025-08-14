@@ -5,6 +5,7 @@ const db = getFirestore(app);
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
+    loadPastWinners(); // Call the function to load past winners
 });
 
 const loadAllCompetitions = async () => {
@@ -28,7 +29,7 @@ const loadAllCompetitions = async () => {
             return;
         }
 
-        // --- NEW LOGIC: Separate competitions into two lists ---
+        // --- Separate competitions into two lists ---
         const instantWinComps = [];
         const regularComps = [];
 
@@ -66,12 +67,45 @@ const loadAllCompetitions = async () => {
     }
 };
 
-function createCompetitionCard(compData) { // Now accepts the whole object
+// --- Load Past Winners ---
+const loadPastWinners = async () => {
+    const winnersGrid = document.getElementById('past-winners-grid');
+    if (!winnersGrid) return;
+
+    try {
+        const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"), where("winnerDisplayName", "!=", null));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            winnersGrid.innerHTML = '<div class="placeholder">Our first winners will be announced soon!</div>';
+            return;
+        }
+        
+        winnersGrid.innerHTML = querySnapshot.docs.map(doc => createWinnerCard(doc.data())).join('');
+
+    } catch (error) {
+        console.error("Error loading past winners:", error);
+        winnersGrid.innerHTML = '<div class="placeholder" style="color:red;">Could not load winner information.</div>';
+    }
+};
+
+// --- Create HTML for a single winner card ---
+function createWinnerCard(winnerData) {
+    const avatar = winnerData.winnerPhotoURL || 'https://i.pravatar.cc/150?u=' + winnerData.winnerId;
+    return `
+        <div class="winner-card">
+            <img src="${avatar}" alt="${winnerData.winnerDisplayName}'s avatar">
+            <h4>${winnerData.winnerDisplayName}</h4>
+            <p>Won the ${winnerData.prizeTitle}</p>
+        </div>
+    `;
+}
+
+function createCompetitionCard(compData) {
     const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
     const endDate = compData.endDate.toDate();
     const price = compData.ticketTiers?.[0]?.price || 0.00;
 
-    // This logic remains the same and works perfectly!
     const instantWinBadge = compData.instantWinsConfig?.enabled 
         ? `<div class="hawk-card__instant-win-badge">⚡️ Instant Wins</div>` 
         : '';

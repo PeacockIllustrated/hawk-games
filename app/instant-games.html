@@ -8,60 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        /* Scoped styles for this page */
-        .game-zone {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 2rem;
-            align-items: flex-start;
-        }
-        .token-panel {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 1.5rem;
-        }
-        .token-panel h3 {
-            font-family: var(--font-heading);
-            text-transform: uppercase;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 1rem;
-            margin-bottom: 1rem;
-        }
-        .token-group .group-title {
-            font-weight: bold;
-            color: #ccc;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-        }
-        .token-btn {
-            display: block;
-            width: 100%;
-            text-align: left;
-            margin-bottom: 0.5rem;
-            background-color: #2a2a2a;
-            border: 1px solid #444;
-        }
-        .token-btn.selected {
-            border-color: var(--primary-gold);
-            box-shadow: 0 0 10px rgba(224, 169, 74, 0.5);
-        }
-        .game-panel {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 2rem;
-            min-height: 500px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        #spin-game-container {
-            text-align: center;
-        }
-    </style>
 </head>
 <body>
     <header class="main-header"></header>
@@ -74,6 +20,14 @@
                 <h3>Your Spin Tokens</h3>
                 <div id="token-list-container">
                     <div class="placeholder">Loading your tokens...</div>
+                </div>
+                
+                <!-- NEW SECTION FOR PURCHASING TOKENS -->
+                <div id="purchase-tokens-section" class="purchase-tokens-section" style="display: none;">
+                    <h4>Purchase More Tokens</h4>
+                    <div id="token-bundles-container" class="token-bundles">
+                        <!-- JS will populate bundles here -->
+                    </div>
                 </div>
             </aside>
 
@@ -89,7 +43,7 @@
                     <div class="wheel-container">
                         <div class="wheel-pointer"></div>
                         <div id="wheel" class="wheel">
-                            <!-- Wheel segments will be dynamically generated -->
+                            <!-- JS now populates this with labels over a background image -->
                         </div>
                     </div>
 
@@ -104,13 +58,6 @@
     </main>
     
     <footer class="main-footer"></footer>
-
-    <!-- This modal is now for showing the spin *result* -->
-    <div id="modal-container" class="modal-container">
-        <div id="modal-content" class="modal-content">
-            <!-- JavaScript populates this modal content dynamically -->
-        </div>
-    </div>
 
     <script type="module" src="js/auth.js"></script>
     <script type="module" src="js/instant-games.js"></script>

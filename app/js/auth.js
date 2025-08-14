@@ -36,20 +36,16 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- Global Auth State Listener ---
-let userProfileUnsubscribe = null; // To hold our real-time listener
+let userProfileUnsubscribe = null; 
 
 onAuthStateChanged(auth, (user) => {
-    renderHeader(!!user); // Render header immediately based on login state
+    renderHeader(!!user); 
     
     if (user) {
         createUserProfileIfNotExists(user);
-
-        // If there's an old listener, unsubscribe from it first
         if (userProfileUnsubscribe) {
             userProfileUnsubscribe();
         }
-
-        // Listen for real-time changes to the user's profile (like spinTokens)
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             const tokenBalanceEl = document.getElementById('spin-token-balance');
@@ -64,7 +60,6 @@ onAuthStateChanged(auth, (user) => {
             }
         });
     } else {
-        // If the user logs out, stop listening for their profile changes
         if (userProfileUnsubscribe) {
             userProfileUnsubscribe();
             userProfileUnsubscribe = null;
@@ -82,7 +77,7 @@ const createUserProfileIfNotExists = async (user) => {
             uid: user.uid, email: user.email, displayName: user.displayName,
             photoURL: user.photoURL, createdAt: serverTimestamp(),
             isAdmin: false, entryCount: {}, marketingConsent: false,
-            spinTokens: [] // Initialize with an empty array for the new token economy
+            spinTokens: []
         };
         try {
             await setDoc(userRef, userData);
@@ -92,7 +87,7 @@ const createUserProfileIfNotExists = async (user) => {
     }
 };
 
-// --- UI RENDERING FUNCTIONS ---
+// --- UI RENDERING FUNCTIONS (UPDATED) ---
 function renderHeader(isLoggedIn) {
     const headerEl = document.querySelector('.main-header');
     if (!headerEl) return;
@@ -101,7 +96,7 @@ function renderHeader(isLoggedIn) {
         navLinks = `
             <a href="index.html">Competitions</a>
             <a href="instant-games.html" id="spin-token-balance" class="spin-token-balance" style="display: none;">
-                <span class="token-icon">🎟️</span>
+                <span class="token-icon"></span>
                 <span class="token-count">0</span>
             </a>
             <a href="account.html" class="btn">My Account</a>
@@ -112,9 +107,12 @@ function renderHeader(isLoggedIn) {
             <a href="login.html" class="btn">Login / Sign Up</a>
         `;
     }
+    // UPDATED: The logo is now an image tag for proper branding.
     const headerHTML = `
         <div class="container">
-            <a href="index.html" class="logo">THE <span class="logo-highlight">HAWK</span> GAMES</a>
+            <a href="index.html" class="logo">
+                <img src="assets/logo.png" alt="The Hawk Games">
+            </a>
             <nav class="main-nav">${navLinks}</nav>
         </div>
     `;

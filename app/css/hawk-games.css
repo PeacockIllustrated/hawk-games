@@ -23,6 +23,8 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .section-title::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 3px; background-color: var(--primary-gold); }
 .btn { display: inline-block; padding: 0.8rem 2.5rem; background-color: var(--primary-gold); color: var(--dark-bg); text-decoration: none; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 1.5px; border: 2px solid var(--primary-gold); border-radius: 4px; font-weight: 700; text-align: center; cursor: pointer; transition: background-color 0.3s ease, color 0.3s ease; }
 .btn:hover { background-color: transparent; color: var(--primary-gold); }
+.btn:disabled { background-color: #555; border-color: #555; color: #888; cursor: not-allowed; }
+.btn:disabled:hover { background-color: #555; color: #888; }
 .btn-small { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
 .btn-secondary { background-color: #333; border-color: #555; color: var(--light-white); }
 .btn-secondary:hover { background-color: #444; border-color: #666; }
@@ -31,9 +33,9 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 /* --- 3. Layout: Header & Footer --- */
 .main-header, .main-footer { padding: 1rem 0; background-color: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); }
 .main-header .container, .main-footer .container { display: flex; justify-content: space-between; align-items: center; }
-.logo { font-family: var(--font-heading); font-size: 1.8rem; text-decoration: none; color: var(--light-white); letter-spacing: 3px; text-transform: uppercase; }
-.logo-highlight { color: var(--primary-gold); }
-.main-nav a { color: var(--light-white); text-decoration: none; font-weight: 700; text-transform: uppercase; font-size: 0.9rem; margin-left: 2rem; transition: color 0.3s ease; }
+.logo img { height: 35px; display: block; }
+.main-nav { display: flex; align-items: center; gap: 1.5rem; }
+.main-nav a { color: var(--light-white); text-decoration: none; font-weight: 700; text-transform: uppercase; font-size: 0.9rem; transition: color 0.3s ease; }
 .main-nav a:hover { color: var(--primary-gold); }
 .main-footer { margin-top: 5rem; border-top: 1px solid var(--border-color); border-bottom: none; }
 .footer-links a { color: #aaa; text-decoration: none; margin-left: 1.5rem; font-size: 0.9rem; }
@@ -41,7 +43,7 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .copyright { color: #777; font-size: 0.9rem; }
 
 /* --- 4. Competition Card Component (Homepage) --- */
-#competition-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2.5rem; }
+.competition-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2.5rem; }
 .hawk-card { position: relative; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: var(--light-white); transition: transform 0.3s ease, box-shadow 0.3s ease; }
 .hawk-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
 .hawk-card__instant-win-badge { position: absolute; top: 1rem; left: 1rem; background-color: var(--primary-gold); color: var(--dark-bg); padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-body); z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
@@ -63,8 +65,10 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .cash-alternative { color: #ccc; font-weight: 700; margin-top: -0.5rem; margin-bottom: 1.5rem; }
 .cash-alternative span { color: var(--primary-gold); }
 .detail-section { padding: 1.5rem 0; border-top: 1px solid var(--border-color); }
-.detail-timer { font-family: var(--font-heading); font-size: 2.5rem; text-align: center; letter-spacing: 2px; }
-.detail-timer small { display: block; font-family: var(--font-body); font-size: 0.7rem; color: #aaa; text-transform: none; letter-spacing: 1px; }
+/* TIMER FIX */
+.detail-timer { font-family: var(--font-heading); font-size: 2.5rem; text-align: center; letter-spacing: 2px; display: flex; justify-content: center; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.detail-timer span { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.detail-timer small { font-family: var(--font-body); font-size: 0.7rem; color: #aaa; text-transform: none; letter-spacing: 1px; }
 .detail-progress p { font-size: 0.9rem; text-align: center; margin-top: 0.5rem; }
 .skill-question-box h3, .ticket-selector-box h3 { font-family: var(--font-heading); font-size: 1.2rem; text-transform: uppercase; margin-bottom: 1rem; }
 .question-text { font-size: 1.1rem; margin-bottom: 1rem; font-weight: 700; }
@@ -80,9 +84,6 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .modal-content { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 2rem; border-radius: 5px; width: 90%; max-width: 450px; text-align: center; }
 .modal-content h2 { font-family: var(--font-heading); font-size: 1.8rem; text-transform: uppercase; }
 .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
-.modal-icon-win { font-size: 4rem; line-height: 1; margin-bottom: 1rem; color: var(--primary-gold); animation: pop-in 0.5s ease; }
-.small-text { font-size: 0.9rem; color: #aaa; margin-top: 0.5rem; }
-@keyframes pop-in { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
 /* --- 7. Account Page Styles --- */
 .account-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: flex-start; margin-top: 3rem; }
@@ -102,554 +103,78 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--primary-gold); }
 input:checked + .slider:before { transform: translateX(26px); }
-#entries-list { display: grid; gap: 1rem; }
-.entry-item { display: grid; grid-template-columns: 80px 1fr auto; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid var(--border-color); border-radius: 4px; }
-.entry-item-image { width: 80px; height: 50px; object-fit: cover; border-radius: 3px; }
-.entry-item-details h4 { font-family: var(--font-heading); font-size: 1.2rem; margin: 0; }
-.entry-item-details p { font-size: 0.9rem; color: #aaa; margin: 0; }
 .status-badge { font-weight: bold; padding: 6px 10px; border-radius: 20px; font-size: 0.8rem; text-transform: uppercase; }
 .status-live { background-color: rgba(46, 204, 113, 0.2); color: #2ecc71; }
 .status-ended { background-color: rgba(231, 76, 60, 0.2); color: #e74c3c; }
 .status-won { background-color: var(--primary-gold); color: var(--dark-bg); }
 
-/* --- 8. Admin Page Styles --- */
-.admin-nav { display: flex; flex-direction: column; }
-.admin-nav-link { padding: 1rem; text-decoration: none; font-weight: bold; text-transform: uppercase; border-radius: 4px; margin-bottom: 0.5rem; transition: background-color 0.2s ease; }
-.admin-nav-link.active { background-color: var(--primary-gold); color: var(--dark-bg); }
-.competition-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1.5rem; align-items: center; padding: 1.5rem; background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 1rem; }
-.comp-info h4 { font-family: var(--font-heading); font-size: 1.3rem; margin-bottom: 0.5rem; }
-.comp-info .progress-bar { height: 6px; }
-.comp-info span { font-size: 0.8rem; color: #aaa; }
-.comp-actions { display: flex; gap: 0.5rem; }
-.modal-form { text-align: left; }
-.modal-form .form-group { margin-bottom: 1rem; }
-.modal-form label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
-.modal-form input { width: 100%; padding: 0.7rem; background-color: var(--dark-bg); border: 1px solid var(--border-color); color: var(--light-white); border-radius: 4px; font-size: 1rem; }
+/* --- 8. Homepage & Universal Section Styles --- */
+.hero-home { position: relative; min-height: 60vh; background-color: var(--dark-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: white; padding: 3rem 0; }
+.hero-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+.hero-content { position: relative; z-index: 2; max-width: 800px; }
+.hero-content h1 { font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); text-transform: uppercase; letter-spacing: 3px; text-shadow: none; }
+.hero-content p { font-size: 1.2rem; max-width: 600px; margin: 1rem auto 2rem; color: #aaa; }
+#how-it-works-section, #instant-win-section, #live-competitions-section, #past-winners-section { padding: 5rem 0; }
+.section-subtitle { font-size: 1.1rem; color: #ccc; text-align: center; max-width: 800px; margin: -2.5rem auto 3rem auto; line-height: 1.7; }
+.how-it-works-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem; }
+.step-card { background-color: var(--card-bg); padding: 2.5rem 2rem; text-align: center; border: 1px solid var(--border-color); border-radius: 5px; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.step-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.5); }
+.step-icon { width: 60px; height: 60px; line-height: 60px; border-radius: 50%; background-color: var(--primary-gold); color: var(--dark-bg); font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 auto 1.5rem; border: 3px solid var(--primary-gold); }
+.step-card h3 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 0.5rem; }
+.step-card p { color: #aaa; }
+#past-winners-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+.winner-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; text-align: center; padding: 1.5rem; }
+.winner-card img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-gold); margin-bottom: 1rem; }
+.winner-card h4 { font-family: var(--font-heading); color: var(--primary-gold); font-size: 1.3rem; }
+.winner-card p { color: #ccc; font-size: 0.9rem; }
 
-/* --- 9. Homepage-Specific Styles --- */
-.hero-home {
-    position: relative;
-    min-height: 70vh;
-    background-image: url('https://images.unsplash.com/photo-1579546929518-9e396f3a8034?ixlib=rb-4.0.3&auto=format&fit=crop&w=1770&q=80');
-    background-size: cover;
-    background-position: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: white;
-}
+/* --- 9. Competition Entry Group Styles (Account Page) --- */
+.competition-entry-group { background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 1.5rem; overflow: hidden; }
+.competition-group-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background-color: #222; border-bottom: 1px solid var(--border-color); }
+.group-header-image { width: 100px; height: 65px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.group-header-details { display: flex; flex-direction: column; gap: 0.5rem; }
+.group-header-details h4 { font-family: var(--font-heading); font-size: 1.3rem; line-height: 1.2; margin: 0; }
+.entry-list-container { padding: 0.5rem 1rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.entry-list-item { display: grid; grid-template-columns: 1fr 1fr 2fr auto; align-items: center; gap: 1rem; padding: 0.75rem 0; font-size: 0.9rem; border-bottom: 1px solid var(--border-color); }
+.entry-list-item:last-child { border-bottom: none; padding-bottom: 0.25rem; }
+.entry-date { color: #aaa; }
+.entry-tickets { font-weight: 700; }
+.entry-numbers { color: #ccc; font-family: monospace; }
+.instant-win-tag { background-color: var(--primary-gold); color: var(--dark-bg); font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; justify-self: end; }
 
-.hero-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(18, 18, 18, 0.7); /* Dark overlay */
-    z-index: 1;
-}
+/* --- 10. Spin Token Indicator --- */
+.spin-token-balance { display: flex; align-items: center; gap: 0.5rem; background-color: #2a2a2a; border: 1px solid var(--border-color); padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; font-size: 0.9rem; color: var(--light-white); transition: all 0.2s ease-in-out; }
+.spin-token-balance:hover { border-color: #555; }
+.token-icon { display: inline-block; width: 16px; height: 16px; background-color: #ff4d6d; border-radius: 3px; }
 
-.hero-content {
-    position: relative;
-    z-index: 2;
-}
+/* --- 11. Instant Win Page & Wheel Styles --- */
+.game-zone { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: flex-start; }
+.token-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 1.5rem; }
+.token-panel h3 { font-family: var(--font-heading); text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem; }
+.token-group .group-title { font-weight: bold; color: #ccc; margin-top: 1rem; margin-bottom: 0.5rem; }
+.token-btn { display: block; width: 100%; text-align: left; margin-bottom: 0.5rem; background-color: #2a2a2a; border: 1px solid #444; }
+.token-btn.selected { border-color: var(--primary-gold); box-shadow: 0 0 10px rgba(224, 169, 74, 0.5); }
+.game-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2rem; min-height: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#spin-game-container { text-align: center; }
+.wheel-container { position: relative; width: 300px; height: 300px; margin: 2rem auto; display: flex; justify-content: center; align-items: center; }
+.wheel-pointer { position: absolute; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 40px solid var(--primary-gold); top: -10px; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.wheel { position: relative; width: 100%; height: 100%; border-radius: 50%; background-image: url('../assets/spin-wheel-bg.png'); background-size: contain; background-repeat: no-repeat; background-position: center; transition: transform 8s cubic-bezier(0.25, 0.1, 0.25, 1); transform: rotate(0deg); }
+.segment-label { position: absolute; top: 50%; left: 50%; color: white; font-weight: 700; font-size: 1rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none; transform-origin: top left; }
+.btn-spin { padding: 1rem 3rem; font-size: 1.2rem; letter-spacing: 2px; }
+.spin-result-container { min-height: 50px; margin-top: 1.5rem; font-size: 1.2rem; font-weight: bold; }
+.purchase-tokens-section { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color); }
+.purchase-tokens-section h4 { font-family: var(--font-heading); text-align: center; margin-bottom: 1rem; }
+.token-bundles { display: flex; flex-direction: column; gap: 0.75rem; }
+.bundle-btn { display: flex; justify-content: space-between; align-items: center; background-color: #2a2a2a; border: 1px solid #444; padding: 0.75rem 1rem; }
+.bundle-btn .bundle-amount { font-weight: bold; }
+.bundle-btn .bundle-price { color: var(--primary-gold); font-family: var(--font-heading); }
 
-.hero-content h1 {
-    font-family: var(--font-heading);
-    font-size: 4rem;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
-}
-
-.hero-content p {
-    font-size: 1.2rem;
-    max-width: 600px;
-    margin: 1rem auto 2rem;
-}
-
-.how-it-works-section,
-#live-competitions-section {
-    padding: 5rem 0;
-}
-
-.how-it-works-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin-top: 3rem;
-}
-
-.step-card {
-    background-color: var(--card-bg);
-    padding: 2.5rem 2rem;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-}
-
-.step-icon {
-    width: 60px;
-    height: 60px;
-    line-height: 60px;
-    border-radius: 50%;
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    font-family: var(--font-heading);
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0 auto 1.5rem;
-}
-
-.step-card h3 {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-
-#past-winners-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-}
-
-.winner-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    text-align: center;
-    padding: 1.5rem;
-}
-
-.winner-card img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid var(--primary-gold);
-    margin-bottom: 1rem;
-}
-
-.winner-card h4 {
-    font-family: var(--font-heading);
-    color: var(--primary-gold);
-}
-
-.winner-card p {
-    color: #ccc;
-    font-size: 0.9rem;
-}
-
-/* --- 10. Account Page - Competition Entry Group Styles --- */
-
-/* This replaces the old .entry-item styles */
-.competition-entry-group {
-    background-color: var(--dark-bg); /* Darker than the panel bg for contrast */
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    margin-bottom: 1.5rem;
-    overflow: hidden; /* Ensures child border-radius is respected */
-}
-
-.competition-group-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    background-color: #222; /* Slightly lighter header */
-    border-bottom: 1px solid var(--border-color);
-}
-
-.group-header-image {
-    width: 100px;
-    height: 65px;
-    object-fit: cover;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
-.group-header-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.group-header-details h4 {
-    font-family: var(--font-heading);
-    font-size: 1.3rem;
-    line-height: 1.2;
-    margin: 0;
-}
-
-.entry-list-container {
-    padding: 0.5rem 1rem 1rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.entry-list-item {
-    display: grid;
-    grid-template-columns: 1fr 1fr 2fr auto;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.75rem 0;
-    font-size: 0.9rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.entry-list-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0.25rem;
-}
-
-.entry-date {
-    color: #aaa;
-}
-
-.entry-tickets {
-    font-weight: 700;
-}
-
-.entry-numbers {
-    color: #ccc;
-    font-family: monospace;
-}
-
-.instant-win-tag {
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    font-weight: 700;
-    padding: 0.25rem 0.6rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    justify-self: end; /* Aligns the tag to the right */
-}
-
-/* --- 11. Homepage - Section Enhancements --- */
-
-.section-subtitle {
-    font-size: 1.1rem;
-    color: #ccc;
-    text-align: center;
-    max-width: 800px;
-    margin: -2.5rem auto 3rem auto; /* Pulls it up under the title */
-    line-height: 1.7;
-}
-
-.competition-grid-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 2.5rem;
-}
-
-/* Add some extra space between homepage sections */
-#instant-win-section, #live-competitions-section {
-    padding: 4rem 0;
-}
-
-/* --- 12. Instant Win - Spin The Wheel Modal --- */
-
-.spin-wheel-modal {
-    max-width: 500px; /* A bit wider for the wheel */
-    overflow: hidden; /* Hide parts of the wheel that might poke out */
-}
-
-.wheel-container {
-    position: relative;
-    width: 300px;
-    height: 300px;
-    margin: 2rem auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.wheel-pointer {
-    position: absolute;
-    width: 0;
-    height: 0;
-    border-left: 20px solid transparent;
-    border-right: 20px solid transparent;
-    border-top: 40px solid var(--primary-gold); /* Golden pointer */
-    top: -10px; /* Positioned just above the center */
-    z-index: 10;
-    transform-origin: bottom center;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-}
-
-.wheel {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 8px solid #282828;
-    box-shadow: 0 0 20px rgba(0,0,0,0.7) inset, 0 0 10px rgba(0,0,0,0.5);
-    background-color: #333; /* Fallback color */
-    /* The transition is what makes the spin smooth! */
-    transition: transform 5s cubic-bezier(0.25, 0.1, 0.25, 1);
-    transform: rotate(0deg); /* Initial position */
-}
-
-.wheel::before { /* Center circle */
-    content: '';
-    position: absolute;
-    width: 50px;
-    height: 50px;
-    background: #282828;
-    border-radius: 50%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    border: 4px solid #444;
-    z-index: 5;
-}
-
-.wheel-segment {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 50%); /* Default clip path */
-    transform-origin: center;
-}
-
-.segment-label {
-    position: absolute;
-    top: 25%; /* Position inside the segment */
-    left: 50%;
-    transform: translateX(-50%) rotate(15deg); /* Adjust rotation */
-    color: white;
-    font-weight: 700;
-    font-size: 1rem;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-}
-
-.btn-spin {
-    padding: 1rem 3rem;
-    font-size: 1.2rem;
-    letter-spacing: 2px;
-}
-
-.spin-result-container {
-    min-height: 50px; /* Reserve space for the result message */
-    margin-top: 1.5rem;
-    font-size: 1.2rem;
-    font-weight: bold;
-}
-
-/* --- 13. Spin Token Balance Indicator --- */
-.spin-token-balance {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background-color: rgba(224, 169, 74, 0.1); /* Faint gold background */
-    border: 1px solid var(--primary-gold);
-    padding: 0.4rem 0.8rem;
-    border-radius: 20px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--primary-gold);
-    transition: all 0.2s ease-in-out;
-}
-.spin-token-balance:hover {
-    background-color: rgba(224, 169, 74, 0.2);
-    box-shadow: 0 0 10px rgba(224, 169, 74, 0.5);
-}
-.token-icon {
-    font-size: 1rem;
-}
-
-/* === HOMEPAGE SECTIONS - STYLES === */
-
-/* --- Hero Section Enhancements --- */
-.hero-home {
-    position: relative;
-    height: 70vh; /* Controlled height */
-    background-image: url('../assets/hero-background.jpg'); /* Assumes you have a hero image in /app/assets */
-    background-size: cover;
-    background-position: center;
-    display: flex;
-    align-items: center;
-    text-align: center;
-    color: white;
-}
-.hero-overlay {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(18, 18, 18, 0.7);
-    z-index: 1;
-}
-.hero-content {
-    position: relative;
-    z-index: 2;
-    max-width: 800px;
-}
-.hero-content h1 {
-    font-family: var(--font-heading);
-    font-size: clamp(2.5rem, 5vw, 4rem); /* Responsive font size */
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    text-shadow: 2px 2px 10px rgba(0,0,0,0.7);
-}
-.hero-content p {
-    font-size: 1.2rem;
-    margin: 1rem auto 2rem;
-    line-height: 1.7;
-}
-
-/* --- Section Spacing & Subtitles --- */
-#how-it-works-section,
-#instant-win-section,
-#live-competitions-section,
-#past-winners-section {
-    padding: 5rem 0;
-}
-
-.section-subtitle {
-    font-size: 1.1rem;
-    color: #ccc;
-    text-align: center;
-    max-width: 800px;
-    margin: -2.5rem auto 3rem auto;
-    line-height: 1.7;
-}
-
-/* --- How It Works Section --- */
-.how-it-works-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin-top: 3rem;
-}
-.step-card {
-    background-color: var(--card-bg);
-    padding: 2.5rem 2rem;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.step-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-}
-.step-icon {
-    width: 60px;
-    height: 60px;
-    line-height: 60px;
-    border-radius: 50%;
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    font-family: var(--font-heading);
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0 auto 1.5rem;
-    border: 3px solid var(--primary-gold);
-}
-.step-card h3 {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-.step-card p {
-    color: #aaa;
-}
-
-/* --- Past Winners Section --- */
-#past-winners-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-}
-.winner-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    text-align: center;
-    padding: 1.5rem;
-}
-.winner-card img {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid var(--primary-gold);
-    margin-bottom: 1rem;
-}
-.winner-card h4 {
-    font-family: var(--font-heading);
-    color: var(--primary-gold);
-    font-size: 1.3rem;
-}
-.winner-card p {
-    color: #ccc;
-    font-size: 0.9rem;
-}
-
-/* === HEADER & NAVBAR FIXES (NEW) === */
-.logo img {
-    height: 35px; /* Control the height of your logo */
-    display: block;
-}
-
-.main-nav {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem; /* Adds space between nav items */
-}
-
-/* === HERO SECTION STYLES (UPDATED) === */
-.hero-home {
-    position: relative;
-    min-height: 60vh; 
-    background-color: var(--dark-bg); /* Use solid color instead of image */
-    background-image: none; /* Explicitly remove the old background image */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: white;
-    padding: 3rem 0;
-}
-
-.hero-content h1 {
-    font-family: var(--font-heading);
-    font-size: clamp(2.5rem, 5vw, 4rem);
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    text-shadow: none; /* Remove shadow for flat design */
-}
-.hero-content p {
-    font-size: 1.2rem;
-    max-width: 600px;
-    margin: 1rem auto 2rem;
-    color: #aaa;
-}
-
-/* === SPIN TOKEN INDICATOR UPDATE (UPDATED) === */
-.spin-token-balance {
-    background-color: #2a2a2a; /* Darker background */
-    border: 1px solid var(--border-color);
-    padding: 0.5rem 1rem;
-    border-radius: 6px; /* Less rounded corners */
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: var(--light-white); /* White text */
-    transition: all 0.2s ease-in-out;
-}
-.spin-token-balance:hover {
-    border-color: #555;
-    box-shadow: none;
-}
-.token-icon {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    background-color: #ff4d6d; /* Pinkish-red icon color from screenshot */
-    border-radius: 3px;
+/* --- 12. RESPONSIVE FIXES --- */
+@media (max-width: 992px) {
+    .account-layout, .game-zone {
+        grid-template-columns: 1fr;
+    }
+    .competition-detail-view {
+        grid-template-columns: 1fr;
+    }
 }

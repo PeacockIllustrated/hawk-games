@@ -17,7 +17,7 @@
             <!-- Game Section -->
             <section id="spin-game-container" class="spin-game-panel">
                 <h2 class="section-title">Instant Win</h2>
-                <p class="section-subtitle">Use your tokens for a chance to win cash prizes instantly!</p>
+                <p class="section-subtitle">Use your tokens for a chance to win cash prizes & credit instantly!</p>
                 
                 <div class="wheel-container">
                     <div class="wheel-pointer"></div>
@@ -35,6 +35,8 @@
                     <button id="spin-button" class="btn btn-spin" disabled>SPIN THE WHEEL</button>
                     <button id="buy-more-tokens-btn" class="btn btn-buy-tokens">+</button>
                 </div>
+                
+                <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
 
                 <div id="spin-result" class="spin-result-container">
                     <!-- Result message will be injected here -->
@@ -56,10 +58,17 @@
         <div id="purchase-modal-content" class="modal-content">
             <h2>Purchase More Spins</h2>
             <p>Select a bundle below to top up your tokens.</p>
-            <div id="token-bundles-container" class="token-bundles">
-                <!-- JS will populate bundles here -->
-            </div>
+            <div id="token-bundles-container" class="token-bundles"></div>
             <button class="btn btn-secondary" style="margin-top: 1.5rem;" data-close-modal>Cancel</button>
+        </div>
+    </div>
+    
+    <!-- Prizes & Odds Modal -->
+    <div id="prizes-modal" class="modal-container">
+        <div id="prizes-modal-content" class="modal-content">
+            <h2>Prizes & Odds</h2>
+            <div id="prizes-table-container"></div>
+            <button class="btn btn-secondary" style="margin-top: 1.5rem;" data-close-modal>Close</button>
         </div>
     </div>
     

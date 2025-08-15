@@ -17,28 +17,19 @@ let userProfileUnsubscribe = null;
 // ===================================================================
 // == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
 // ===================================================================
-// This map now accurately reflects the prize locations on your new PNG.
-// The top pointer position is 0°, and angles increase clockwise.
 const PRIZE_ANGLES = {
-    // Cash Prizes from your image
-    'cash-1000': 150, // Trophy Icon
-    'cash-500': 210,  // Large Sack
-    'cash-250': 300,  // Medium Sack
-    'cash-100': 0,    // Top Coin Stack
-    'cash-50': 60,   // Coin Stack
-    
-    // Credit Prizes from your image
-    'credit-20': 30,  // Top-Right Coin Stack
-    'credit-10': 270, // Bottom-Left Coin Stack
-    'credit-5': 120,  // Left Coin Stack
-    
-    // No Win Segments (The 4 empty slots)
+    'cash-1000': 150,
+    'cash-500': 210,
+    'cash-250': 300,
+    'cash-100': 0,
+    'cash-50': 60,
+    'credit-20': 30,
+    'credit-10': 270,
+    'credit-5': 120,
     'no-win': [90, 180, 240, 330] 
 };
 // ===================================================================
 
-
-// --- DOM Elements ---
 const tokenCountElement = document.getElementById('token-count');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
 const wheel = document.getElementById('wheel');
@@ -51,7 +42,6 @@ const prizesModal = document.getElementById('prizes-modal');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
-// --- Auth Gate & Data Listener ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
         if (userProfileUnsubscribe) userProfileUnsubscribe();
@@ -64,14 +54,12 @@ onAuthStateChanged(auth, (user) => {
             }
         });
         loadPrizeSettings();
-        // The wheel is now a static background image, no dynamic rendering needed.
-        wheel.innerHTML = ''; // Ensure wheel is empty
+        wheel.innerHTML = '';
     } else {
         window.location.replace('login.html');
     }
 });
 
-// --- Main UI Update Function ---
 function updateUI() {
     const tokenCount = userTokens.length;
     tokenCountElement.textContent = tokenCount;
@@ -82,12 +70,13 @@ function updateUI() {
         spinButton.textContent = "NO SPINS AVAILABLE";
         tokenAccordionContainer.innerHTML = `<div class="placeholder">You have no Spin Tokens. Enter a Main Comp to earn them!</div>`;
     } else {
-        spinButton.textContent = "SPIN THE WHEEL";
+        if (!isSpinning) {
+            spinButton.textContent = "SPIN THE WHEEL";
+        }
         renderTokenAccordion();
     }
 }
 
-// --- Load Prize Settings for the Odds Table ---
 async function loadPrizeSettings() {
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
@@ -103,7 +92,6 @@ async function loadPrizeSettings() {
     }
 }
 
-// --- Rendering Functions (Simplified) ---
 function renderTokenAccordion() {
     if (!tokenAccordionContainer) return;
     const groupedTokens = userTokens.reduce((acc, token) => {
@@ -146,11 +134,7 @@ function renderPrizesTable(prizes) {
 }
 
 function renderPurchaseBundles() {
-    const bundles = [
-        { amount: 5, price: 4.50 },
-        { amount: 10, price: 8.00 },
-        { amount: 25, price: 15.00 },
-    ];
+    const bundles = [ { amount: 5, price: 4.50 }, { amount: 10, price: 8.00 }, { amount: 25, price: 15.00 } ];
     bundlesContainer.innerHTML = bundles.map(b => `
         <button class="btn bundle-btn" data-amount="${b.amount}" data-price="${b.price}">
             <span class="bundle-amount">${b.amount} Tokens</span>
@@ -159,43 +143,50 @@ function renderPurchaseBundles() {
     `).join('');
 }
 
-// --- Event Handlers ---
+
+// --- REWRITTEN Event Handler for Spinning ---
 spinButton.addEventListener('click', async () => {
     if (userTokens.length === 0 || isSpinning) return;
 
+    // 1. Set spinning state immediately
     isSpinning = true;
-    updateUI();
     spinButton.textContent = 'SPINNING...';
+    updateUI();
     spinResultContainer.innerHTML = '';
-    const tokenToSpend = userTokens[0];
-
+    
+    // 2. Prepare for animation (reset position)
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
     void wheel.offsetWidth;
-    
+
+    const tokenToSpend = userTokens[0];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
 
     try {
+        // 3. Call the server and WAIT for the definitive result
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
         const { won, prizeType, value } = result.data;
 
+        // 4. NOW that we have the result, calculate the correct landing spot
         let targetAngle;
         if (won) {
             const prizeKey = `${prizeType}-${value}`;
             targetAngle = PRIZE_ANGLES[prizeKey];
         }
-        if (targetAngle === undefined) {
+        if (targetAngle === undefined) { // Handles "no-win" or prizes not on the visual wheel
             const noWinAngles = PRIZE_ANGLES['no-win'];
             targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
         }
         
         const baseSpins = 360 * 8;
-        const randomOffsetInSegment = (Math.random() - 0.5) * 20;
+        const randomOffsetInSegment = (Math.random() - 0.5) * 20; // +/- 10 degrees for variance
         const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
         
+        // 5. Play the animation with the guaranteed correct destination
         wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
 
+        // 6. After the animation is complete, show the result message
         setTimeout(() => {
             if (won) {
                 const prizeText = prizeType === 'credit' ? `£${value.toFixed(2)} STORE CREDIT` : `£${value.toFixed(2)} CASH`;
@@ -204,6 +195,8 @@ spinButton.addEventListener('click', async () => {
                 spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
             }
             isSpinning = false;
+            // The onSnapshot listener will handle the token count update automatically.
+            // We just need to re-enable the button if tokens are left.
             updateUI();
         }, 8500);
 
@@ -211,10 +204,12 @@ spinButton.addEventListener('click', async () => {
         console.error("Error spending token:", error);
         spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
         isSpinning = false;
-        updateUI();
+        updateUI(); // Re-enable button on error
     }
 });
 
+
+// Other event listeners remain the same
 buyMoreBtn.addEventListener('click', () => {
     renderPurchaseBundles();
     purchaseModal.classList.add('show');

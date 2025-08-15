@@ -261,16 +261,17 @@ function initializeSpinnerSettingsView() {
                 totalRTP += (value / odds);
             }
         });
-        const rtpPercentage = (totalRTP / 1.00) * 100; // Assuming £1.00 per spin
+        const rtpPercentage = (totalRTP / 1.00) * 100; // Assuming £1.00 per spin for calculation
         rtpDisplay.textContent = `${rtpPercentage.toFixed(2)}%`;
     };
 
-    const addPrizeTier = (value = '', odds = '') => {
+    const addPrizeTier = (type = 'credit', value = '', odds = '') => {
         const prizeEl = document.createElement('div');
         prizeEl.className = 'form-group-inline spinner-prize-row';
         prizeEl.innerHTML = `
-            <div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="spinner-prize-value" value="${value}" required></div>
-            <div class="form-group"><label>Odds (1 in X)</label><input type="number" class="spinner-prize-odds" value="${odds}" required></div>
+            <div class="form-group" style="flex: 1;"><label>Prize Type</label><select class="spinner-prize-type"><option value="credit" ${type === 'credit' ? 'selected' : ''}>Credit</option><option value="cash" ${type === 'cash' ? 'selected' : ''}>Cash</option></select></div>
+            <div class="form-group" style="flex: 1;"><label>Value (£)</label><input type="number" step="0.01" class="spinner-prize-value" value="${value}" required></div>
+            <div class="form-group" style="flex: 1;"><label>Odds (1 in X)</label><input type="number" class="spinner-prize-odds" value="${odds}" required></div>
             <button type="button" class="btn-remove-tier">×</button>`;
         prizesContainer.appendChild(prizeEl);
         prizeEl.querySelector('.btn-remove-tier').addEventListener('click', () => {
@@ -285,9 +286,9 @@ function initializeSpinnerSettingsView() {
     const loadSettings = async () => {
         const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(defaultsRef);
-        prizesContainer.innerHTML = ''; // Clear first
+        prizesContainer.innerHTML = '';
         if (docSnap.exists() && docSnap.data().prizes) {
-            docSnap.data().prizes.forEach(p => addPrizeTier(p.value, p.odds));
+            docSnap.data().prizes.forEach(p => addPrizeTier(p.type, p.value, p.odds));
         }
         if (prizesContainer.children.length === 0) addPrizeTier();
         calculateRTP();
@@ -302,6 +303,7 @@ function initializeSpinnerSettingsView() {
         submitBtn.textContent = 'Saving...';
         try {
             const prizes = Array.from(document.querySelectorAll('.spinner-prize-row')).map(row => ({
+                type: row.querySelector('.spinner-prize-type').value,
                 value: parseFloat(row.querySelector('.spinner-prize-value').value),
                 odds: parseInt(row.querySelector('.spinner-prize-odds').value)
             }));

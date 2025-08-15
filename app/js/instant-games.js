@@ -11,9 +11,37 @@ const db = getFirestore(app);
 const functions = getFunctions(app);
 let userTokens = [];
 let spinnerPrizes = [];
-let visualWheelSegments = []; // The 12 segments currently displayed on the wheel
 let isSpinning = false;
 let userProfileUnsubscribe = null;
+
+// ===================================================================
+// == CONFIGURATION: SET YOUR PRIZE ANGLES HERE                     ==
+// ===================================================================
+// Instructions:
+// 1. Your wheel image should have 12 segments.
+// 2. The top-most segment (where the pointer is) is 0 degrees.
+// 3. Angles increase clockwise. Each segment is 30 degrees wide.
+//    - The segment to the right of the top is 30 degrees.
+//    - The segment at the 3 o'clock position is 90 degrees.
+//    - The segment at the bottom is 180 degrees.
+// 4. Update the key (e.g., 'cash-500') and the value (the angle) to match your image.
+// 5. For 'no-win', provide an array of all angles where a "No Win" segment is located.
+const PRIZE_ANGLES = {
+    // Cash Prizes
+    'cash-500': 180,
+    'cash-250': 60,
+    'cash-100': 0,
+    // Credit Prizes
+    'credit-20': 30,
+    'credit-10': 210,
+    'credit-5': 150,
+    // Add any other prizes from your admin panel here...
+    
+    // No Win Segments (provide all angles for "No Win" slots)
+    'no-win': [90, 120, 240, 270, 300, 330] 
+};
+// ===================================================================
+
 
 // --- DOM Elements ---
 const tokenCountElement = document.getElementById('token-count');
@@ -40,7 +68,7 @@ onAuthStateChanged(auth, (user) => {
                 updateUI();
             }
         });
-        loadAndRenderWheel();
+        loadPrizeSettings();
     } else {
         window.location.replace('login.html');
     }
@@ -62,42 +90,30 @@ function updateUI() {
     }
 }
 
-// --- NEW HELPER: Maps a prize object to an icon path ---
-function getIconForPrize(prize) {
-    if (!prize || prize.value === 0) {
-        return 'assets/icons/no-win.svg';
-    }
-    return `assets/icons/${prize.type}-${prize.value}.svg`;
-}
-
-// --- Load Prizes and Build Wheel/Table ---
-async function loadAndRenderWheel() {
+// --- Load Prize Settings for the Odds Table ---
+async function loadPrizeSettings() {
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(settingsRef);
         if (docSnap.exists() && docSnap.data().prizes) {
-            spinnerPrizes = docSnap.data().prizes.sort((a, b) => b.value - a.value); // Sort highest to lowest
-            renderWheel(spinnerPrizes);
+            spinnerPrizes = docSnap.data().prizes;
             renderPrizesTable(spinnerPrizes);
         } else {
             console.error("Spinner settings not found in Firestore.");
-            renderWheel([]); // Render a default empty wheel
         }
     } catch (error) {
         console.error("Error fetching spinner prizes:", error);
     }
 }
 
-// --- Rendering Functions ---
+// --- Rendering Functions (Simplified) ---
 function renderTokenAccordion() {
     if (!tokenAccordionContainer) return;
-    
     const groupedTokens = userTokens.reduce((acc, token) => {
         const groupTitle = token.compTitle || "Purchased Tokens";
         (acc[groupTitle] = acc[groupTitle] || []).push(token);
         return acc;
     }, {});
-
     let html = '';
     for (const groupTitle in groupedTokens) {
         const tokens = groupedTokens[groupTitle];
@@ -117,39 +133,6 @@ function renderTokenAccordion() {
             </div>`;
     }
     tokenAccordionContainer.innerHTML = html || `<div class="placeholder">No tokens found.</div>`;
-}
-
-function renderWheel(prizes) {
-    if (!wheel) return;
-    wheel.innerHTML = '';
-    
-    const topPrizes = prizes.slice(0, 8);
-    const noWinSegment = { value: 0, type: 'none' };
-    visualWheelSegments = [
-        ...topPrizes,
-        noWinSegment,
-        noWinSegment,
-        noWinSegment,
-        prizes[Math.floor(prizes.length / 2)] || noWinSegment
-    ].slice(0, 12).sort(() => Math.random() - 0.5);
-
-    const segmentAngle = 360 / visualWheelSegments.length;
-
-    visualWheelSegments.forEach((prize, i) => {
-        const iconContainer = document.createElement('div');
-        iconContainer.className = 'segment-icon-container';
-        
-        const rotation = (i * segmentAngle) + (segmentAngle / 2);
-        iconContainer.style.transform = `rotate(${rotation}deg)`;
-
-        const icon = document.createElement('img');
-        icon.src = getIconForPrize(prize);
-        icon.className = 'segment-icon';
-        icon.style.transform = `rotate(${-rotation}deg)`;
-
-        iconContainer.appendChild(icon);
-        wheel.appendChild(iconContainer);
-    });
 }
 
 function renderPrizesTable(prizes) {
@@ -179,7 +162,6 @@ function renderPurchaseBundles() {
     `).join('');
 }
 
-
 // --- Event Handlers ---
 spinButton.addEventListener('click', async () => {
     if (userTokens.length === 0 || isSpinning) return;
@@ -188,7 +170,6 @@ spinButton.addEventListener('click', async () => {
     updateUI();
     spinButton.textContent = 'SPINNING...';
     spinResultContainer.innerHTML = '';
-
     const tokenToSpend = userTokens[0];
 
     wheel.style.transition = 'none';
@@ -201,22 +182,21 @@ spinButton.addEventListener('click', async () => {
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
         const { won, prizeType, value } = result.data;
 
-        let targetSegmentIndex = -1;
+        // --- NEW: Calculate landing angle based on PRIZE_ANGLES map ---
+        let targetAngle;
         if (won) {
-            targetSegmentIndex = visualWheelSegments.findIndex(p => p.type === prizeType && p.value === value);
+            const prizeKey = `${prizeType}-${value}`;
+            targetAngle = PRIZE_ANGLES[prizeKey];
         }
-        if (targetSegmentIndex === -1) {
-            targetSegmentIndex = visualWheelSegments.findIndex(p => p.value === 0);
-        }
-        if (targetSegmentIndex === -1) {
-            targetSegmentIndex = Math.floor(Math.random() * 12);
+        // If the prize isn't in the map, or it was a loss, pick a random "no-win" slot
+        if (targetAngle === undefined) {
+            const noWinAngles = PRIZE_ANGLES['no-win'];
+            targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
         }
         
-        const segmentAngle = 360 / 12;
-        const targetRotation = (targetSegmentIndex * segmentAngle);
-        const randomOffsetInSegment = (Math.random() - 0.5) * (segmentAngle * 0.8);
         const baseSpins = 360 * 8;
-        const finalAngle = baseSpins - targetRotation - randomOffsetInSegment;
+        const randomOffsetInSegment = (Math.random() - 0.5) * 20; // +/- 10 degrees
+        const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
         
         wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
@@ -240,32 +220,27 @@ spinButton.addEventListener('click', async () => {
     }
 });
 
+// Other event listeners remain the same
 buyMoreBtn.addEventListener('click', () => {
     renderPurchaseBundles();
     purchaseModal.classList.add('show');
 });
-
 showPrizesBtn.addEventListener('click', () => {
     prizesModal.classList.add('show');
 });
-
 const closeModalHandler = (e) => {
     if (e.target.matches('.modal-container') || e.target.closest('[data-close-modal]')) {
         e.target.closest('.modal-container').classList.remove('show');
     }
 };
-
 purchaseModal.addEventListener('click', closeModalHandler);
 prizesModal.addEventListener('click', closeModalHandler);
-
 bundlesContainer.addEventListener('click', async (e) => {
     const button = e.target.closest('.bundle-btn');
     if (!button) return;
-
     const originalText = button.innerHTML;
     button.disabled = true;
     button.innerHTML = 'Processing...';
-
     const purchaseTokenFunc = httpsCallable(functions, 'purchaseSpinTokens');
     try {
         await purchaseTokenFunc({
@@ -281,7 +256,6 @@ bundlesContainer.addEventListener('click', async (e) => {
         button.disabled = false;
     }
 });
-
 tokenAccordionContainer.addEventListener('click', (e) => {
     const header = e.target.closest('.accordion-header');
     if (!header) return;

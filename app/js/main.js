@@ -5,8 +5,30 @@ const db = getFirestore(app);
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
-    loadPastWinners(); // Call the function to load past winners
+    loadPastWinners();
+    initializeParallax(); // Add this line to activate the effect
 });
+
+// --- NEW FUNCTION: Initialize Parallax Effect ---
+const initializeParallax = () => {
+    const heroLogo = document.querySelector('.hero-logo');
+
+    // Only run this script if the hero logo is on the page
+    if (!heroLogo) {
+        return;
+    }
+
+    const handleScroll = () => {
+        const offset = window.scrollY;
+        // Move the logo down at 40% of the scroll speed. Adjust the '0.4' for more/less effect.
+        heroLogo.style.transform = `translateY(${offset * 0.4}px)`;
+    };
+
+    // Use requestAnimationFrame for a smoother animation
+    window.addEventListener('scroll', () => {
+        window.requestAnimationFrame(handleScroll);
+    });
+};
 
 const loadAllCompetitions = async () => {
     const instantWinGrid = document.getElementById('instant-win-grid');
@@ -60,27 +82,23 @@ const loadAllCompetitions = async () => {
     }
 };
 
-// --- CORRECTED FUNCTION: Load Past Winners ---
 const loadPastWinners = async () => {
     const winnersGrid = document.getElementById('past-winners-grid');
     if (!winnersGrid) return;
 
     try {
-        // STEP 1: Simplify the query. Just order by the date.
         const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"));
         const querySnapshot = await getDocs(q);
-
-        // STEP 2: Filter the results here in the code.
+        
         const validWinners = querySnapshot.docs
             .map(doc => doc.data())
-            .filter(winner => winner.winnerDisplayName); // This ensures the winner has a name.
+            .filter(winner => winner.winnerDisplayName);
 
         if (validWinners.length === 0) {
             winnersGrid.innerHTML = '<div class="placeholder">Our first winners will be announced soon!</div>';
             return;
         }
         
-        // STEP 3: Map over the *filtered* results.
         winnersGrid.innerHTML = validWinners.map(winner => createWinnerCard(winner)).join('');
 
     } catch (error) {
@@ -156,5 +174,5 @@ function startAllCountdowns() {
     };
     
     updateTimers(); 
-    const timerInterval = setInterval(updateTimers, 60000);
+    setInterval(updateTimers, 60000);
 }

@@ -15,17 +15,22 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 
 // ===================================================================
-// == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
+// == CONFIGURATION: PRIZE ANGLES SYNCHRONIZED WITH ADMIN PANEL     ==
 // ===================================================================
+// This map now includes all prizes from your admin settings to prevent mismatches.
 const PRIZE_ANGLES = {
-    'cash-1000': 150,
+    // Cash Prizes
     'cash-500': 210,
     'cash-250': 300,
     'cash-100': 0,
     'cash-50': 60,
-    'credit-20': 30,
+    'cash-20': 30, // Assuming this is the top-right coin stack
+    
+    // Credit Prizes
     'credit-10': 270,
     'credit-5': 120,
+    
+    // No Win Segments
     'no-win': [90, 180, 240, 330] 
 };
 // ===================================================================
@@ -143,18 +148,14 @@ function renderPurchaseBundles() {
     `).join('');
 }
 
-
-// --- REWRITTEN Event Handler for Spinning ---
 spinButton.addEventListener('click', async () => {
     if (userTokens.length === 0 || isSpinning) return;
 
-    // 1. Set spinning state immediately
     isSpinning = true;
     spinButton.textContent = 'SPINNING...';
     updateUI();
     spinResultContainer.innerHTML = '';
     
-    // 2. Prepare for animation (reset position)
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
     void wheel.offsetWidth;
@@ -163,40 +164,37 @@ spinButton.addEventListener('click', async () => {
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
 
     try {
-        // 3. Call the server and WAIT for the definitive result
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
         const { won, prizeType, value } = result.data;
 
-        // 4. NOW that we have the result, calculate the correct landing spot
         let targetAngle;
         if (won) {
             const prizeKey = `${prizeType}-${value}`;
             targetAngle = PRIZE_ANGLES[prizeKey];
         }
-        if (targetAngle === undefined) { // Handles "no-win" or prizes not on the visual wheel
+        
+        if (targetAngle === undefined) {
             const noWinAngles = PRIZE_ANGLES['no-win'];
             targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
         }
         
         const baseSpins = 360 * 8;
-        const randomOffsetInSegment = (Math.random() - 0.5) * 20; // +/- 10 degrees for variance
+        const randomOffsetInSegment = (Math.random() - 0.5) * 20;
         const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
         
-        // 5. Play the animation with the guaranteed correct destination
         wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
 
-        // 6. After the animation is complete, show the result message
         setTimeout(() => {
             if (won) {
-                const prizeText = prizeType === 'credit' ? `£${value.toFixed(2)} STORE CREDIT` : `£${value.toFixed(2)} CASH`;
+                // THIS IS THE FIX: Check that `value` is a valid number before calling toFixed().
+                const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
+                const prizeText = prizeType === 'credit' ? `£${prizeValue} STORE CREDIT` : `£${prizeValue} CASH`;
                 spinResultContainer.innerHTML = `<p class="spin-win">🎉 YOU WON ${prizeText}! 🎉</p>`;
             } else {
                 spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
             }
             isSpinning = false;
-            // The onSnapshot listener will handle the token count update automatically.
-            // We just need to re-enable the button if tokens are left.
             updateUI();
         }, 8500);
 
@@ -204,12 +202,10 @@ spinButton.addEventListener('click', async () => {
         console.error("Error spending token:", error);
         spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
         isSpinning = false;
-        updateUI(); // Re-enable button on error
+        updateUI();
     }
 });
 
-
-// Other event listeners remain the same
 buyMoreBtn.addEventListener('click', () => {
     renderPurchaseBundles();
     purchaseModal.classList.add('show');

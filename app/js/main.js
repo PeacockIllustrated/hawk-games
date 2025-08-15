@@ -1,4 +1,4 @@
---- START OF FILE app/js/main.js ---
+
 import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js'; // Import the initialized app
 

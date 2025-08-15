@@ -13,49 +13,55 @@
     <header class="main-header"></header>
 
     <main class="container">
-        <h2 class="section-title">Instant Win Games</h2>
-        
-        <div class="game-zone">
-            <aside id="token-panel" class="token-panel">
-                <h3>Your Spin Tokens</h3>
-                <div id="token-list-container">
-                    <div class="placeholder">Loading your tokens...</div>
-                </div>
+        <div class="instant-win-container">
+            <!-- Game Section -->
+            <section id="spin-game-container" class="spin-game-panel">
+                <h2 class="section-title">Instant Win</h2>
+                <p class="section-subtitle">Use your tokens for a chance to win cash prizes instantly!</p>
                 
-                <!-- NEW SECTION FOR PURCHASING TOKENS -->
-                <div id="purchase-tokens-section" class="purchase-tokens-section" style="display: none;">
-                    <h4>Purchase More Tokens</h4>
-                    <div id="token-bundles-container" class="token-bundles">
-                        <!-- JS will populate bundles here -->
+                <div class="wheel-container">
+                    <div class="wheel-pointer"></div>
+                    <div id="wheel" class="wheel">
+                        <!-- JS populates this with prize labels -->
                     </div>
                 </div>
-            </aside>
 
-            <section id="game-panel" class="game-panel">
-                <div id="game-placeholder">
-                    <p>Select a Spin Token from the left to play.</p>
-                </div>
-                
-                <div id="spin-game-container" style="display: none;">
-                    <h2 id="spin-modal-title">Spin The Wheel!</h2>
-                    <p id="spin-modal-subtitle">Use your token for a chance to win instantly!</p>
-                    
-                    <div class="wheel-container">
-                        <div class="wheel-pointer"></div>
-                        <div id="wheel" class="wheel">
-                            <!-- JS now populates this with labels over a background image -->
-                        </div>
+                <div class="spin-controls">
+                    <div class="token-counter">
+                        <span class="token-icon"></span>
+                        <span id="token-count">0</span>
+                        <span>Spins Available</span>
                     </div>
-
                     <button id="spin-button" class="btn btn-spin" disabled>SPIN THE WHEEL</button>
+                    <button id="buy-more-tokens-btn" class="btn btn-buy-tokens">+</button>
+                </div>
 
-                    <div id="spin-result" class="spin-result-container">
-                        <!-- Result message will be injected here -->
-                    </div>
+                <div id="spin-result" class="spin-result-container">
+                    <!-- Result message will be injected here -->
+                </div>
+            </section>
+
+            <!-- Token Inventory Section -->
+            <section class="token-inventory">
+                <h3>Your Token Inventory</h3>
+                <div id="token-accordion-container">
+                    <div class="placeholder">Loading your tokens...</div>
                 </div>
             </section>
         </div>
     </main>
+    
+    <!-- Purchase Modal -->
+    <div id="purchase-modal" class="modal-container">
+        <div id="purchase-modal-content" class="modal-content">
+            <h2>Purchase More Spins</h2>
+            <p>Select a bundle below to top up your tokens.</p>
+            <div id="token-bundles-container" class="token-bundles">
+                <!-- JS will populate bundles here -->
+            </div>
+            <button class="btn btn-secondary" style="margin-top: 1.5rem;" data-close-modal>Cancel</button>
+        </div>
+    </div>
     
     <footer class="main-footer"></footer>
 

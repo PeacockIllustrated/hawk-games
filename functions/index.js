@@ -71,17 +71,13 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
     });
 });
 
-// --- spendSpinToken (REWRITTEN) ---
+// --- spendSpinToken (REWRITTEN for Odds & Credit) ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
     const userRef = db.collection('users').doc(uid);
-
-    // The token to spend is passed from the client, who knows the oldest one
     const { tokenId } = request.data;
-    if (!tokenId) {
-        throw new HttpsError('invalid-argument', 'A tokenId is required.');
-    }
+    if (!tokenId) throw new HttpsError('invalid-argument', 'A tokenId is required.');
 
     return db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
@@ -89,24 +85,19 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
         
         const userData = userDoc.data();
         const userTokens = userData.spinTokens || [];
-
-        // Validate the specific token exists and remove it
         const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
-        if (tokenIndex === -1) {
-            throw new HttpsError('not-found', 'Spin token not found or already spent.');
-        }
+        if (tokenIndex === -1) throw new HttpsError('not-found', 'Spin token not found or already spent.');
+        
         const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
         transaction.update(userRef, { spinTokens: updatedTokens });
 
-        // Get the master prize table
         const settingsRef = db.collection('admin_settings').doc('spinnerPrizes');
-        const settingsDoc = await settingsRef.get(); // Use get() not transaction.get() as it's outside user data
-        if (!settingsDoc.exists || !settingsDoc.data().prizes) {
+        const settingsDoc = await settingsRef.get();
+        if (!settingsDoc.exists() || !settingsDoc.data().prizes) {
             throw new HttpsError('internal', 'Spinner prize configuration is not available.');
         }
         const prizes = settingsDoc.data().prizes;
 
-        // Perform the weighted random draw
         const cumulativeProbabilities = [];
         let cumulative = 0;
         for (const prize of prizes) {
@@ -116,25 +107,27 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
         }
 
         const random = Math.random();
-        let finalPrize = { won: false, prizeValue: 0 };
+        let finalPrize = { won: false, prizeType: 'none', value: 0 };
 
         for (const prize of cumulativeProbabilities) {
             if (random < prize.cumulativeProb) {
-                finalPrize = { won: true, prizeValue: prize.value };
+                finalPrize = { won: true, prizeType: prize.type, value: prize.value };
                 break;
             }
         }
         
-        // If it's a win, log it for auditing
         if (finalPrize.won) {
             const winLogRef = db.collection('spin_wins').doc();
             transaction.set(winLogRef, {
                 userId: uid,
-                prizeValue: finalPrize.prizeValue,
+                prizeType: finalPrize.prizeType,
+                prizeValue: finalPrize.value,
                 wonAt: FieldValue.serverTimestamp(),
                 tokenIdUsed: tokenId,
             });
-            // Here you would also credit the user's account balance in a real scenario
+            if (finalPrize.prizeType === 'credit') {
+                transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            }
         }
 
         return finalPrize;
@@ -146,29 +139,21 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
 exports.purchaseSpinTokens = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { amount } = request.data; // Price is handled by client/payment gateway
-
-    if (!amount || amount <= 0) {
-        throw new HttpsError('invalid-argument', 'Invalid amount for token purchase.');
-    }
+    const { amount } = request.data;
+    if (!amount || amount <= 0) throw new HttpsError('invalid-argument', 'Invalid amount for token purchase.');
 
     const userRef = db.collection('users').doc(uid);
-
     let newTokens = [];
     const earnedAt = new Date();
     for (let i = 0; i < amount; i++) {
         newTokens.push({
             tokenId: crypto.randomBytes(16).toString('hex'),
-            compId: 'purchased', // Generic ID for purchased tokens
-            compTitle: 'Purchased Token Bundle', // Generic title
+            compId: 'purchased',
+            compTitle: 'Purchased Token Bundle',
             earnedAt: earnedAt
         });
     }
-
-    await userRef.update({
-        spinTokens: FieldValue.arrayUnion(...newTokens)
-    });
-
+    await userRef.update({ spinTokens: FieldValue.arrayUnion(...newTokens) });
     return { success: true, tokensAdded: newTokens.length };
 });
 

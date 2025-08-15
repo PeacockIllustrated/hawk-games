@@ -212,17 +212,18 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 .hero-logo {
     display: block;
-    margin: 0 auto 2.5rem auto;
-    height: 130px; /* Increased logo size */
-    width: auto;
+    margin: 0 auto 2rem auto;
+    width: clamp(200px, 40vw, 500px); /* Responsive width: min 200px, preferred 40% of viewport, max 500px */
+    height: auto;
 }
 .hero-content h1 {
     font-family: var(--font-heading);
-    font-size: clamp(2.2rem, 5vw, 4rem); /* Smaller, more concise font size */
+    font-size: clamp(2.2rem, 5vw, 4rem);
     text-transform: uppercase;
     letter-spacing: 3px;
     text-shadow: 0 2px 10px rgba(0,0,0,0.5);
     line-height: 1.2;
+    margin-top: 1.5rem;
 }
 .hero-content p {
     font-size: 1.2rem;
@@ -241,6 +242,6 @@ input:checked + .slider:before { transform: translateX(26px); }
         grid-template-columns: 1fr;
     }
     .hero-logo {
-        height: 100px;
+        width: clamp(150px, 60vw, 250px);
     }
 }

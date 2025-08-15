@@ -11,6 +11,7 @@ const db = getFirestore(app);
 const functions = getFunctions(app);
 let userTokens = [];
 let spinnerPrizes = [];
+let visualWheelSegments = []; // The 12 segments currently displayed on the wheel
 let isSpinning = false;
 let userProfileUnsubscribe = null;
 
@@ -27,7 +28,6 @@ const prizesModal = document.getElementById('prizes-modal');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
-
 // --- Auth Gate & Data Listener ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -40,7 +40,7 @@ onAuthStateChanged(auth, (user) => {
                 updateUI();
             }
         });
-        loadAndRenderWheel(); // Fetch prizes and render the wheel
+        loadAndRenderWheel();
     } else {
         window.location.replace('login.html');
     }
@@ -62,19 +62,26 @@ function updateUI() {
     }
 }
 
-// --- NEW: Load Prizes and Build Wheel/Table ---
+// --- NEW HELPER: Maps a prize object to an icon path ---
+function getIconForPrize(prize) {
+    if (!prize || prize.value === 0) {
+        return 'assets/icons/no-win.svg';
+    }
+    return `assets/icons/${prize.type}-${prize.value}.svg`;
+}
+
+// --- Load Prizes and Build Wheel/Table ---
 async function loadAndRenderWheel() {
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(settingsRef);
         if (docSnap.exists() && docSnap.data().prizes) {
-            spinnerPrizes = docSnap.data().prizes;
+            spinnerPrizes = docSnap.data().prizes.sort((a, b) => b.value - a.value); // Sort highest to lowest
             renderWheel(spinnerPrizes);
             renderPrizesTable(spinnerPrizes);
         } else {
             console.error("Spinner settings not found in Firestore.");
-            // Render a default wheel so the page doesn't look broken
-            renderWheel([]);
+            renderWheel([]); // Render a default empty wheel
         }
     } catch (error) {
         console.error("Error fetching spinner prizes:", error);
@@ -116,29 +123,32 @@ function renderWheel(prizes) {
     if (!wheel) return;
     wheel.innerHTML = '';
     
-    // Create a visually appealing set of 12 segments for the wheel
-    let wheelSegments = [...prizes];
-    // Pad with "No Win" if there are fewer than 12 prizes
-    while (wheelSegments.length < 12) {
-        wheelSegments.push({ value: 0, type: 'none' });
-    }
-    // Shuffle for visual randomness
-    wheelSegments.sort(() => Math.random() - 0.5);
+    const topPrizes = prizes.slice(0, 8);
+    const noWinSegment = { value: 0, type: 'none' };
+    visualWheelSegments = [
+        ...topPrizes,
+        noWinSegment,
+        noWinSegment,
+        noWinSegment,
+        prizes[Math.floor(prizes.length / 2)] || noWinSegment
+    ].slice(0, 12).sort(() => Math.random() - 0.5);
 
-    const segmentAngle = 360 / wheelSegments.length;
+    const segmentAngle = 360 / visualWheelSegments.length;
 
-    wheelSegments.forEach((prize, i) => {
-        const labelRotation = (i * segmentAngle) + (segmentAngle / 2);
-        let labelText = 'No Win';
-        if (prize.value > 0) {
-            labelText = prize.type === 'credit' ? `£${prize.value} Credit` : `£${prize.value} Cash`;
-        }
+    visualWheelSegments.forEach((prize, i) => {
+        const iconContainer = document.createElement('div');
+        iconContainer.className = 'segment-icon-container';
         
-        const label = document.createElement('div');
-        label.className = `segment-label ${prize.type}`;
-        label.textContent = labelText;
-        label.style.transform = `rotate(${labelRotation}deg) translate(0, -110px)`;
-        wheel.appendChild(label);
+        const rotation = (i * segmentAngle) + (segmentAngle / 2);
+        iconContainer.style.transform = `rotate(${rotation}deg)`;
+
+        const icon = document.createElement('img');
+        icon.src = getIconForPrize(prize);
+        icon.className = 'segment-icon';
+        icon.style.transform = `rotate(${-rotation}deg)`;
+
+        iconContainer.appendChild(icon);
+        wheel.appendChild(iconContainer);
     });
 }
 
@@ -156,7 +166,6 @@ function renderPrizesTable(prizes) {
 }
 
 function renderPurchaseBundles() {
-    // We can always allow purchase now, tokens are not tied to comps
     const bundles = [
         { amount: 5, price: 4.50 },
         { amount: 10, price: 8.00 },
@@ -184,8 +193,7 @@ spinButton.addEventListener('click', async () => {
 
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
-    void wheel.offsetWidth; 
-    wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
+    void wheel.offsetWidth;
     
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
 
@@ -193,10 +201,24 @@ spinButton.addEventListener('click', async () => {
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
         const { won, prizeType, value } = result.data;
 
-        const baseRotation = 360 * 8; 
-        const randomOffset = Math.random() * 360;
-        const finalAngle = baseRotation + randomOffset;
-
+        let targetSegmentIndex = -1;
+        if (won) {
+            targetSegmentIndex = visualWheelSegments.findIndex(p => p.type === prizeType && p.value === value);
+        }
+        if (targetSegmentIndex === -1) {
+            targetSegmentIndex = visualWheelSegments.findIndex(p => p.value === 0);
+        }
+        if (targetSegmentIndex === -1) {
+            targetSegmentIndex = Math.floor(Math.random() * 12);
+        }
+        
+        const segmentAngle = 360 / 12;
+        const targetRotation = (targetSegmentIndex * segmentAngle);
+        const randomOffsetInSegment = (Math.random() - 0.5) * (segmentAngle * 0.8);
+        const baseSpins = 360 * 8;
+        const finalAngle = baseSpins - targetRotation - randomOffsetInSegment;
+        
+        wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
 
         setTimeout(() => {
@@ -207,7 +229,7 @@ spinButton.addEventListener('click', async () => {
                 spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
             }
             isSpinning = false;
-            updateUI(); 
+            updateUI();
         }, 8500);
 
     } catch (error) {

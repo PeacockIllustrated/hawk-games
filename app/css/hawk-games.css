@@ -31,7 +31,7 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .placeholder { padding: 4rem; text-align: center; font-family: var(--font-heading); color: #888; }
 
 /* --- 3. Layout: Header & Footer --- */
-.main-header, .main-footer { padding: 1rem 0; background-color: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); }
+.main-header, .main-footer { padding: 1rem 0; background-color: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
 .main-header .container, .main-footer .container { display: flex; justify-content: space-between; align-items: center; }
 .logo img { height: 35px; display: block; }
 .main-nav { display: flex; align-items: center; gap: 1.5rem; }
@@ -65,7 +65,6 @@ body { font-family: var(--font-body); background-color: var(--dark-bg); color: v
 .cash-alternative { color: #ccc; font-weight: 700; margin-top: -0.5rem; margin-bottom: 1.5rem; }
 .cash-alternative span { color: var(--primary-gold); }
 .detail-section { padding: 1.5rem 0; border-top: 1px solid var(--border-color); }
-/* TIMER FIX */
 .detail-timer { font-family: var(--font-heading); font-size: 2.5rem; text-align: center; letter-spacing: 2px; display: flex; justify-content: center; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
 .detail-timer span { display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .detail-timer small { font-family: var(--font-body); font-size: 0.7rem; color: #aaa; text-transform: none; letter-spacing: 1px; }
@@ -109,11 +108,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 .status-won { background-color: var(--primary-gold); color: var(--dark-bg); }
 
 /* --- 8. Homepage & Universal Section Styles --- */
-.hero-home { position: relative; min-height: 60vh; background-color: var(--dark-bg); display: flex; align-items: center; justify-content: center; text-align: center; color: white; padding: 3rem 0; }
-.hero-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-.hero-content { position: relative; z-index: 2; max-width: 800px; }
-.hero-content h1 { font-family: var(--font-heading); font-size: clamp(2.5rem, 5vw, 4rem); text-transform: uppercase; letter-spacing: 3px; text-shadow: none; }
-.hero-content p { font-size: 1.2rem; max-width: 600px; margin: 1rem auto 2rem; color: #aaa; }
 #how-it-works-section, #instant-win-section, #live-competitions-section, #past-winners-section { padding: 5rem 0; }
 .section-subtitle { font-size: 1.1rem; color: #ccc; text-align: center; max-width: 800px; margin: -2.5rem auto 3rem auto; line-height: 1.7; }
 .how-it-works-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem; }
@@ -169,7 +163,53 @@ input:checked + .slider:before { transform: translateX(26px); }
 .bundle-btn .bundle-amount { font-weight: bold; }
 .bundle-btn .bundle-price { color: var(--primary-gold); font-family: var(--font-heading); }
 
-/* --- 12. RESPONSIVE FIXES --- */
+/* --- 12. HERO SECTION & PARALLAX --- */
+.hero-home {
+    position: relative;
+    height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+    padding: 3rem 1rem;
+    overflow: hidden;
+    /* This creates the static background effect */
+    background-image: url('../assets/hero-bg.png');
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
+}
+.hero-content {
+    position: relative;
+    z-index: 2; /* Content sits above overlay */
+    max-width: 800px;
+}
+.hero-logo {
+    display: block;
+    margin: 0 auto 2.5rem auto;
+    height: 80px; /* Adjust as needed */
+    width: auto;
+    /* This transition smooths the parallax movement */
+    transition: transform 0.1s ease-out;
+}
+.hero-content h1 {
+    font-family: var(--font-heading);
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+.hero-content p {
+    font-size: 1.2rem;
+    max-width: 600px;
+    margin: 1.5rem auto 2.5rem;
+    color: #ccc;
+    line-height: 1.7;
+}
+
+/* --- 13. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {
     .account-layout, .game-zone {
         grid-template-columns: 1fr;

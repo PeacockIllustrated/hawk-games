@@ -15,30 +15,25 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 
 // ===================================================================
-// == CONFIGURATION: SET YOUR PRIZE ANGLES HERE                     ==
+// == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
 // ===================================================================
-// Instructions:
-// 1. Your wheel image should have 12 segments.
-// 2. The top-most segment (where the pointer is) is 0 degrees.
-// 3. Angles increase clockwise. Each segment is 30 degrees wide.
-//    - The segment to the right of the top is 30 degrees.
-//    - The segment at the 3 o'clock position is 90 degrees.
-//    - The segment at the bottom is 180 degrees.
-// 4. Update the key (e.g., 'cash-500') and the value (the angle) to match your image.
-// 5. For 'no-win', provide an array of all angles where a "No Win" segment is located.
+// This map now accurately reflects the prize locations on your new PNG.
+// The top pointer position is 0°, and angles increase clockwise.
 const PRIZE_ANGLES = {
-    // Cash Prizes
-    'cash-500': 180,
-    'cash-250': 60,
-    'cash-100': 0,
-    // Credit Prizes
-    'credit-20': 30,
-    'credit-10': 210,
-    'credit-5': 150,
-    // Add any other prizes from your admin panel here...
+    // Cash Prizes from your image
+    'cash-1000': 150, // Trophy Icon
+    'cash-500': 210,  // Large Sack
+    'cash-250': 300,  // Medium Sack
+    'cash-100': 0,    // Top Coin Stack
+    'cash-50': 60,   // Coin Stack
     
-    // No Win Segments (provide all angles for "No Win" slots)
-    'no-win': [90, 120, 240, 270, 300, 330] 
+    // Credit Prizes from your image
+    'credit-20': 30,  // Top-Right Coin Stack
+    'credit-10': 270, // Bottom-Left Coin Stack
+    'credit-5': 120,  // Left Coin Stack
+    
+    // No Win Segments (The 4 empty slots)
+    'no-win': [90, 180, 240, 330] 
 };
 // ===================================================================
 
@@ -69,6 +64,8 @@ onAuthStateChanged(auth, (user) => {
             }
         });
         loadPrizeSettings();
+        // The wheel is now a static background image, no dynamic rendering needed.
+        wheel.innerHTML = ''; // Ensure wheel is empty
     } else {
         window.location.replace('login.html');
     }
@@ -182,20 +179,18 @@ spinButton.addEventListener('click', async () => {
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
         const { won, prizeType, value } = result.data;
 
-        // --- NEW: Calculate landing angle based on PRIZE_ANGLES map ---
         let targetAngle;
         if (won) {
             const prizeKey = `${prizeType}-${value}`;
             targetAngle = PRIZE_ANGLES[prizeKey];
         }
-        // If the prize isn't in the map, or it was a loss, pick a random "no-win" slot
         if (targetAngle === undefined) {
             const noWinAngles = PRIZE_ANGLES['no-win'];
             targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
         }
         
         const baseSpins = 360 * 8;
-        const randomOffsetInSegment = (Math.random() - 0.5) * 20; // +/- 10 degrees
+        const randomOffsetInSegment = (Math.random() - 0.5) * 20;
         const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
         
         wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
@@ -220,7 +215,6 @@ spinButton.addEventListener('click', async () => {
     }
 });
 
-// Other event listeners remain the same
 buyMoreBtn.addEventListener('click', () => {
     renderPurchaseBundles();
     purchaseModal.classList.add('show');

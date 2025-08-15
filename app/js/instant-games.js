@@ -15,22 +15,24 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 
 // ===================================================================
-// == CONFIGURATION: PRIZE ANGLES SYNCHRONIZED WITH ADMIN PANEL     ==
+// == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
 // ===================================================================
-// This map now includes all prizes from your admin settings to prevent mismatches.
+// This map now accurately reflects the prize locations on your new PNG.
+// The top pointer position is 0°, and angles increase clockwise.
 const PRIZE_ANGLES = {
-    // Cash Prizes
-    'cash-500': 210,
-    'cash-250': 300,
-    'cash-100': 0,
-    'cash-50': 60,
-    'cash-20': 30, // Assuming this is the top-right coin stack
+    // Cash Prizes from your image
+    'cash-1000': 150, // Trophy Icon
+    'cash-500': 210,  // Large Sack
+    'cash-250': 300,  // Medium Sack
+    'cash-100': 0,    // Top Coin Stack
+    'cash-50': 60,   // Coin Stack
     
-    // Credit Prizes
-    'credit-10': 270,
-    'credit-5': 120,
+    // Credit Prizes from your image
+    'credit-20': 30,  // Top-Right Coin Stack
+    'credit-10': 270, // Bottom-Left Coin Stack
+    'credit-5': 120,  // Left Coin Stack
     
-    // No Win Segments
+    // No Win Segments (The 4 empty slots)
     'no-win': [90, 180, 240, 330] 
 };
 // ===================================================================
@@ -138,16 +140,7 @@ function renderPrizesTable(prizes) {
     prizesTableContainer.innerHTML = tableHTML;
 }
 
-function renderPurchaseBundles() {
-    const bundles = [ { amount: 5, price: 4.50 }, { amount: 10, price: 8.00 }, { amount: 25, price: 15.00 } ];
-    bundlesContainer.innerHTML = bundles.map(b => `
-        <button class="btn bundle-btn" data-amount="${b.amount}" data-price="${b.price}">
-            <span class="bundle-amount">${b.amount} Tokens</span>
-            <span class="bundle-price">£${b.price.toFixed(2)}</span>
-        </button>
-    `).join('');
-}
-
+// --- Event Handlers ---
 spinButton.addEventListener('click', async () => {
     if (userTokens.length === 0 || isSpinning) return;
 
@@ -187,7 +180,6 @@ spinButton.addEventListener('click', async () => {
 
         setTimeout(() => {
             if (won) {
-                // THIS IS THE FIX: Check that `value` is a valid number before calling toFixed().
                 const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
                 const prizeText = prizeType === 'credit' ? `£${prizeValue} STORE CREDIT` : `£${prizeValue} CASH`;
                 spinResultContainer.innerHTML = `<p class="spin-win">🎉 YOU WON ${prizeText}! 🎉</p>`;
@@ -206,13 +198,99 @@ spinButton.addEventListener('click', async () => {
     }
 });
 
-buyMoreBtn.addEventListener('click', () => {
-    renderPurchaseBundles();
+buyMoreBtn.addEventListener('click', async () => {
+    const modalContent = document.getElementById('purchase-modal-content');
+    modalContent.innerHTML = `<h2>Get More Spins</h2><p class="placeholder">Loading competition...</p>`;
     purchaseModal.classList.add('show');
+    
+    try {
+        const compRef = doc(db, 'spinner_competitions', 'active');
+        const docSnap = await getDoc(compRef);
+        if (!docSnap.exists()) throw new Error('No active spinner competition found.');
+        
+        const compData = docSnap.data();
+        const answersHTML = Object.entries(compData.skillQuestion.answers)
+            .map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
+
+        const bundles = [
+            { amount: 5, price: 4.50 },
+            { amount: 10, price: 8.00 },
+            { amount: 25, price: 15.00 },
+        ];
+        const bundlesHTML = bundles.map(b => `<button class="ticket-option" data-amount="${b.amount}" data-price="${b.price}">${b.amount} Entries + ${b.amount} Bonus Spins for £${b.price.toFixed(2)}</button>`).join('');
+
+        modalContent.innerHTML = `
+            <h2>${compData.title}</h2>
+            <p>Enter our weekly draw for a chance to win <strong>${compData.prize}</strong> and get bonus spin tokens instantly!</p>
+            <form id="spinner-entry-form" class="modal-form">
+                <div class="skill-question-box" style="padding: 1rem 0;">
+                    <p class="question-text">${compData.skillQuestion.text}</p>
+                    <div class="answer-options">${answersHTML}</div>
+                </div>
+                <div class="ticket-selector-box" style="padding: 1rem 0;">
+                     <div class="ticket-options">${bundlesHTML}</div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+                    <button type="submit" class="btn">Confirm & Pay</button>
+                </div>
+            </form>
+        `;
+
+        const form = document.getElementById('spinner-entry-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleSpinnerCompEntry(form, compData.skillQuestion.correctAnswer);
+        });
+
+    } catch (error) {
+        console.error(error);
+        modalContent.innerHTML = `<h2>Error</h2><p>${error.message}</p><button class="btn" data-close-modal>Close</button>`;
+    }
 });
-showPrizesBtn.addEventListener('click', () => {
-    prizesModal.classList.add('show');
+
+async function handleSpinnerCompEntry(form, correctAnswer) {
+    const selectedAnswer = form.querySelector('.answer-btn.selected');
+    const selectedBundle = form.querySelector('.ticket-option.selected');
+
+    if (!selectedAnswer) { alert('Please answer the question.'); return; }
+    if (selectedAnswer.dataset.answer !== correctAnswer) { alert('Incorrect answer. Please try again.'); return; }
+    if (!selectedBundle) { alert('Please select a bundle.'); return; }
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true; submitBtn.textContent = 'Processing...';
+
+    try {
+        const enterSpinnerCompetition = httpsCallable(functions, 'enterSpinnerCompetition');
+        await enterSpinnerCompetition({
+            compId: 'active',
+            bundle: {
+                amount: parseInt(selectedBundle.dataset.amount),
+                price: parseFloat(selectedBundle.dataset.price)
+            }
+        });
+        purchaseModal.classList.remove('show');
+    } catch (error) {
+        console.error("Spinner comp entry failed:", error);
+        alert(`Entry failed: ${error.message}`);
+    } finally {
+        submitBtn.disabled = false; submitBtn.textContent = 'Confirm & Pay';
+    }
+}
+
+document.getElementById('purchase-modal').addEventListener('click', (e) => {
+    const target = e.target;
+    if (target.closest('.answer-btn')) {
+        target.closest('.answer-options').querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
+        target.closest('.answer-btn').classList.add('selected');
+    }
+    if (target.closest('.ticket-option')) {
+        target.closest('.ticket-options').querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
+        target.closest('.ticket-option').classList.add('selected');
+    }
 });
+
+showPrizesBtn.addEventListener('click', () => prizesModal.classList.add('show'));
 const closeModalHandler = (e) => {
     if (e.target.matches('.modal-container') || e.target.closest('[data-close-modal]')) {
         e.target.closest('.modal-container').classList.remove('show');
@@ -220,27 +298,6 @@ const closeModalHandler = (e) => {
 };
 purchaseModal.addEventListener('click', closeModalHandler);
 prizesModal.addEventListener('click', closeModalHandler);
-bundlesContainer.addEventListener('click', async (e) => {
-    const button = e.target.closest('.bundle-btn');
-    if (!button) return;
-    const originalText = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = 'Processing...';
-    const purchaseTokenFunc = httpsCallable(functions, 'purchaseSpinTokens');
-    try {
-        await purchaseTokenFunc({
-            amount: parseInt(button.dataset.amount),
-            price: parseFloat(button.dataset.price)
-        });
-        purchaseModal.classList.remove('show');
-    } catch (error) {
-        console.error("Token purchase failed:", error);
-        alert(`Purchase failed: ${error.message}`);
-    } finally {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }
-});
 tokenAccordionContainer.addEventListener('click', (e) => {
     const header = e.target.closest('.accordion-header');
     if (!header) return;

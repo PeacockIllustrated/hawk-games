@@ -163,7 +163,10 @@ spinButton.addEventListener('click', async () => {
                 spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
             }
             isSpinning = false;
-            // The onSnapshot listener will automatically update the UI once the token is removed from DB
+            // ========= THIS IS THE FIX =========
+            // Force a UI update immediately after animation ends to re-enable the button
+            updateUI(); 
+            // ===================================
         }, 8500);
 
     } catch (error) {

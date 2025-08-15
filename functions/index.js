@@ -77,7 +77,9 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     const uid = request.auth.uid;
     const userRef = db.collection('users').doc(uid);
     const { tokenId } = request.data;
-    if (!tokenId) throw new HttpsError('invalid-argument', 'A tokenId is required.');
+    if (!tokenId) {
+        throw new HttpsError('invalid-argument', 'A tokenId is required.');
+    }
 
     return db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
@@ -86,7 +88,9 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
         const userData = userDoc.data();
         const userTokens = userData.spinTokens || [];
         const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
-        if (tokenIndex === -1) throw new HttpsError('not-found', 'Spin token not found or already spent.');
+        if (tokenIndex === -1) {
+            throw new HttpsError('not-found', 'Spin token not found or already spent.');
+        }
         
         const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
         transaction.update(userRef, { spinTokens: updatedTokens });
@@ -134,28 +138,50 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
-
-// --- purchaseSpinTokens (UPDATED) ---
-exports.purchaseSpinTokens = onCall(functionOptions, async (request) => {
+// --- NEW: enterSpinnerCompetition ---
+exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { amount } = request.data;
-    if (!amount || amount <= 0) throw new HttpsError('invalid-argument', 'Invalid amount for token purchase.');
+    const { compId, bundle } = request.data;
+
+    if (!compId || !bundle || !bundle.amount || bundle.amount <= 0) {
+        throw new HttpsError('invalid-argument', 'Invalid competition or bundle specified.');
+    }
 
     const userRef = db.collection('users').doc(uid);
-    let newTokens = [];
-    const earnedAt = new Date();
-    for (let i = 0; i < amount; i++) {
-        newTokens.push({
-            tokenId: crypto.randomBytes(16).toString('hex'),
-            compId: 'purchased',
-            compTitle: 'Purchased Token Bundle',
-            earnedAt: earnedAt
+    const spinnerCompRef = db.collection('spinner_competitions').doc(compId);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+            throw new HttpsError('not-found', 'User profile not found.');
+        }
+
+        // 1. Log the entry into the spinner competition's draw
+        const entryRef = spinnerCompRef.collection('entries').doc();
+        transaction.set(entryRef, {
+            userId: uid,
+            userDisplayName: userDoc.data().displayName || "N/A",
+            entriesBought: bundle.amount,
+            amountPaid: bundle.price,
+            enteredAt: FieldValue.serverTimestamp(),
         });
-    }
-    await userRef.update({ spinTokens: FieldValue.arrayUnion(...newTokens) });
-    return { success: true, tokensAdded: newTokens.length };
+
+        // 2. Award the bonus spin tokens
+        let newTokens = [];
+        const earnedAt = new Date();
+        for (let i = 0; i < bundle.amount; i++) {
+            newTokens.push({
+                tokenId: crypto.randomBytes(16).toString('hex'),
+                compId: 'spinner-comp-bundle',
+                compTitle: `Spinner Competition Entry`,
+                earnedAt: earnedAt
+            });
+        }
+        transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
+    });
 });
+
 
 // --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {

@@ -1,3 +1,4 @@
+--- START OF FILE app/js/main.js ---
 import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js'; // Import the initialized app
 
@@ -7,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
     loadPastWinners();
     initializeHeaderScroll(); // Activate the header scroll effect
+    initializeHowItWorks(); // Activate the interactive cards
 });
 
 // --- NEW FUNCTION: Initialize Header Scroll Effect ---
@@ -25,6 +27,26 @@ const initializeHeaderScroll = () => {
 
     window.addEventListener('scroll', handleScroll);
 };
+
+// --- NEW FUNCTION: Initialize "How It Works" Interactive Cards ---
+const initializeHowItWorks = () => {
+    const stepCards = document.querySelectorAll('.how-it-works-grid .step-card');
+    if (stepCards.length === 0) return;
+
+    stepCards.forEach(card => {
+        card.addEventListener('click', () => {
+            // If the clicked card is already active, deactivate it.
+            if (card.classList.contains('active')) {
+                card.classList.remove('active');
+            } else {
+                // Otherwise, deactivate all other cards and activate this one.
+                stepCards.forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+            }
+        });
+    });
+};
+
 
 const loadAllCompetitions = async () => {
     const instantWinGrid = document.getElementById('instant-win-grid');

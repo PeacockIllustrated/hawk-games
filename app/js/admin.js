@@ -1,5 +1,5 @@
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, query, orderBy, where, runTransaction, limit, writeBatch } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, query, orderBy, where, runTransaction, limit, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
@@ -37,12 +37,13 @@ const createCompViewHTML = `
             </fieldset>
             <fieldset><legend>Ticket Pricing</legend><div id="ticket-tiers-container"></div><button type="button" id="add-tier-btn" class="btn btn-secondary btn-small">Add Tier</button></fieldset>
             
-            <fieldset><legend>Instant Wins</legend>
-                <div class="form-group-inline"><label for="enable-instant-wins" style="display:flex; align-items: center; gap: 10px;">Enable Instant Wins? <input type="checkbox" id="enable-instant-wins" style="width:auto; height:auto;"></label></div>
+            <fieldset><legend>Spin Wheel Prizes (Instant Wins)</legend>
+                <div class="form-group-inline"><label for="enable-instant-wins" style="display:flex; align-items: center; gap: 10px;">Enable Spin Wheel? <input type="checkbox" id="enable-instant-wins" style="width:auto; height:auto;"></label></div>
                 <div id="instant-win-config-panel" style="display:none; margin-top: 1rem;">
                     <div id="instant-win-prizes-container"></div>
-                    <button type="button" id="add-instant-prize-btn" class="btn btn-secondary btn-small">Add Instant Prize Tier</button>
-                    <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Define how many instant prizes of a certain value to create.</p>
+                    <button type="button" id="add-instant-prize-btn" class="btn btn-secondary btn-small">Add Prize Tier</button>
+                    <button type="button" id="load-defaults-btn" class="btn btn-secondary btn-small" style="margin-left: 1rem;">Load Default Prizes</button>
+                    <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Define the prize pool for this competition's spin wheel. The total number of prizes you create here will be randomly hidden among the competition tickets.</p>
                 </div>
             </fieldset>
 
@@ -56,6 +57,19 @@ const createCompViewHTML = `
             <button type="submit" class="btn btn-primary">Create Competition</button>
         </form>
     </div>`;
+
+const spinnerSettingsViewHTML = `
+    <div class="content-panel">
+        <h2>Default Spin Wheel Prize Template</h2>
+        <p>Set up your ideal prize pool here. You can load this template on the "Create Competition" page to quickly set up new Instant Win games with a consistent prize structure.</p>
+        <form id="spinner-settings-form" class="admin-form" style="margin-top: 2rem;">
+            <div id="spinner-prizes-container"></div>
+            <button type="button" id="add-spinner-prize-btn" class="btn btn-secondary btn-small">Add Prize Tier</button>
+            <hr style="border-color: var(--border-color); margin: 1.5rem 0;">
+            <button type="submit" class="btn btn-primary">Save Default Template</button>
+        </form>
+    </div>`;
+
 
 // Admin Gatekeeper
 onAuthStateChanged(auth, user => {
@@ -104,6 +118,10 @@ function renderView(viewName) {
         case 'create':
             mainContentContainer.innerHTML = createCompViewHTML;
             initializeCreateFormView();
+            break;
+        case 'spinner-settings':
+            mainContentContainer.innerHTML = spinnerSettingsViewHTML;
+            initializeSpinnerSettingsView();
             break;
     }
 }
@@ -169,18 +187,16 @@ function initializeCreateFormView() {
         tierEl.querySelector('.btn-remove-tier').addEventListener('click', () => tierEl.remove());
     };
     addTierBtn.addEventListener('click', addTier);
-    addTier(); // Add one tier by default
+    addTier(); 
 
-    // --- Instant Win Logic ---
     const instantWinCheckbox = document.getElementById('enable-instant-wins');
     const instantWinPanel = document.getElementById('instant-win-config-panel');
     const addInstantPrizeBtn = document.getElementById('add-instant-prize-btn');
+    const loadDefaultsBtn = document.getElementById('load-defaults-btn');
     const instantPrizesContainer = document.getElementById('instant-win-prizes-container');
 
     const setInstantWinInputsRequired = (isRequired) => {
-        instantWinPanel.querySelectorAll('input').forEach(input => {
-            input.required = isRequired;
-        });
+        instantWinPanel.querySelectorAll('input').forEach(input => input.required = isRequired);
     };
 
     instantWinCheckbox.addEventListener('change', (e) => {
@@ -189,20 +205,34 @@ function initializeCreateFormView() {
         setInstantWinInputsRequired(isEnabled);
     });
 
-    const addInstantPrize = () => {
+    const addInstantPrize = (count = '', value = '') => {
         const prizeEl = document.createElement('div');
         prizeEl.className = 'form-group-inline instant-prize-row';
-        // Start with required=false. It will be enabled by the listener if needed.
-        prizeEl.innerHTML = `<div class="form-group"><label>Number of Prizes</label><input type="number" class="instant-prize-count"></div><div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="instant-prize-value"></div><button type="button" class="btn-remove-tier">×</button>`;
+        prizeEl.innerHTML = `<div class="form-group"><label>Number of Prizes</label><input type="number" class="instant-prize-count" value="${count}"></div><div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="instant-prize-value" value="${value}"></div><button type="button" class="btn-remove-tier">×</button>`;
         instantPrizesContainer.appendChild(prizeEl);
         prizeEl.querySelector('.btn-remove-tier').addEventListener('click', () => prizeEl.remove());
     };
-    addInstantPrizeBtn.addEventListener('click', addInstantPrize);
-    addInstantPrize(); // Add one prize tier by default
+    addInstantPrizeBtn.addEventListener('click', () => addInstantPrize());
 
-    // Initialize the state
+    loadDefaultsBtn.addEventListener('click', async () => {
+        try {
+            const defaultsRef = doc(db, 'admin_settings', 'spinnerDefaults');
+            const docSnap = await getDoc(defaultsRef);
+            if (docSnap.exists()) {
+                instantPrizesContainer.innerHTML = ''; // Clear existing
+                const prizes = docSnap.data().prizes || [];
+                prizes.forEach(prize => addInstantPrize(prize.count, prize.value));
+                if (prizes.length === 0) addInstantPrize(); // Add one empty if template is empty
+                setInstantWinInputsRequired(instantWinCheckbox.checked);
+                alert('Default prizes loaded!');
+            } else {
+                alert('No default prize template found. Please save one in Spinner Settings first.');
+            }
+        } catch(e) { console.error(e); alert('Error loading defaults.'); }
+    });
+    
+    addInstantPrize();
     setInstantWinInputsRequired(instantWinCheckbox.checked);
-
     form.addEventListener('submit', handleCreateFormSubmit);
 }
 
@@ -287,11 +317,11 @@ function handleDashboardClick(e) {
     const compId = compRow?.dataset.compId;
     if (!action || !compId) return;
 
-    button.disabled = true; // Disable button immediately to prevent double clicks
+    button.disabled = true;
 
     if (action === 'add-fer') {
         showAddFerModal(compId);
-        button.disabled = false; // Re-enable since modal handles its own logic
+        button.disabled = false; 
     } else if (action === 'end') {
         handleEndCompetition(compId, button);
     } else if (action === 'draw-winner') {
@@ -308,7 +338,7 @@ async function handleEndCompetition(compId, button) {
         const compRef = doc(db, 'competitions', compId);
         await updateDoc(compRef, { status: 'ended' });
         alert('Competition has been ended.');
-        loadAndRenderCompetitions(); // Refresh the dashboard
+        loadAndRenderCompetitions();
     } catch (error) {
         console.error('Error ending competition:', error);
         alert(`Error: ${error.message}`);
@@ -321,9 +351,7 @@ async function handleDrawWinner(compId, button) {
         button.disabled = false;
         return;
     }
-    
     button.textContent = 'Drawing...';
-    
     try {
         const functions = getFunctions(app);
         const drawWinner = httpsCallable(functions, 'drawWinner');
@@ -331,7 +359,7 @@ async function handleDrawWinner(compId, button) {
 
         if (result.data.success) {
             alert(`🎉 Winner Drawn! 🎉\n\nWinner: ${result.data.winnerDisplayName}\nTicket: #${result.data.winningTicketNumber}`);
-            loadAndRenderCompetitions(); // Refresh dashboard to show winner
+            loadAndRenderCompetitions(); 
         } else {
             throw new Error(result.data.message || 'The draw failed for an unknown reason.');
         }
@@ -428,6 +456,66 @@ async function handleAddFerSubmit(e, compId) {
         submitBtn.disabled = false;
     }
 }
+
+// --- NEW Spinner Settings View Logic ---
+function initializeSpinnerSettingsView() {
+    const form = document.getElementById('spinner-settings-form');
+    const prizesContainer = document.getElementById('spinner-prizes-container');
+    const addPrizeBtn = document.getElementById('add-spinner-prize-btn');
+
+    const addPrizeTier = (count = '', value = '') => {
+        const prizeEl = document.createElement('div');
+        prizeEl.className = 'form-group-inline spinner-prize-row';
+        prizeEl.innerHTML = `
+            <div class="form-group"><label>Number of Prizes</label><input type="number" class="spinner-prize-count" value="${count}" required></div>
+            <div class="form-group"><label>Prize Value (£)</label><input type="number" step="0.01" class="spinner-prize-value" value="${value}" required></div>
+            <button type="button" class="btn-remove-tier">×</button>`;
+        prizesContainer.appendChild(prizeEl);
+        prizeEl.querySelector('.btn-remove-tier').addEventListener('click', () => prizeEl.remove());
+    };
+
+    addPrizeBtn.addEventListener('click', () => addPrizeTier());
+
+    // Load existing settings
+    const loadSettings = async () => {
+        const defaultsRef = doc(db, 'admin_settings', 'spinnerDefaults');
+        const docSnap = await getDoc(defaultsRef);
+        if (docSnap.exists()) {
+            const prizes = docSnap.data().prizes || [];
+            prizesContainer.innerHTML = '';
+            prizes.forEach(p => addPrizeTier(p.count, p.value));
+        }
+        if (prizesContainer.children.length === 0) {
+            addPrizeTier(); // Start with one if empty
+        }
+    };
+    
+    loadSettings();
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        try {
+            const prizes = Array.from(document.querySelectorAll('.spinner-prize-row')).map(row => ({
+                count: parseInt(row.querySelector('.spinner-prize-count').value),
+                value: parseFloat(row.querySelector('.spinner-prize-value').value)
+            }));
+
+            const defaultsRef = doc(db, 'admin_settings', 'spinnerDefaults');
+            await setDoc(defaultsRef, { prizes });
+            alert('Default spinner template saved successfully!');
+        } catch (error) {
+            console.error('Error saving spinner defaults:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Default Template';
+        }
+    });
+}
+
 
 function setupModal() {
     modalContainer.addEventListener('click', (e) => {

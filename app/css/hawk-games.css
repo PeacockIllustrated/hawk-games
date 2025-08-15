@@ -126,7 +126,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* --- 8. Homepage & Universal Section Styles --- */
 #how-it-works-section, #instant-win-section, #live-competitions-section, #past-winners-section { padding: 5rem 0; }
 .section-subtitle { font-size: 1.1rem; color: #ccc; text-align: center; max-width: 800px; margin: -2.5rem auto 3rem auto; line-height: 1.7; }
-.how-it-works-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem; }
 #past-winners-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
 .winner-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; text-align: center; padding: 1.5rem; }
 .winner-card img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-gold); margin-bottom: 1rem; }
@@ -228,35 +227,88 @@ input:checked + .slider:before { transform: translateX(26px); }
     line-height: 1.7;
 }
 
-/* --- 13. How It Works - Interactive Card (NEW) --- */
-.step-card { 
-    background-color: var(--card-bg); 
-    padding: 2.5rem 2rem; 
-    text-align: center; 
-    border: 1px solid var(--border-color); 
-    border-radius: 5px; 
-    transition: transform 0.3s ease, box-shadow 0.3s ease; 
+/* --- 13. How It Works - Interactive 3D Card (NEW) --- */
+.how-it-works-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+.step-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 2.5rem 2rem;
+    text-align: center;
     cursor: pointer;
+    perspective: 1000px; /* Creates the 3D space */
 }
-.step-card:hover { 
-    transform: translateY(-5px); 
-    box-shadow: 0 8px 25px rgba(0,0,0,0.5); 
+.step-content {
+    position: relative;
+    width: 100%;
+    min-height: 100px; /* Ensures space for content */
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d; /* This is crucial for 3D children */
 }
-.step-icon { width: 60px; height: 60px; line-height: 60px; border-radius: 50%; background-color: var(--primary-gold); color: var(--dark-bg); font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 auto 1.5rem; border: 3px solid var(--primary-gold); }
-.step-content { position: relative; min-height: 100px; display: flex; flex-direction: column; justify-content: center; }
-.step-front, .step-back { position: absolute; top: 0; left: 0; width: 100%; transition: opacity 0.4s ease; }
-.step-back { opacity: 0; }
-.step-front h3 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 0.5rem; }
-.step-front span { color: #888; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
-.step-back p { color: #aaa; margin: 0; }
-/* Interaction States */
-@media (hover: hover) { /* Apply hover only on devices that support it */
-    .step-card:hover .step-front { opacity: 0; }
-    .step-card:hover .step-back { opacity: 1; }
+.step-icon {
+    width: 60px;
+    height: 60px;
+    line-height: 60px;
+    border-radius: 50%;
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 auto 1.5rem;
+    border: 3px solid var(--primary-gold);
+    position: relative; /* Needed for transform */
+    transform: translateZ(40px); /* Make the icon pop out in 3D space */
+    transition: transform 0.3s ease;
 }
-/* Active class for mobile touch */
-.step-card.active .step-front { opacity: 0; }
-.step-card.active .step-back { opacity: 1; }
+.step-card:hover .step-icon {
+    transform: translateZ(50px); /* Slightly more pop on hover */
+}
+.step-front, .step-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden; /* Hide the back when facing away */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transform: translateZ(20px); /* This makes the text appear raised */
+}
+.step-back {
+    transform: rotateX(180deg) translateZ(20px); /* Pre-rotate and raise */
+}
+.step-front h3 {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+.step-front span {
+    color: #888;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+}
+.step-back p {
+    color: #aaa;
+    margin: 0;
+}
+@media (hover: hover) {
+    .step-card:hover .step-content {
+        transform: rotateX(180deg);
+    }
+}
+.step-card.active .step-content {
+    transform: rotateX(180deg);
+}
 
 
 /* --- 14. RESPONSIVE FIXES --- */

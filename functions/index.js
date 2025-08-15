@@ -97,7 +97,7 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
 
         const settingsRef = db.collection('admin_settings').doc('spinnerPrizes');
         const settingsDoc = await settingsRef.get();
-        if (!settingsDoc.exists() || !settingsDoc.data().prizes) {
+        if (!settingsDoc.exists) {
             throw new HttpsError('internal', 'Spinner prize configuration is not available.');
         }
         const prizes = settingsDoc.data().prizes;
@@ -152,20 +152,19 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
     const spinnerCompRef = db.collection('spinner_competitions').doc(compId);
 
     return db.runTransaction(async (transaction) => {
-        // ========= THIS IS THE FIX =========
-        // Both documents involved in the transaction must be read inside it.
         const userDoc = await transaction.get(userRef);
         const spinnerCompDoc = await transaction.get(spinnerCompRef);
-        // ===================================
 
-        if (!userDoc.exists()) {
+        // ========= THIS IS THE FIX =========
+        // Changed .exists() to .exists for both document snapshots
+        if (!userDoc.exists) {
             throw new HttpsError('not-found', 'User profile not found.');
         }
-        if (!spinnerCompDoc.exists()) {
+        if (!spinnerCompDoc.exists) {
             throw new HttpsError('not-found', 'The spinner competition is not active.');
         }
+        // ===================================
 
-        // 1. Log the entry into the spinner competition's draw
         const entryRef = spinnerCompRef.collection('entries').doc();
         transaction.set(entryRef, {
             userId: uid,
@@ -175,7 +174,6 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
             enteredAt: FieldValue.serverTimestamp(),
         });
 
-        // 2. Award the bonus spin tokens
         let newTokens = [];
         const earnedAt = new Date();
         for (let i = 0; i < bundle.amount; i++) {

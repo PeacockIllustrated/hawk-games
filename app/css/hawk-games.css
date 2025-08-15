@@ -176,7 +176,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* --- 12. HERO SECTION (FINAL DESIGN) --- */
 .hero-home {
     position: relative;
-    height: 100vh;
+    height: 85vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -321,5 +321,11 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
     .hero-logo {
         width: clamp(150px, 60vw, 250px);
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-home {
+        background-image: url('../assets/hero-bg-mobile.png');
     }
 }

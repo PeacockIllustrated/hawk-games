@@ -2,7 +2,6 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
-const { createHash } = require("crypto");
 
 initializeApp();
 const db = getFirestore();
@@ -20,37 +19,6 @@ const functionOptions = {
     region: "us-central1",
     cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
 };
-
-// --- seedInstantWins ---
-exports.seedInstantWins = onCall(functionOptions, async (request) => {
-    await assertIsAdmin(request);
-    const { compId, instantWinPrizes, totalTickets } = request.data;
-    if (!compId || !instantWinPrizes || !totalTickets) throw new HttpsError('invalid-argument', 'Missing parameters.');
-    const totalPrizeCount = instantWinPrizes.reduce((sum, tier) => sum + tier.count, 0);
-    if (totalPrizeCount > totalTickets) throw new HttpsError('invalid-argument', 'Too many prizes for the number of tickets.');
-    const winningPicks = new Set();
-    while (winningPicks.size < totalPrizeCount) { winningPicks.add(crypto.randomInt(0, totalTickets)); }
-    const sortedWinningNumbers = Array.from(winningPicks).sort((a, b) => a - b);
-    const salt = crypto.randomBytes(16).toString('hex');
-    const positionsToHash = JSON.stringify(sortedWinningNumbers);
-    const hash = createHash("sha256").update(positionsToHash + ':' + salt).digest("hex");
-    const batch = db.batch();
-    const instantWinsRef = db.collection('competitions').doc(compId).collection('instant_wins');
-    let prizeCursor = 0;
-    instantWinPrizes.forEach(tier => {
-        for (let i = 0; i < tier.count; i++) {
-            const ticketNumber = sortedWinningNumbers[prizeCursor++];
-            const docRef = instantWinsRef.doc(String(ticketNumber));
-            batch.set(docRef, { ticketNumber, prizeValue: tier.value, claimed: false, claimedBy: null, claimedAt: null });
-        }
-    });
-    const compRef = db.collection('competitions').doc(compId);
-    batch.update(compRef, { 'instantWinsConfig.enabled': true, 'instantWinsConfig.prizes': instantWinPrizes, 'instantWinsConfig.positionsHash': hash, 'instantWinsConfig.generator': 'v2-csprng-salt' });
-    const serverMetaRef = compRef.collection('server_meta').doc('fairness_reveal');
-    batch.set(serverMetaRef, { salt, positions: sortedWinningNumbers });
-    await batch.commit();
-    return { success: true, positionsHash: hash };
-});
 
 // --- allocateTicketsAndAwardTokens ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
@@ -76,14 +44,14 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available.`);
         const ticketStartNumber = ticketsSoldBefore;
 
-        transaction.update(compRef, { ticketsSold: ticketsSoldBefore + ticketsBought });
-        transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsBought });
+        transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsBought) });
+        transaction.update(userRef, { [`entryCount.${compId}`]: FieldValue.increment(ticketsBought) });
+        
         const entryRef = compRef.collection('entries').doc();
         transaction.set(entryRef, {
             userId: uid, userDisplayName: userData.displayName || "N/A",
             ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
             enteredAt: FieldValue.serverTimestamp(), entryType: 'paid',
-            instantWins: []
         });
         
         let newTokens = [];
@@ -99,86 +67,100 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             }
             transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
         }
-        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens.length };
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens };
     });
 });
 
-// --- spendSpinToken ---
+// --- spendSpinToken (REWRITTEN) ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { tokenId } = request.data;
-    if (!tokenId) throw new HttpsError('invalid-argument', 'A tokenId is required to spend a token.');
-
     const userRef = db.collection('users').doc(uid);
-    let prizeResult = { won: false, prizeValue: 0 };
 
-    return await db.runTransaction(async (transaction) => {
+    // The token to spend is passed from the client, who knows the oldest one
+    const { tokenId } = request.data;
+    if (!tokenId) {
+        throw new HttpsError('invalid-argument', 'A tokenId is required.');
+    }
+
+    return db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
         if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
-
+        
         const userData = userDoc.data();
         const userTokens = userData.spinTokens || [];
-        
-        const tokenToSpend = userTokens.find(token => token.tokenId === tokenId);
-        if (!tokenToSpend) throw new HttpsError('not-found', 'Spin token not found or already spent.');
-        
-        const compRef = db.collection('competitions').doc(tokenToSpend.compId);
-        const instantWinsRef = compRef.collection('instant_wins');
-        
-        const unclaimedPrizesQuery = db.collection(instantWinsRef.path).where('claimed', '==', false);
-        const unclaimedPrizesSnap = await unclaimedPrizesQuery.get();
-        const unclaimedPrizes = unclaimedPrizesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        if (unclaimedPrizes.length > 0) {
-            const winningPrizeIndex = crypto.randomInt(0, unclaimedPrizes.length);
-            const winningPrize = unclaimedPrizes[winningPrizeIndex];
-            prizeResult = { won: true, prizeValue: winningPrize.prizeValue };
-            
-            const prizeToClaimRef = instantWinsRef.doc(winningPrize.id);
-            transaction.update(prizeToClaimRef, {
-                claimed: true,
-                claimedBy: uid,
-                claimedAt: FieldValue.serverTimestamp(),
-                tokenIdUsed: tokenId
-            });
+        // Validate the specific token exists and remove it
+        const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
+        if (tokenIndex === -1) {
+            throw new HttpsError('not-found', 'Spin token not found or already spent.');
+        }
+        const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
+        transaction.update(userRef, { spinTokens: updatedTokens });
+
+        // Get the master prize table
+        const settingsRef = db.collection('admin_settings').doc('spinnerPrizes');
+        const settingsDoc = await settingsRef.get(); // Use get() not transaction.get() as it's outside user data
+        if (!settingsDoc.exists || !settingsDoc.data().prizes) {
+            throw new HttpsError('internal', 'Spinner prize configuration is not available.');
+        }
+        const prizes = settingsDoc.data().prizes;
+
+        // Perform the weighted random draw
+        const cumulativeProbabilities = [];
+        let cumulative = 0;
+        for (const prize of prizes) {
+            const probability = 1 / prize.odds;
+            cumulative += probability;
+            cumulativeProbabilities.push({ ...prize, cumulativeProb: cumulative });
+        }
+
+        const random = Math.random();
+        let finalPrize = { won: false, prizeValue: 0 };
+
+        for (const prize of cumulativeProbabilities) {
+            if (random < prize.cumulativeProb) {
+                finalPrize = { won: true, prizeValue: prize.value };
+                break;
+            }
         }
         
-        const updatedTokens = userTokens.filter(token => token.tokenId !== tokenId);
-        transaction.update(userRef, { spinTokens: updatedTokens });
-        return prizeResult;
+        // If it's a win, log it for auditing
+        if (finalPrize.won) {
+            const winLogRef = db.collection('spin_wins').doc();
+            transaction.set(winLogRef, {
+                userId: uid,
+                prizeValue: finalPrize.prizeValue,
+                wonAt: FieldValue.serverTimestamp(),
+                tokenIdUsed: tokenId,
+            });
+            // Here you would also credit the user's account balance in a real scenario
+        }
+
+        return finalPrize;
     });
 });
 
-// --- purchaseSpinTokens (FIXED) ---
+
+// --- purchaseSpinTokens (UPDATED) ---
 exports.purchaseSpinTokens = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { compId, amount, price } = request.data;
+    const { amount } = request.data; // Price is handled by client/payment gateway
 
-    if (!compId || !amount || !price) {
-        throw new HttpsError('invalid-argument', 'Missing parameters for token purchase.');
+    if (!amount || amount <= 0) {
+        throw new HttpsError('invalid-argument', 'Invalid amount for token purchase.');
     }
 
     const userRef = db.collection('users').doc(uid);
-    const compRef = db.collection('competitions').doc(compId);
-
-    const compSnap = await compRef.get();
-    // ========= THIS IS THE FIX =========
-    // Changed compSnap.exists() to compSnap.exists
-    if (!compSnap.exists) {
-    // ===================================
-        throw new HttpsError('not-found', 'The competition associated with this prize pool is no longer available.');
-    }
-    const compData = compSnap.data();
 
     let newTokens = [];
     const earnedAt = new Date();
     for (let i = 0; i < amount; i++) {
         newTokens.push({
             tokenId: crypto.randomBytes(16).toString('hex'),
-            compId: compId,
-            compTitle: compData.title,
+            compId: 'purchased', // Generic ID for purchased tokens
+            compTitle: 'Purchased Token Bundle', // Generic title
             earnedAt: earnedAt
         });
     }

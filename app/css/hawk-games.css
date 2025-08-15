@@ -151,27 +151,38 @@ input:checked + .slider:before { transform: translateX(26px); }
 .spin-token-balance:hover { border-color: #555; }
 .token-icon { display: inline-block; width: 16px; height: 16px; background-color: #ff4d6d; border-radius: 3px; }
 
-/* --- 11. Instant Win Page & Wheel Styles --- */
-.game-zone { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: flex-start; }
-.token-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 1.5rem; }
-.token-panel h3 { font-family: var(--font-heading); text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem; }
-.token-group .group-title { font-weight: bold; color: #ccc; margin-top: 1rem; margin-bottom: 0.5rem; }
-.token-btn { display: block; width: 100%; text-align: left; margin-bottom: 0.5rem; background-color: #2a2a2a; border: 1px solid #444; }
-.token-btn.selected { border-color: var(--primary-gold); box-shadow: 0 0 10px rgba(224, 169, 74, 0.5); }
-.game-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2rem; min-height: 500px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#spin-game-container { text-align: center; }
-.wheel-container { position: relative; width: 300px; height: 300px; margin: 2rem auto; display: flex; justify-content: center; align-items: center; }
+/* --- 11. Instant Win Page & Wheel Styles (NEW LAYOUT) --- */
+.instant-win-container { display: flex; flex-direction: column; align-items: center; gap: 4rem; padding: 2rem 0; }
+.spin-game-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2rem; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; }
+.spin-game-panel .section-title { margin-bottom: 0; }
+.spin-game-panel .section-subtitle { margin-top: 0.5rem; margin-bottom: 2rem; }
+.wheel-container { position: relative; width: 300px; height: 300px; margin: 1rem auto; display: flex; justify-content: center; align-items: center; }
 .wheel-pointer { position: absolute; width: 0; height: 0; border-left: 20px solid transparent; border-right: 20px solid transparent; border-top: 40px solid var(--primary-gold); top: -10px; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 .wheel { position: relative; width: 100%; height: 100%; border-radius: 50%; background-image: url('../assets/spin-wheel-bg.png'); background-size: contain; background-repeat: no-repeat; background-position: center; transition: transform 8s cubic-bezier(0.25, 0.1, 0.25, 1); transform: rotate(0deg); }
 .segment-label { position: absolute; top: 50%; left: 50%; color: white; font-weight: 700; font-size: 1rem; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none; transform-origin: top left; }
-.btn-spin { padding: 1rem 3rem; font-size: 1.2rem; letter-spacing: 2px; }
-.spin-result-container { min-height: 50px; margin-top: 1.5rem; font-size: 1.2rem; font-weight: bold; }
-.purchase-tokens-section { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color); }
-.purchase-tokens-section h4 { font-family: var(--font-heading); text-align: center; margin-bottom: 1rem; }
-.token-bundles { display: flex; flex-direction: column; gap: 0.75rem; }
+.spin-controls { display: flex; align-items: stretch; justify-content: center; gap: 0.5rem; width: 100%; margin: 2rem 0; }
+.token-counter { background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 4px; display: flex; align-items: center; gap: 0.5rem; padding: 0 1rem; font-weight: bold; }
+.token-counter span:first-child { font-size: 1.5rem; }
+.btn-spin { flex-grow: 1; padding: 1rem; font-size: 1.2rem; letter-spacing: 2px; }
+.btn-buy-tokens { font-size: 1.8rem; line-height: 1; padding: 0 1.2rem; }
+.spin-result-container { min-height: 50px; margin-top: 1rem; font-size: 1.2rem; font-weight: bold; }
+.spin-result-container .spin-win { color: var(--primary-gold); }
+.spin-result-container .spin-error { color: #e74c3c; }
+.token-bundles { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
 .bundle-btn { display: flex; justify-content: space-between; align-items: center; background-color: #2a2a2a; border: 1px solid #444; padding: 0.75rem 1rem; }
 .bundle-btn .bundle-amount { font-weight: bold; }
 .bundle-btn .bundle-price { color: var(--primary-gold); font-family: var(--font-heading); }
+.token-inventory { width: 100%; max-width: 800px; }
+.token-inventory h3 { font-family: var(--font-heading); text-transform: uppercase; text-align: center; margin-bottom: 2rem; }
+.accordion-item { border-bottom: 1px solid var(--border-color); }
+.accordion-header { background-color: transparent; border: none; color: var(--light-white); cursor: pointer; padding: 1rem; width: 100%; text-align: left; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+.accordion-header:hover { background-color: #222; }
+.accordion-meta { color: #888; font-size: 0.8rem; }
+.accordion-arrow { border: solid var(--primary-gold); border-width: 0 2px 2px 0; display: inline-block; padding: 3px; transform: rotate(45deg); transition: transform 0.3s ease; }
+.accordion-header.active .accordion-arrow { transform: rotate(-135deg); }
+.accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background-color: var(--dark-bg); }
+.accordion-content ul { list-style-type: none; padding: 1rem 1.5rem; }
+.accordion-content li { color: #aaa; font-family: monospace; font-size: 0.9rem; padding: 0.25rem 0; }
 
 /* --- 12. HERO SECTION (FINAL DESIGN) --- */
 .hero-home {
@@ -313,7 +324,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* --- 14. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {
-    .account-layout, .game-zone {
+    .account-layout {
         grid-template-columns: 1fr;
     }
     .competition-detail-view {

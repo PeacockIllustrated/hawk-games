@@ -21,7 +21,7 @@ const dashboardViewHTML = `
 
 const createCompViewHTML = `
     <div class="content-panel">
-        <h2>Create New Competition</h2>
+        <h2>Create New Main Competition</h2>
         <form id="create-comp-form" class="admin-form">
             <fieldset><legend>Core Details</legend>
                 <div class="form-group"><label for="title">Competition Title</label><input type="text" id="title" required></div>
@@ -37,9 +37,16 @@ const createCompViewHTML = `
             </fieldset>
             <fieldset><legend>Ticket Pricing</legend><div id="ticket-tiers-container"></div><button type="button" id="add-tier-btn" class="btn btn-secondary btn-small">Add Tier</button></fieldset>
             
-            <fieldset><legend>Spin Token Rewards</legend>
-                <div class="form-group-inline"><label for="enable-spin-tokens" style="display:flex; align-items: center; gap: 10px;">Award 1 Spin Token per ticket purchased? <input type="checkbox" id="enable-spin-tokens" style="width:auto; height:auto;"></label></div>
-                 <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">Check this to make this a "Main Comp". Spin wheel prizes and odds are configured globally in the Spinner Settings tab.</p>
+            <fieldset><legend>Bonus Spin Tokens</legend>
+                <div class="form-group-inline">
+                    <label for="enable-spin-tokens" style="display:flex; align-items: center; gap: 10px;">
+                        Award 1 Bonus Spin Token per ticket purchased?
+                        <input type="checkbox" id="enable-spin-tokens" style="width:auto; height:auto;">
+                    </label>
+                </div>
+                 <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">
+                    Check this to award tokens. The Spinner Game itself is configured in the "Spinner Settings" tab.
+                 </p>
             </fieldset>
 
             <fieldset><legend>Skill Question</legend>
@@ -67,6 +74,29 @@ const spinnerSettingsViewHTML = `
             </div>
             <hr style="border-color: var(--border-color); margin: 1.5rem 0;">
             <button type="submit" class="btn btn-primary">Save Spinner Settings</button>
+        </form>
+    </div>`;
+
+const spinnerCompsViewHTML = `
+    <div class="content-panel">
+        <h2>Manage Spinner Competition</h2>
+        <p>This is the always-on, low-stakes competition that users enter to receive bonus spin tokens. You only need one active at a time.</p>
+        <form id="spinner-comp-form" class="admin-form" style="margin-top: 2rem;">
+            <input type="hidden" id="spinner-comp-id" value="active">
+            <fieldset>
+                <legend>Competition Details</legend>
+                <div class="form-group"><label for="spinner-title">Title</label><input type="text" id="spinner-title" required value="Weekly £50 Spinner Draw"></div>
+                <div class="form-group"><label for="spinner-prize">Prize Description</label><input type="text" id="spinner-prize" required value="£50 Cash"></div>
+            </fieldset>
+            <fieldset>
+                <legend>Skill Question</legend>
+                <div class="form-group"><label for="spinner-questionText">Question</label><input type="text" id="spinner-questionText" required></div>
+                <div class="form-group-inline">
+                    <div class="form-group"><label for="spinner-correctAnswer">Correct Answer</label><input type="text" id="spinner-correctAnswer" required></div>
+                    <div class="form-group"><label for="spinner-otherAnswers">Incorrect Answers (comma separated)</label><input type="text" id="spinner-otherAnswers" required></div>
+                </div>
+            </fieldset>
+            <button type="submit" class="btn btn-primary">Save Spinner Competition</button>
         </form>
     </div>`;
 
@@ -123,10 +153,13 @@ function renderView(viewName) {
             mainContentContainer.innerHTML = spinnerSettingsViewHTML;
             initializeSpinnerSettingsView();
             break;
+        case 'spinner-comps':
+            mainContentContainer.innerHTML = spinnerCompsViewHTML;
+            initializeSpinnerCompsView();
+            break;
     }
 }
 
-// ... (loadAndRenderCompetitions and renderCompetitionRow remain the same) ...
 async function loadAndRenderCompetitions() {
     const listDiv = document.getElementById('competition-list');
     try {
@@ -158,24 +191,18 @@ function renderCompetitionRow(comp) {
          buttons = `<span class="status-badge">${comp.status}</span>`;
     }
 
-    const instantWinHash = comp.instantWinsConfig?.positionsHash 
-        ? `<div style="font-size:0.7rem; color:#aaa; margin-top:5px; word-break:break-all;">Fairness Hash: ${comp.instantWinsConfig.positionsHash}</div>`
-        : '';
-
     return `
         <div class="competition-row" data-comp-id="${comp.id}">
             <div class="comp-info">
                 <h4>${comp.title}</h4>
                 <div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
                 <span>${comp.ticketsSold || 0} / ${comp.totalTickets}</span>
-                ${instantWinHash}
             </div>
             <div class="comp-status"><span class="status-badge status-${comp.status}">${comp.status}</span></div>
             <div class="comp-actions">${buttons}</div>
         </div>`;
 }
 
-// --- Create Competition View Logic (Simplified) ---
 function initializeCreateFormView() {
     const form = document.getElementById('create-comp-form');
     const addTierBtn = document.getElementById('add-tier-btn');
@@ -244,7 +271,6 @@ async function handleCreateFormSubmit(e) {
     }
 }
 
-// --- NEW Spinner Settings View Logic ---
 function initializeSpinnerSettingsView() {
     const form = document.getElementById('spinner-settings-form');
     const prizesContainer = document.getElementById('spinner-prizes-container');
@@ -320,8 +346,64 @@ function initializeSpinnerSettingsView() {
     });
 }
 
+function initializeSpinnerCompsView() {
+    const form = document.getElementById('spinner-comp-form');
+    const compId = form.querySelector('#spinner-comp-id').value;
+    
+    const loadData = async () => {
+        const compRef = doc(db, 'spinner_competitions', compId);
+        const docSnap = await getDoc(compRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            form.querySelector('#spinner-title').value = data.title || '';
+            form.querySelector('#spinner-prize').value = data.prize || '';
+            form.querySelector('#spinner-questionText').value = data.skillQuestion.text || '';
+            
+            const answers = data.skillQuestion.answers;
+            const correct = data.skillQuestion.correctAnswer;
+            form.querySelector('#spinner-correctAnswer').value = answers[correct];
+            form.querySelector('#spinner-otherAnswers').value = Object.keys(answers).filter(k => k !== correct).map(k => answers[k]).join(', ');
+        }
+    };
+    loadData();
 
-// ... (Modal and Dashboard click handlers remain the same) ...
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
+        
+        try {
+            const correctAnswer = form.querySelector('#spinner-correctAnswer').value.trim();
+            const otherAnswers = form.querySelector('#spinner-otherAnswers').value.split(',').map(a => a.trim());
+            const allAnswers = [correctAnswer, ...otherAnswers].sort(() => Math.random() - 0.5);
+            const answers = {};
+            let correctKey = '';
+            ['A', 'B', 'C', 'D'].slice(0, allAnswers.length).forEach((key, i) => {
+                 answers[key] = allAnswers[i];
+                 if (allAnswers[i] === correctAnswer) correctKey = key;
+            });
+
+            const compData = {
+                title: form.querySelector('#spinner-title').value,
+                prize: form.querySelector('#spinner-prize').value,
+                skillQuestion: {
+                    text: form.querySelector('#spinner-questionText').value,
+                    answers,
+                    correctAnswer: correctKey
+                },
+                isActive: true,
+            };
+            await setDoc(doc(db, 'spinner_competitions', compId), compData);
+            alert('Spinner competition saved!');
+        } catch (error) {
+            console.error(error);
+            alert('Error saving spinner competition.');
+        } finally {
+            submitBtn.disabled = false; submitBtn.textContent = 'Save Spinner Competition';
+        }
+    });
+}
+
 function handleDashboardClick(e) {
     const button = e.target.closest('button');
     if (!button) return;

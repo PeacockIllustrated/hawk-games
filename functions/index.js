@@ -71,7 +71,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
     });
 });
 
-// --- spendSpinToken (REWRITTEN for Odds & Credit) ---
+// --- spendSpinToken ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -138,7 +138,7 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- NEW: enterSpinnerCompetition ---
+// --- enterSpinnerCompetition (FIXED) ---
 exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -152,9 +152,17 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
     const spinnerCompRef = db.collection('spinner_competitions').doc(compId);
 
     return db.runTransaction(async (transaction) => {
+        // ========= THIS IS THE FIX =========
+        // Both documents involved in the transaction must be read inside it.
         const userDoc = await transaction.get(userRef);
+        const spinnerCompDoc = await transaction.get(spinnerCompRef);
+        // ===================================
+
         if (!userDoc.exists()) {
             throw new HttpsError('not-found', 'User profile not found.');
+        }
+        if (!spinnerCompDoc.exists()) {
+            throw new HttpsError('not-found', 'The spinner competition is not active.');
         }
 
         // 1. Log the entry into the spinner competition's draw

@@ -40,7 +40,7 @@ const db = getFirestore(app);
 // IMPORTANT: Replace 'YOUR_RECAPTCHA_V3_SITE_KEY' with your actual key from Google Cloud Console
 // You must also enable the App Check service in your Firebase project settings.
 const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_V3_SITE_KEY'),
+  provider: new ReCaptchaV3Provider('6Lcr96crAAAAAEKx64UgZjizVpwm1HUq_yWrrMlk'),
   isTokenAutoRefreshEnabled: true
 });
 

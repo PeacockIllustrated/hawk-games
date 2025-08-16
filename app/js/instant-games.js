@@ -16,21 +16,10 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 let currentCompetitionData = null;
 
-// ===================================================================
-// == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
-// ===================================================================
 const PRIZE_ANGLES = {
-    'cash-1000': 150,
-    'cash-500': 210,
-    'cash-250': 300,
-    'cash-100': 0,
-    'cash-50': 60,
-    'credit-20': 30,
-    'credit-10': 270,
-    'credit-5': 120,
-    'no-win': [90, 180, 240, 330] 
+    'cash-1000': 150, 'cash-500': 210, 'cash-250': 300, 'cash-100': 0, 'cash-50': 60,
+    'credit-20': 30, 'credit-10': 270, 'credit-5': 120, 'no-win': [90, 180, 240, 330] 
 };
-// ===================================================================
 
 const tokenCountElement = document.getElementById('token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
@@ -44,13 +33,15 @@ const prizesModal = document.getElementById('prizes-modal');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
-// --- SECURITY: Helper for safe element creation ---
+// --- (createElement helper function remains the same) ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
-            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
-            else if (value) el.classList.add(value);
+            const classes = Array.isArray(value) ? value : String(value).split(' ');
+            classes.forEach(c => {
+                if (c) el.classList.add(c);
+            });
         } else if (key === 'textContent') {
             el.textContent = value;
         } else if (key === 'style') {
@@ -72,7 +63,9 @@ auth.onAuthStateChanged((user) => {
                 const data = docSnap.data();
                 userCreditBalance = data.creditBalance || 0;
                 userTokens = (data.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
-                updateUI();
+                if (!isSpinning) { // Only update UI if not in the middle of a spin animation
+                    updateUI();
+                }
             }
         });
         loadPrizeSettings();
@@ -89,6 +82,7 @@ function updateUI() {
 }
 
 async function loadPrizeSettings() {
+    // ... (This function is correct and remains unchanged)
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(settingsRef);
@@ -104,6 +98,7 @@ async function loadPrizeSettings() {
 }
 
 function renderTokenAccordion() {
+    // ... (This function is correct and remains unchanged)
     tokenAccordionContainer.innerHTML = '';
     if (userTokens.length === 0) {
         tokenAccordionContainer.append(createElement('div', { class: 'placeholder', textContent: 'You have no Spin Tokens. Enter a competition to earn them!' }));
@@ -135,7 +130,9 @@ function renderTokenAccordion() {
     tokenAccordionContainer.append(fragment);
 }
 
+
 function renderPrizesTable(prizes) {
+    // ... (This function is correct and remains unchanged)
     prizesTableContainer.innerHTML = '';
     const tableRows = prizes.map(prize => {
         const prizeText = prize.type === 'credit' ? `£${prize.value.toFixed(2)} Site Credit` : `£${prize.value.toFixed(2)} Cash`;
@@ -162,22 +159,26 @@ async function handleSpin() {
     
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
-    void wheel.offsetWidth; // Force reflow
+    void wheel.offsetWidth; 
 
     const tokenToSpend = userTokens[0];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
 
     try {
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
+        
+        // --- BUG FIX: Manually update local state for instant UI feedback ---
+        userTokens.shift(); // Remove the token we just successfully spent from the local array
+        updateUI(); // Immediately update the token count and disable the spin button if it was the last token
+        // --- END OF BUG FIX ---
+        
         const { won, prizeType, value } = result.data;
 
         let targetAngle;
         if (won) {
             const prizeKey = `${prizeType}-${value}`;
             targetAngle = PRIZE_ANGLES[prizeKey];
-        }
-        
-        if (targetAngle === undefined) {
+        } else {
             const noWinAngles = PRIZE_ANGLES['no-win'];
             targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
         }
@@ -200,7 +201,9 @@ async function handleSpin() {
             }
             isSpinning = false;
             spinButton.textContent = 'SPIN';
-            // onSnapshot listener will call updateUI() automatically
+            // Final state reconciliation will happen automatically via the onSnapshot listener,
+            // but the UI is already correct because of our manual update.
+            updateUI(); 
         }, 8500);
 
     } catch (error) {

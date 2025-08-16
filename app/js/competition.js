@@ -12,6 +12,20 @@ const functions = getFunctions(app);
 let currentCompetitionData = null;
 let competitionId = null;
 
+// --- PRIZE ANGLE CONFIGURATION (Copied from instant-games.js) ---
+const PRIZE_ANGLES = {
+    'cash-1000': 150,
+    'cash-500': 210,
+    'cash-250': 300,
+    'cash-100': 0,
+    'cash-50': 60,
+    'credit-20': 30,
+    'credit-10': 270,
+    'credit-5': 120,
+    'no-win': [90, 180, 240, 330] 
+};
+
+
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
@@ -50,6 +64,7 @@ async function loadCompetitionDetails(id) {
         pageContent.innerHTML = '<main><div class="container"><div class="hawk-card placeholder" style="color:red">Could not load competition details.</div></div></main>';
     }
 }
+
 
 function setupEntryLogic(correctAnswer) {
     const entryButton = document.getElementById('entry-button');
@@ -170,7 +185,6 @@ function setupCountdown(endDate) {
         const m = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
         const s = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
         
-        // Check if it's the hero timer based on its class
         if (timerElement.classList.contains('hero-digital-timer')) {
              timerElement.innerHTML = `${d}:${h}:${m}:${s}`;
         } else {
@@ -186,7 +200,6 @@ function initializeParallax() {
 
     window.addEventListener('scroll', () => {
         const scrollValue = window.scrollY;
-        // Move background slightly slower than scroll, foreground slightly faster
         bg.style.transform = `translateY(${scrollValue * 0.1}px)`;
         fg.style.transform = `translateY(-${scrollValue * 0.15}px)`;
     });
@@ -242,7 +255,6 @@ function createHeroPageHTML(data) {
     }).join('');
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
-    // A placeholder for prize specs - in a real app this would come from the DB
     const prizeSpecs = `
         <li>AMG Spec</li>
         <li>Diesel Coupe</li>
@@ -318,18 +330,115 @@ function createHeroPageHTML(data) {
 }
 
 // --- INSTANT WIN MODAL LOGIC ---
-// This remains simple as the main spin page is instant-games.html
-// This modal is just a notification and CTA
 function showInstantWinModal(tokenCount) {
-    openModal(`
-        <div class="celebration-modal">
-            <div class="modal-icon-success">⚡️</div>
-            <h2>Spins Unlocked!</h2>
-            <p>You've earned ${tokenCount} Spin Token${tokenCount > 1 ? 's' : ''} for the Instant Win game!</p>
-            <div class="modal-actions" style="flex-direction: column;">
-                <a href="instant-games.html" class="btn">Use Spins Now</a>
-                <button data-close-modal class="btn btn-secondary" onclick="window.location.reload()">Maybe Later</button>
-            </div>
-        </div>
-    `);
+    const modal = document.getElementById('instant-win-modal');
+    if (!modal) return;
+
+    document.getElementById('spin-modal-title').textContent = `You've Unlocked ${tokenCount} Instant Win Spin${tokenCount > 1 ? 's' : ''}!`;
+    
+    const spinButton = document.getElementById('spin-button');
+    const spinResultContainer = document.getElementById('spin-result');
+    const wheel = document.getElementById('wheel');
+    
+    spinButton.disabled = false;
+    spinButton.textContent = "SPIN THE WHEEL";
+    spinButton.onclick = handleSpinButtonClick; // Re-assign the click handler
+    spinResultContainer.innerHTML = '';
+    wheel.style.transition = 'none'; // Reset any previous spin
+    wheel.style.transform = 'rotate(0deg)';
+
+    modal.classList.add('show');
+    
+    if (!modal.dataset.initialized) {
+        setupSpinWheel();
+        modal.dataset.initialized = 'true';
+    }
+}
+
+function setupSpinWheel() {
+    const wheel = document.getElementById('wheel');
+    const segmentCount = 12; 
+    wheel.innerHTML = '';
+    for (let i = 0; i < segmentCount; i++) {
+        const segment = document.createElement('div');
+        segment.className = 'wheel-segment';
+        wheel.appendChild(segment);
+    }
+}
+
+async function handleSpinButtonClick() {
+    const spinButton = document.getElementById('spin-button');
+    const spinResultContainer = document.getElementById('spin-result');
+    const wheel = document.getElementById('wheel');
+
+    const userDocRef = doc(db, 'users', auth.currentUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const userTokens = userDocSnap.data().spinTokens || [];
+
+    if (userTokens.length === 0 || spinButton.disabled) return;
+
+    spinButton.disabled = true;
+    spinButton.textContent = 'SPINNING...';
+    spinResultContainer.innerHTML = '';
+    
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
+    void wheel.offsetWidth;
+
+    const tokenToSpend = userTokens.sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000))[0];
+    const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
+
+    try {
+        const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
+        const { won, prizeType, value } = result.data;
+
+        let targetAngle;
+        if (won) {
+            const prizeKey = `${prizeType}-${value}`;
+            targetAngle = PRIZE_ANGLES[prizeKey];
+        }
+        
+        if (targetAngle === undefined) {
+            const noWinAngles = PRIZE_ANGLES['no-win'];
+            targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
+        }
+        
+        const baseSpins = 360 * 8;
+        const randomOffsetInSegment = (Math.random() - 0.5) * 20;
+        const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
+        
+        wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        wheel.style.transform = `rotate(${finalAngle}deg)`;
+
+        setTimeout(() => {
+            if (won) {
+                const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
+                const prizeText = prizeType === 'credit' ? `£${prizeValue} SITE CREDIT` : `£${prizeValue} CASH`;
+                spinResultContainer.innerHTML = `<p class="spin-win">🎉 YOU WON ${prizeText}! 🎉</p>`;
+            } else {
+                spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
+            }
+
+            spinButton.textContent = 'GO TO INSTANT GAMES';
+            spinButton.onclick = () => window.location.href = 'instant-games.html';
+            spinButton.disabled = false;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn btn-secondary';
+            closeBtn.textContent = 'Close';
+            closeBtn.style.marginTop = '1rem';
+            closeBtn.onclick = () => {
+                document.getElementById('instant-win-modal').classList.remove('show');
+                window.location.reload();
+            };
+            spinResultContainer.appendChild(closeBtn);
+
+        }, 8500);
+
+    } catch (error) {
+        console.error("Error spending token:", error);
+        spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
+        spinButton.disabled = false;
+        spinButton.textContent = "SPIN THE WHEEL";
+    }
 }

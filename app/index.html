@@ -13,82 +13,82 @@
     <header class="main-header"></header>
     
     <main>
-        <!-- HERO SECTION (FINAL DESIGN) -->
+        <!-- HERO SECTION -->
         <section class="hero-home">
             <div class="hero-overlay"></div>
             <div class="hero-content">
                 <img src="assets/logo.png" alt="The Hawk Games Logo" class="hero-logo">
                 <h1>Win Life-Changing Prizes</h1>
                 <p>Enter our skill-based competitions and you could win cars, cash, luxury holidays, and the latest tech. Your next win is just a click away.</p>
-                <a href="#live-competitions-section" class="btn">View Competitions</a>
+                <a href="#main-competitions-section" class="btn">View Competitions</a>
             </div>
+        </section>
+
+        <!-- HERO COMPETITION SECTION -->
+        <section id="hero-competition-section" class="container">
+            <!-- JS will inject the single Hero Competition card here -->
+            <div class="placeholder">Loading featured prize...</div>
         </section>
 
         <!-- HOW IT WORKS SECTION -->
         <section id="how-it-works-section" class="container">
             <h2 class="section-title">How It Works</h2>
             <div class="how-it-works-grid">
-                <!-- Card 1: Updated Structure -->
                 <div class="step-card">
                     <div class="step-icon">1</div>
                     <div class="step-content">
-                        <div class="step-front">
-                            <h3>Pick Your Prize</h3>
-                            <span>More Info &gt;</span>
-                        </div>
-                        <div class="step-back">
-                            <p>Browse our live competitions and choose the prize you want to win.</p>
-                        </div>
+                        <div class="step-front"><h3>Pick Your Prize</h3><span>More Info &gt;</span></div>
+                        <div class="step-back"><p>Browse our live competitions and choose the prize you want to win.</p></div>
                     </div>
                 </div>
-                <!-- Card 2: Updated Structure -->
                 <div class="step-card">
                     <div class="step-icon">2</div>
                      <div class="step-content">
-                        <div class="step-front">
-                            <h3>Answer The Question</h3>
-                            <span>More Info &gt;</span>
-                        </div>
-                        <div class="step-back">
-                            <p>Use your skill and knowledge to correctly answer the qualifying question.</p>
-                        </div>
+                        <div class="step-front"><h3>Answer The Question</h3><span>More Info &gt;</span></div>
+                        <div class="step-back"><p>Use your skill and knowledge to correctly answer the qualifying question.</p></div>
                     </div>
                 </div>
-                <!-- Card 3: Updated Structure -->
                 <div class="step-card">
                     <div class="step-icon">3</div>
                      <div class="step-content">
-                        <div class="step-front">
-                           <h3>Get Your Tickets</h3>
-                           <span>More Info &gt;</span>
-                        </div>
-                        <div class="step-back">
-                            <p>Select your number of entries and complete your purchase to be in the draw.</p>
-                        </div>
+                        <div class="step-front"><h3>Get Your Tickets</h3><span>More Info &gt;</span></div>
+                        <div class="step-back"><p>Select your number of entries and complete your purchase to be in the draw.</p></div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- INSTANT WIN COMPETITIONS SECTION -->
-        <section id="instant-win-section" class="container">
-            <h2 class="section-title">Instant Win Games</h2>
-            <p class="section-subtitle">
-                Win prizes the moment you enter! Your ticket numbers could be pre-selected winners, and every ticket is still entered into the main prize draw.
-            </p>
-            <div id="instant-win-grid" class="competition-grid-container">
-                <div class="hawk-card placeholder">Loading Instant Win games...</div>
-            </div>
-        </section>
-
-        <!-- REGULAR COMPETITIONS SECTION -->
-        <section id="live-competitions-section" class="container">
-            <h2 class="section-title">More Live Competitions</h2>
-            <div id="competition-grid" class="competition-grid-container">
-                <div class="hawk-card placeholder">Loading competitions...</div>
+        <!-- MAIN PRIZE COMPETITIONS SECTION -->
+        <section id="main-competitions-section" class="container">
+            <h2 class="section-title">Main Prize Competitions</h2>
+            <p class="section-subtitle">The big ones! Enter these skill-based draws where one winner takes all. No partial prizes, just the grand prize as listed.</p>
+            <div id="main-competition-grid" class="competition-grid-container">
+                <div class="hawk-card placeholder">Loading main competitions...</div>
             </div>
         </section>
         
+        <!-- INSTANT WIN COMPETITIONS SECTION -->
+        <section id="instant-win-section" class="container">
+            <h2 class="section-title">Instant Win Competitions</h2>
+            <p class="section-subtitle">
+                Win prizes the moment you enter! Buy a ticket for one of these main draws and you'll get a Bonus Spin Token to use on our spinner game.
+            </p>
+            <div id="instant-win-grid" class="competition-grid-container">
+                <div class="hawk-card placeholder">Loading Instant Win competitions...</div>
+            </div>
+        </section>
+
+        <!-- SPINNER COMPETITIONS SECTION -->
+        <section id="spinner-competition-section" class="container">
+            <h2 class="section-title">Get More Spins</h2>
+             <p class="section-subtitle">
+                Want more chances on the Instant Win spinner? Enter our weekly Spinner Competition to get bonus spin tokens instantly.
+            </p>
+            <div id="spinner-competition-grid" class="competition-grid-container">
+                <div class="hawk-card placeholder">Loading spinner competitions...</div>
+            </div>
+        </section>
+
         <!-- PAST WINNERS SECTION -->
         <section id="past-winners-section" class="container">
             <h2 class="section-title">See Our Latest Winners</h2>

@@ -4,7 +4,22 @@
 
 import { app } from './auth.js';
 import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, collectionGroup, query, where, getDocs, orderBy, documentId } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
+// --- BUG FIX: Added the missing 'collection' function to the import list ---
+import { 
+    getFirestore, 
+    doc, 
+    getDoc, 
+    setDoc, 
+    updateDoc, 
+    serverTimestamp, 
+    collection, 
+    collectionGroup, 
+    query, 
+    where, 
+    getDocs, 
+    orderBy, 
+    documentId 
+} from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
 
 const auth = getAuth(app);
 const db   = getFirestore(app);
@@ -18,26 +33,21 @@ const elMarketingFeedback = document.getElementById('preference-feedback');
 const elEntriesList = document.getElementById('entries-list');
 const elAdminContainer = document.getElementById('admin-panel-container');
 
-// --- SECURITY: Helper for safe element creation ---
+// --- (createElement helper and other functions are correct and unchanged) ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
-            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
-            else if (value) el.classList.add(value);
-        } else if (key === 'textContent') {
-            el.textContent = value;
-        } else if (key === 'style') {
-            Object.assign(el.style, value);
-        } else {
-            el.setAttribute(key, value);
-        }
+            const classes = Array.isArray(value) ? value : String(value).split(' ');
+            classes.forEach(c => { if (c) el.classList.add(c); });
+        } else if (key === 'textContent') { el.textContent = value;
+        } else if (key === 'style') { Object.assign(el.style, value);
+        } else { el.setAttribute(key, value); }
     });
     children.forEach(child => child && el.append(child));
     return el;
 }
 
-// --- Utility: safe text setter ---
 function setText(el, text) {
   if (!el) return;
   el.textContent = text ?? '';
@@ -49,10 +59,9 @@ function renderAvatar(el, user) {
   el.alt = user.displayName || 'User Avatar';
 }
 
-// --- SECURITY: Renders competition groups programmatically (no innerHTML) ---
 function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
     if (!elEntriesList) return;
-    elEntriesList.innerHTML = ''; // Clear placeholder
+    elEntriesList.innerHTML = ''; 
 
     const competitionIds = Object.keys(groupedEntries);
     if (competitionIds.length === 0) {
@@ -103,7 +112,6 @@ function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
     elEntriesList.appendChild(fragment);
 }
 
-
 async function loadUserEntries(user) {
   if (!elEntriesList) return;
   elEntriesList.innerHTML = `<div class="placeholder">Loading your entries...</div>`;
@@ -125,8 +133,10 @@ async function loadUserEntries(user) {
     const competitionIds = Object.keys(groupedEntries);
     const competitionsMap = new Map();
     if (competitionIds.length > 0) {
+        // Batch requests in chunks of 10 to satisfy Firestore 'in' query limit
         for (let i = 0; i < competitionIds.length; i += 10) {
             const chunk = competitionIds.slice(i, i + 10);
+            // This is the line that was failing because 'collection' was not defined
             const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
             const compsSnapshot = await getDocs(compsQuery);
             compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
@@ -196,7 +206,7 @@ auth.onAuthStateChanged(async (user) => {
   renderAvatar(elUserAvatar, user);
   
   if (elAdminContainer && profile.isAdmin) {
-    elAdminContainer.innerHTML = ''; // Clear previous content
+    elAdminContainer.innerHTML = ''; 
     const adminButton = createElement('a', { href: 'admin.html', class: 'btn' }, ['Admin Panel']);
     elAdminContainer.append(adminButton);
   }

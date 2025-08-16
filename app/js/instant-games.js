@@ -16,10 +16,7 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 let currentCompetitionData = null;
 
-const PRIZE_ANGLES = {
-    'cash-1000': 150, 'cash-500': 210, 'cash-250': 300, 'cash-100': 0, 'cash-50': 60,
-    'credit-20': 30, 'credit-10': 270, 'credit-5': 120, 'no-win': [90, 180, 240, 330] 
-};
+// --- REFACTOR: The PRIZE_ANGLES map is no longer needed as the wheel's visual stopping point is now random. ---
 
 const tokenCountElement = document.getElementById('token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
@@ -33,22 +30,15 @@ const prizesModal = document.getElementById('prizes-modal');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
-// --- (createElement helper function remains the same) ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
             const classes = Array.isArray(value) ? value : String(value).split(' ');
-            classes.forEach(c => {
-                if (c) el.classList.add(c);
-            });
-        } else if (key === 'textContent') {
-            el.textContent = value;
-        } else if (key === 'style') {
-            Object.assign(el.style, value);
-        } else {
-            el.setAttribute(key, value);
-        }
+            classes.forEach(c => { if (c) el.classList.add(c); });
+        } else if (key === 'textContent') { el.textContent = value;
+        } else if (key === 'style') { Object.assign(el.style, value);
+        } else { el.setAttribute(key, value); }
     });
     children.forEach(child => child && el.append(child));
     return el;
@@ -63,7 +53,7 @@ auth.onAuthStateChanged((user) => {
                 const data = docSnap.data();
                 userCreditBalance = data.creditBalance || 0;
                 userTokens = (data.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
-                if (!isSpinning) { // Only update UI if not in the middle of a spin animation
+                if (!isSpinning) {
                     updateUI();
                 }
             }
@@ -82,7 +72,6 @@ function updateUI() {
 }
 
 async function loadPrizeSettings() {
-    // ... (This function is correct and remains unchanged)
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(settingsRef);
@@ -98,7 +87,6 @@ async function loadPrizeSettings() {
 }
 
 function renderTokenAccordion() {
-    // ... (This function is correct and remains unchanged)
     tokenAccordionContainer.innerHTML = '';
     if (userTokens.length === 0) {
         tokenAccordionContainer.append(createElement('div', { class: 'placeholder', textContent: 'You have no Spin Tokens. Enter a competition to earn them!' }));
@@ -130,9 +118,7 @@ function renderTokenAccordion() {
     tokenAccordionContainer.append(fragment);
 }
 
-
 function renderPrizesTable(prizes) {
-    // ... (This function is correct and remains unchanged)
     prizesTableContainer.innerHTML = '';
     const tableRows = prizes.map(prize => {
         const prizeText = prize.type === 'credit' ? `£${prize.value.toFixed(2)} Site Credit` : `£${prize.value.toFixed(2)} Cash`;
@@ -167,28 +153,19 @@ async function handleSpin() {
     try {
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
         
-        // --- BUG FIX: Manually update local state for instant UI feedback ---
-        userTokens.shift(); // Remove the token we just successfully spent from the local array
-        updateUI(); // Immediately update the token count and disable the spin button if it was the last token
-        // --- END OF BUG FIX ---
+        userTokens.shift(); 
+        updateUI(); 
         
         const { won, prizeType, value } = result.data;
 
-        let targetAngle;
-        if (won) {
-            const prizeKey = `${prizeType}-${value}`;
-            targetAngle = PRIZE_ANGLES[prizeKey];
-        } else {
-            const noWinAngles = PRIZE_ANGLES['no-win'];
-            targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
-        }
-        
-        const baseSpins = 360 * 8;
-        const randomOffsetInSegment = (Math.random() - 0.5) * 20;
-        const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
+        // --- REFACTOR: Simplified Random Spin Animation ---
+        const baseSpins = 360 * 8; 
+        const randomAdditionalRotation = Math.random() * 360;
+        const finalAngle = baseSpins + randomAdditionalRotation;
         
         wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
+        // --- END OF REFACTOR ---
 
         setTimeout(() => {
             spinResultContainer.innerHTML = '';
@@ -201,8 +178,6 @@ async function handleSpin() {
             }
             isSpinning = false;
             spinButton.textContent = 'SPIN';
-            // Final state reconciliation will happen automatically via the onSnapshot listener,
-            // but the UI is already correct because of our manual update.
             updateUI(); 
         }, 8500);
 
@@ -216,7 +191,6 @@ async function handleSpin() {
     }
 }
 
-// --- Event Handlers ---
 spinButton.addEventListener('click', handleSpin);
 
 buyMoreBtn.addEventListener('click', async () => {
@@ -341,13 +315,16 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
 });
 
 showPrizesBtn.addEventListener('click', () => prizesModal.classList.add('show'));
+
 const closeModalHandler = (e) => {
     if (e.target.matches('.modal-container') || e.target.closest('[data-close-modal]')) {
         e.target.closest('.modal-container').classList.remove('show');
     }
 };
+
 purchaseModal.addEventListener('click', closeModalHandler);
 prizesModal.addEventListener('click', closeModalHandler);
+
 tokenAccordionContainer.addEventListener('click', (e) => {
     const header = e.target.closest('.accordion-header');
     if (!header) return;

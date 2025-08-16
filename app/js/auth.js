@@ -37,7 +37,7 @@ const db = getFirestore(app);
 
 // Initialize App Check
 const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('6Lcr96crAAAAAEKx64UgZjizVpwm1HUq_yWrrMlk'),
+  provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_V3_SITE_KEY'),
   isTokenAutoRefreshEnabled: true
 });
 
@@ -56,10 +56,12 @@ onAuthStateChanged(auth, (user) => {
             const data = docSnap.exists() ? docSnap.data() : {};
             const tokenCount = data.spinTokens?.length || 0;
             const creditBalance = data.creditBalance || 0;
+            
+            // --- BUG FIX: Corrected ReferenceError ---
             updateIndicator('spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
             updateIndicator('mobile-spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
-            updateIndicator('credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, val > 0);
-            updateIndicator('mobile-credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, val > 0);
+            updateIndicator('credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, creditBalance > 0);
+            updateIndicator('mobile-credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, creditBalance > 0);
         });
     } else {
         if (userProfileUnsubscribe) {
@@ -110,7 +112,7 @@ function createElement(tag, options = {}, children = []) {
         if (key === 'class') {
             const classes = Array.isArray(value) ? value : String(value).split(' ');
             classes.forEach(c => {
-                if (c) el.classList.add(c); // Check for empty strings
+                if (c) el.classList.add(c);
             });
         } else if (key === 'textContent') {
             el.textContent = value;
@@ -118,7 +120,7 @@ function createElement(tag, options = {}, children = []) {
             el.setAttribute(key, value);
         }
     });
-    children.forEach(child => el.append(child));
+    children.forEach(child => child && el.append(child));
     return el;
 }
 

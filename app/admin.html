@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel | The Hawk Games</title>
+    <!-- SECURITY: Add reCAPTCHA script for App Check -->
+    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_RECAPTCHA_V3_SITE_KEY"></script>
     <link rel="stylesheet" href="css/hawk-games.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +33,6 @@
                 </nav>
             </aside>
             <div id="admin-main-content" class="admin-main-content">
-                <!-- Admin JS will populate this area -->
                 <div class="placeholder">Loading...</div>
             </div>
         </div>
@@ -39,7 +40,6 @@
     
     <footer class="main-footer"></footer>
 
-    <!-- Modal Structure required by admin.js -->
     <div id="modal-container" class="modal-container">
         <div id="modal-content" class="modal-content">
             <div id="modal-body"></div>

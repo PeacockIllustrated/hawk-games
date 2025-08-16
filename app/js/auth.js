@@ -48,18 +48,18 @@ onAuthStateChanged(auth, (user) => {
         }
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
-            const tokenBalanceEl = document.getElementById('spin-token-balance');
-            const mobileTokenBalanceEl = document.getElementById('mobile-spin-token-balance');
-            const elements = [tokenBalanceEl, mobileTokenBalanceEl];
-            
+            const tokenIndicator = document.getElementById('spin-token-indicator');
+            const mobileTokenIndicator = document.getElementById('mobile-spin-token-indicator');
+            const elements = [tokenIndicator, mobileTokenIndicator];
+
             elements.forEach(el => {
                 if (el) {
                     if (docSnap.exists() && docSnap.data().spinTokens && docSnap.data().spinTokens.length > 0) {
                         const tokenCount = docSnap.data().spinTokens.length;
                         el.querySelector('.token-count').textContent = tokenCount;
-                        el.style.display = 'flex';
+                        el.style.display = 'flex'; // Show the indicator
                     } else {
-                        el.style.display = 'none';
+                        el.style.display = 'none'; // Hide if no tokens
                     }
                 }
             });
@@ -71,6 +71,11 @@ onAuthStateChanged(auth, (user) => {
         }
     }
     renderFooter();
+});
+
+// Re-render header on hash change to update active link for "Winners"
+window.addEventListener('hashchange', () => {
+    renderHeader(auth.currentUser);
 });
 
 const createUserProfileIfNotExists = async (user) => {
@@ -92,39 +97,46 @@ const createUserProfileIfNotExists = async (user) => {
     }
 };
 
-// --- UI RENDERING FUNCTIONS (UPDATED) ---
+// --- UI RENDERING FUNCTIONS (REVISED) ---
 function renderHeader(user) {
     const headerEl = document.querySelector('.main-header');
     if (!headerEl) return;
 
-    const currentPage = document.body.dataset.page || '';
-
-    const navItems = [
-        { href: 'index.html', page: 'competitions', text: 'Competitions' },
-        // The instant-games link will be handled separately due to its dynamic nature
-    ];
+    let currentPage = document.body.dataset.page || '';
+    // Special case for the "Winners" anchor on the homepage
+    if (window.location.pathname.endsWith('index.html') && window.location.hash === '#past-winners-section') {
+        currentPage = 'winners';
+    }
 
     const createNavLinks = (isMobile = false) => {
+        // Define navigation items
+        const navItems = [
+            { href: 'index.html', page: 'competitions', text: 'Competitions' },
+            { href: 'index.html#past-winners-section', page: 'winners', text: 'Winners' },
+            { href: 'terms-and-conditions.html', page: 'terms', text: 'Terms' }
+        ];
+
         let linksHTML = navItems.map(item => `
-            <a href="${item.href}" data-page-link="${item.page}" class="${currentPage === item.page ? 'active' : ''}">
-                ${item.text}
-            </a>
+            <a href="${item.href}" class="${currentPage === item.page ? 'active' : ''}">${item.text}</a>
         `).join('');
 
-        // Add dynamic instant games link
-        linksHTML += `
-            <a href="instant-games.html" data-page-link="instant-games" id="${isMobile ? 'mobile-' : ''}spin-token-balance" class="spin-token-balance ${currentPage === 'instant-games' ? 'active' : ''}" style="display: none;">
-                 <span class="token-icon"></span>
-                 <span class="token-count">0</span>
-                 <span class="token-text">${isMobile ? 'Instant Win' : ''}</span>
-            </a>`;
-
-        // Add account/login button
+        // Add Account or Login link
         if (user) {
-            linksHTML += `<a href="account.html" data-page-link="account" class="btn ${currentPage === 'account' ? 'active' : ''}">My Account</a>`;
+            linksHTML += `<a href="account.html" class="${currentPage === 'account' ? 'active' : ''}">Account</a>`;
         } else {
-            linksHTML += `<a href="login.html" data-page-link="login" class="btn">Login / Sign Up</a>`;
+            linksHTML += `<a href="login.html" class="${currentPage === 'login' ? 'active' : ''}">Login</a>`;
         }
+        
+        // Add the Instant Wins CTA and Token Indicator
+        linksHTML += `
+            <div class="instant-win-nav-item">
+                <a href="instant-games.html" class="btn ${currentPage === 'instant-wins' ? 'active' : ''}">Instant Wins</a>
+                <div id="${isMobile ? 'mobile-' : ''}spin-token-indicator" class="token-indicator" style="display: none;">
+                    <span class="token-icon"></span>
+                    <span class="token-count">0</span>
+                </div>
+            </div>
+        `;
         return linksHTML;
     };
 
@@ -154,7 +166,6 @@ function renderHeader(user) {
         });
     }
 
-    // Close mobile nav when a link is clicked
     const mobileNavLinks = document.querySelector('.mobile-nav-links');
     if (mobileNavLinks) {
         mobileNavLinks.addEventListener('click', (e) => {
@@ -164,7 +175,6 @@ function renderHeader(user) {
         });
     }
 }
-
 
 function renderFooter() {
     const footerEl = document.querySelector('.main-footer');
@@ -191,12 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = 'account.html';
             } catch (error) {
                 console.error('Google Sign-In Error:', error);
-                // Optionally show a user-friendly error message on the page
             }
         });
     }
 
-    // Consolidate register logic as it was identical
     const registerBtn = document.getElementById('google-register-btn');
     if(registerBtn) {
          registerBtn.addEventListener('click', async () => {

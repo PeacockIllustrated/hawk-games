@@ -37,7 +37,7 @@ const db = getFirestore(app);
 
 // Initialize App Check
 const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_V3_SITE_KEY'),
+  provider: new ReCaptchaV3Provider('6Lf1JqgrAAAAAEwhulQ8N2tGOr52j8SWvdyJeH7x'),
   isTokenAutoRefreshEnabled: true
 });
 

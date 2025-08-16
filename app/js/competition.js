@@ -244,8 +244,22 @@ function createStandardPageHTML(data) {
 
 function createHeroPageHTML(data) {
     const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<div class="answer-btn" data-answer="${key}">${value}</div>`).join('');
+    
+    // --- BEST VALUE CALCULATION LOGIC ---
+    let bestValueAmount = -1;
+    if (data.ticketTiers && data.ticketTiers.length > 1) {
+        const tiersWithCost = data.ticketTiers.map(tier => ({
+            ...tier,
+            costPerTicket: tier.price / tier.amount
+        }));
+        const bestTier = tiersWithCost.reduce((best, current) => {
+            return current.costPerTicket < best.costPerTicket ? current : best;
+        });
+        bestValueAmount = bestTier.amount;
+    }
+
     const ticketTiersHTML = data.ticketTiers.map(tier => {
-        const isBestValue = tier.amount === 10; // Example logic for best value
+        const isBestValue = tier.amount === bestValueAmount;
         return `<div class="ticket-option card-style-option ${isBestValue ? 'best-value' : ''}" data-amount="${tier.amount}" data-price="${tier.price}">
                     ${isBestValue ? '<div class="best-value-badge">BEST VALUE</div>' : ''}
                     <span class="ticket-amount">${tier.amount}</span>
@@ -253,6 +267,7 @@ function createHeroPageHTML(data) {
                     <span class="ticket-price">£${tier.price.toFixed(2)}</span>
                 </div>`;
     }).join('');
+
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
     const prizeSpecs = `

@@ -33,6 +33,7 @@ const PRIZE_ANGLES = {
 // ===================================================================
 
 const tokenCountElement = document.getElementById('token-count');
+const creditBalanceElement = document.getElementById('credit-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
 const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
@@ -65,15 +66,12 @@ onAuthStateChanged(auth, (user) => {
 function updateUI() {
     const tokenCount = userTokens.length;
     tokenCountElement.textContent = tokenCount;
+    creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
     spinButton.disabled = tokenCount === 0 || isSpinning;
 
     if (tokenCount === 0) {
-        spinButton.textContent = "NO SPINS AVAILABLE";
         tokenAccordionContainer.innerHTML = `<div class="placeholder">You have no Spin Tokens. Enter a competition to earn them!</div>`;
     } else {
-        if (!isSpinning) {
-            spinButton.textContent = "SPIN THE WHEEL";
-        }
         renderTokenAccordion();
     }
 }
@@ -138,8 +136,8 @@ async function handleSpin() {
     if (userTokens.length === 0 || isSpinning) return;
 
     isSpinning = true;
-    spinButton.textContent = 'SPINNING...';
-    updateUI();
+    spinButton.disabled = true;
+    spinButton.textContent = '...';
     spinResultContainer.innerHTML = '';
     
     wheel.style.transition = 'none';
@@ -180,6 +178,7 @@ async function handleSpin() {
                 spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
             }
             isSpinning = false;
+            spinButton.textContent = 'SPIN';
             updateUI();
         }, 8500);
 
@@ -187,6 +186,7 @@ async function handleSpin() {
         console.error("Error spending token:", error);
         spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
         isSpinning = false;
+        spinButton.textContent = 'SPIN';
         updateUI();
     }
 }
@@ -286,24 +286,20 @@ async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card
 
 document.getElementById('purchase-modal').addEventListener('click', (e) => {
     const target = e.target;
-    // Handle selection of answer buttons
     if (target.closest('.answer-btn')) {
         target.closest('.answer-options').querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
         target.closest('.answer-btn').classList.add('selected');
     }
-    // Handle selection of ticket bundles
     if (target.closest('.ticket-option')) {
         const bundle = target.closest('.ticket-option');
         const price = parseFloat(bundle.dataset.price);
         target.closest('.ticket-options').querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
         bundle.classList.add('selected');
 
-        // Show/hide credit payment option based on selection
         const creditOptionDiv = document.getElementById('credit-payment-option');
         if (userCreditBalance >= price) {
             creditOptionDiv.innerHTML = `<button type="button" id="pay-with-credit-btn" class="btn btn-credit">Pay with £${price.toFixed(2)} Credit</button>`;
             creditOptionDiv.style.display = 'block';
-            // Attach the specific handler for the credit button
             document.getElementById('pay-with-credit-btn').onclick = () => {
                  handleSpinnerCompEntry(target.closest('form'), currentCompetitionData.skillQuestion.correctAnswer, 'credit');
             };

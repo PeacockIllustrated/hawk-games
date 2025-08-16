@@ -6,8 +6,6 @@ import {
     onAuthStateChanged, 
     GoogleAuthProvider, 
     signInWithPopup, 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword,
     signOut
 } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { 
@@ -16,8 +14,11 @@ import {
     getDoc, 
     setDoc, 
     serverTimestamp,
-    onSnapshot // For real-time updates
+    onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+// --- SECURITY: Import App Check modules ---
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app-check.js";
+
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -35,6 +36,15 @@ export const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// --- SECURITY: Initialize App Check ---
+// IMPORTANT: Replace 'YOUR_RECAPTCHA_V3_SITE_KEY' with your actual key from Google Cloud Console
+// You must also enable the App Check service in your Firebase project settings.
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider('YOUR_RECAPTCHA_V3_SITE_KEY'),
+  isTokenAutoRefreshEnabled: true
+});
+
+
 // --- Global Auth State Listener ---
 let userProfileUnsubscribe = null; 
 
@@ -50,39 +60,14 @@ onAuthStateChanged(auth, (user) => {
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             const data = docSnap.exists() ? docSnap.data() : {};
             
-            // Update Spin Token Indicator
-            const tokenIndicator = document.getElementById('spin-token-indicator');
-            const mobileTokenIndicator = document.getElementById('mobile-spin-token-indicator');
-            const tokenElements = [tokenIndicator, mobileTokenIndicator];
             const tokenCount = data.spinTokens?.length || 0;
-            
-            tokenElements.forEach(el => {
-                if (el) {
-                    if (tokenCount > 0) {
-                        el.querySelector('.token-count').textContent = tokenCount;
-                        el.style.display = 'flex';
-                    } else {
-                        el.style.display = 'none';
-                    }
-                }
-            });
-
-            // Update Credit Balance Indicator
-            const creditIndicator = document.getElementById('credit-balance-indicator');
-            const mobileCreditIndicator = document.getElementById('mobile-credit-balance-indicator');
-            const creditElements = [creditIndicator, mobileCreditIndicator];
             const creditBalance = data.creditBalance || 0;
-            
-            creditElements.forEach(el => {
-                if (el) {
-                    if (creditBalance > 0) {
-                        el.querySelector('.credit-amount').textContent = `£${creditBalance.toFixed(2)}`;
-                        el.style.display = 'flex';
-                    } else {
-                        el.style.display = 'none';
-                    }
-                }
-            });
+
+            // Update Spin Token & Credit Indicators in both headers (desktop/mobile)
+            updateIndicator('spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
+            updateIndicator('mobile-spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
+            updateIndicator('credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, val > 0);
+            updateIndicator('mobile-credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, val > 0);
         });
     } else {
         if (userProfileUnsubscribe) {
@@ -92,6 +77,18 @@ onAuthStateChanged(auth, (user) => {
     }
     renderFooter();
 });
+
+function updateIndicator(id, value, updateFn, condition = value > 0) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (condition) {
+        updateFn(el, value);
+        el.style.display = 'flex';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
 
 // Re-render header on hash change to update active link for "Winners"
 window.addEventListener('hashchange', () => {
@@ -117,10 +114,28 @@ const createUserProfileIfNotExists = async (user) => {
     }
 };
 
-// --- UI RENDERING FUNCTIONS (REVISED) ---
+// --- SECURITY: Helper function for safe element creation ---
+function createElement(tag, options = {}, children = []) {
+    const el = document.createElement(tag);
+    Object.entries(options).forEach(([key, value]) => {
+        if (key === 'class') {
+            if (Array.isArray(value)) el.classList.add(...value);
+            else el.classList.add(value);
+        } else if (key === 'textContent') {
+            el.textContent = value;
+        } else {
+            el.setAttribute(key, value);
+        }
+    });
+    children.forEach(child => el.append(child));
+    return el;
+}
+
+// --- SECURITY: Refactored UI RENDERING FUNCTIONS (No innerHTML) ---
 function renderHeader(user) {
     const headerEl = document.querySelector('.main-header');
     if (!headerEl) return;
+    headerEl.innerHTML = ''; // Clear previous content
 
     let currentPage = document.body.dataset.page || '';
     if (window.location.pathname.endsWith('index.html') && window.location.hash === '#past-winners-section') {
@@ -134,79 +149,73 @@ function renderHeader(user) {
             { href: 'terms-and-conditions.html', page: 'terms', text: 'Terms' }
         ];
 
-        let linksHTML = navItems.map(item => `
-            <a href="${item.href}" class="${currentPage === item.page ? 'active' : ''}">${item.text}</a>
-        `).join('');
+        const links = navItems.map(item =>
+            createElement('a', { href: item.href, class: currentPage === item.page ? 'active' : '' }, [item.text])
+        );
 
         if (user) {
-            linksHTML += `<a href="account.html" class="${currentPage === 'account' ? 'active' : ''}">Account</a>`;
-            linksHTML += `
-                <div id="${isMobile ? 'mobile-' : ''}credit-balance-indicator" class="credit-balance" style="display: none;">
-                    <span class="credit-amount">£0.00</span>
-                </div>`;
+            links.push(createElement('a', { href: 'account.html', class: currentPage === 'account' ? 'active' : '' }, ['Account']));
+            links.push(
+                createElement('div', { id: `${isMobile ? 'mobile-' : ''}credit-balance-indicator`, class: 'credit-balance', style: 'display: none;' }, [
+                    createElement('span', { class: 'credit-amount' }, ['£0.00'])
+                ])
+            );
         } else {
-            linksHTML += `<a href="login.html" class="${currentPage === 'login' ? 'active' : ''}">Login</a>`;
+            links.push(createElement('a', { href: 'login.html', class: currentPage === 'login' ? 'active' : '' }, ['Login']));
         }
         
-        linksHTML += `
-            <div class="instant-win-nav-item">
-                <a href="instant-games.html" class="btn ${currentPage === 'instant-wins' ? 'active' : ''}">Instant Wins</a>
-                <div id="${isMobile ? 'mobile-' : ''}spin-token-indicator" class="token-indicator" style="display: none;">
-                    <span class="token-icon"></span>
-                    <span class="token-count">0</span>
-                </div>
-            </div>
-        `;
-        return linksHTML;
+        const instantWinLink = createElement('a', { href: 'instant-games.html', class: `btn ${currentPage === 'instant-wins' ? 'active' : ''}` }, ['Instant Wins']);
+        const tokenIndicator = createElement('div', { id: `${isMobile ? 'mobile-' : ''}spin-token-indicator`, class: 'token-indicator', style: 'display: none;' }, [
+            createElement('span', { class: 'token-icon' }),
+            createElement('span', { class: 'token-count' }, ['0'])
+        ]);
+        const instantWinNavItem = createElement('div', { class: 'instant-win-nav-item' }, [instantWinLink, tokenIndicator]);
+        
+        links.push(instantWinNavItem);
+        return links;
     };
 
-    const headerHTML = `
-        <div class="container">
-            <a href="index.html" class="logo">
-                <img src="assets/logo-icon.png" alt="The Hawk Games">
-            </a>
-            <nav class="main-nav-desktop">${createNavLinks(false)}</nav>
-            <button id="hamburger-btn" class="hamburger-btn" aria-label="Open menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-        <div id="mobile-nav-overlay" class="mobile-nav-overlay">
-             <nav class="mobile-nav-links">${createNavLinks(true)}</nav>
-        </div>
-    `;
-    headerEl.innerHTML = headerHTML;
+    const logoLink = createElement('a', { href: 'index.html', class: 'logo' }, [
+        createElement('img', { src: 'assets/logo-icon.png', alt: 'The Hawk Games' })
+    ]);
+    const desktopNav = createElement('nav', { class: 'main-nav-desktop' }, createNavLinks(false));
+    const hamburgerBtn = createElement('button', { id: 'hamburger-btn', class: 'hamburger-btn', 'aria-label': 'Open menu' }, [
+        createElement('span'), createElement('span'), createElement('span')
+    ]);
+    const container = createElement('div', { class: 'container' }, [logoLink, desktopNav, hamburgerBtn]);
+    
+    const mobileNav = createElement('nav', { class: 'mobile-nav-links' }, createNavLinks(true));
+    const mobileOverlay = createElement('div', { id: 'mobile-nav-overlay', class: 'mobile-nav-overlay' }, [mobileNav]);
 
-    const hamburgerBtn = document.getElementById('hamburger-btn');
-    if (hamburgerBtn) {
-        hamburgerBtn.addEventListener('click', () => {
-            document.body.classList.toggle('mobile-nav-open');
-        });
-    }
+    headerEl.append(container, mobileOverlay);
 
-    const mobileNavLinks = document.querySelector('.mobile-nav-links');
-    if (mobileNavLinks) {
-        mobileNavLinks.addEventListener('click', (e) => {
-            if (e.target.tagName === 'A' || e.target.closest('a')) {
-                document.body.classList.remove('mobile-nav-open');
-            }
-        });
-    }
+    hamburgerBtn.addEventListener('click', () => {
+        document.body.classList.toggle('mobile-nav-open');
+    });
+
+    mobileNav.addEventListener('click', (e) => {
+        if (e.target.tagName === 'A' || e.target.closest('a')) {
+            document.body.classList.remove('mobile-nav-open');
+        }
+    });
 }
 
 function renderFooter() {
     const footerEl = document.querySelector('.main-footer');
     if (!footerEl) return;
-    footerEl.innerHTML = `
-        <div class="container">
-            <div class="copyright"><p>© ${new Date().getFullYear()} Hawk Games Ltd.</p></div>
-            <div class="footer-links">
-                <a href="terms-and-conditions.html">T&Cs</a>
-                <a href="privacy-policy.html">Privacy</a>
-                <a href="free-entry-route.html">Free Entry</a>
-            </div>
-        </div>`;
+    footerEl.innerHTML = ''; // Clear previous
+
+    const copyright = createElement('div', { class: 'copyright' }, [
+        createElement('p', {}, [`© ${new Date().getFullYear()} Hawk Games Ltd.`])
+    ]);
+    const footerLinks = createElement('div', { class: 'footer-links' }, [
+        createElement('a', { href: 'terms-and-conditions.html' }, ['T&Cs']),
+        createElement('a', { href: 'privacy-policy.html' }, ['Privacy']),
+        createElement('a', { href: 'free-entry-route.html' }, ['Free Entry'])
+    ]);
+    const container = createElement('div', { class: 'container' }, [copyright, footerLinks]);
+    
+    footerEl.append(container);
 }
 
 // --- Event listeners for auth pages ---

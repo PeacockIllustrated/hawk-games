@@ -11,6 +11,7 @@ const functions = getFunctions(app);
 // --- Module State ---
 let currentCompetitionData = null;
 let competitionId = null;
+let spinnerPrizes = []; // For the instant win modal wheel
 
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     competitionId = params.get('id');
     if (competitionId) {
         loadCompetitionDetails(competitionId);
+        loadPrizeSettings(); // Load prize settings for the modal wheel
     } else {
         document.getElementById('competition-container').innerHTML = '<div class="hawk-card placeholder">Error: No competition specified.</div>';
     }
@@ -43,6 +45,19 @@ async function loadCompetitionDetails(id) {
         container.innerHTML = '<div class="hawk-card placeholder" style="color:red">Could not load competition details.</div>';
     }
 }
+
+async function loadPrizeSettings() {
+    try {
+        const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists() && docSnap.data().prizes) {
+            spinnerPrizes = docSnap.data().prizes;
+        }
+    } catch (error) {
+        console.error("Error fetching spinner prizes for modal:", error);
+    }
+}
+
 
 function setupEntryLogic(correctAnswer) {
     const entryButton = document.getElementById('entry-button');
@@ -101,35 +116,35 @@ function showConfirmationModal() {
 }
 
 async function handleEntry(ticketsBought) {
-    openModal(`<h2>Processing Entry...</h2><p>Please wait.</p>`);
+    openModal(`<h2>Processing Entry...</h2><div class="loader"></div><p>Please wait, do not close this window.</p>`);
     try {
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
         const result = await allocateTicketsAndAwardTokens({ compId: competitionId, ticketsBought });
         const data = result.data;
         
-        let successMessage = `<p>Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} are registered. Good luck!</p>`;
-        
-        // Check if tokens were awarded and add a special message.
         if (data.awardedTokens && data.awardedTokens.length > 0) {
-            successMessage += `
-                <h3 style="margin-top:1.5rem;color:var(--primary-gold);">🎉 You've earned ${data.awardedTokens.length} Spin Token(s)!</h3>
-                <p>Visit the Instant Win Games page to spend them.</p>
-                <a href="instant-games.html" class="btn" style="margin-top:1rem;">Go to Games</a>
-            `;
+            // If tokens are awarded, trigger the spin wheel modal
+            showInstantWinModal(data.awardedTokens.length);
+        } else {
+            // Otherwise, show the celebratory success modal
+            let successMessage = `<p>Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} have been successfully registered. Good luck in the draw!</p>`;
+            openModal(`
+                <div class="celebration-modal">
+                    <div class="modal-icon-success">✓</div>
+                    <h2>Entry Successful!</h2>
+                    ${successMessage}
+                    <button data-close-modal class="btn" style="margin-top:1rem;" onclick="window.location.reload()">Done</button>
+                </div>
+            `);
         }
-
-        openModal(`
-            <h2>Entry Successful!</h2>
-            ${successMessage}
-            <button data-close-modal class="btn btn-secondary" style="margin-top:1rem;" onclick="window.location.reload()">Done</button>
-        `);
     } catch (error) {
         console.error("Entry failed:", error);
         openModal(`<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
     }
 }
 
-// --- UTILITY FUNCTIONS ---
+
+// --- UTILITY & MODAL FUNCTIONS ---
 function openModal(content) {
     const modal = document.getElementById('modal-container');
     const modalContent = document.getElementById('modal-content');
@@ -151,18 +166,19 @@ document.addEventListener('click', (e) => {
 
 function createCompetitionHTML(data) {
     const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
-    const ticketTiersHTML = data.ticketTiers.map(tier => `<button class="ticket-option" data-amount="${tier.amount}" data-price="${tier.price}">${tier.amount} Entries for £${tier.price.toFixed(2)}</button>`).join('');
+    const ticketTiersHTML = data.ticketTiers.map(tier => `<button class="ticket-option" data-amount="${tier.amount}" data-price="${tier.price}">${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}</button>`).join('');
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
+    
     return `
         <div class="competition-detail-view">
             <div class="prize-image-panel"><img src="${data.prizeImage}" alt="${data.title}"></div>
             <div class="entry-details-panel">
                 <h1>${data.title}</h1>
                 <p class="cash-alternative">Or <span>£${(data.cashAlternative || 0).toLocaleString()}</span> Cash Alternative</p>
-                <div class="detail-section detail-timer-section"><div id="timer" class="detail-timer"></div></div>
-                <div class="detail-section detail-progress">
+                <div id="timer" class="detail-timer"></div>
+                <div class="detail-progress">
                     <div class="progress-bar"><div class="progress-bar-fill" style="width: ${progressPercent}%;"></div></div>
-                    <p><strong>${data.ticketsSold || 0}</strong> / ${data.totalTickets} sold</p>
+                    <p>${data.ticketsSold || 0} / ${data.totalTickets} sold</p>
                 </div>
                 <div class="detail-section skill-question-box">
                     <h3><span>1.</span> Answer The Question</h3>
@@ -190,10 +206,99 @@ function setupCountdown(endDate) {
             document.querySelectorAll('#entry-button, .answer-btn, .ticket-option').forEach(el => el.disabled = true);
             return;
         }
-        const d = String(Math.floor(distance / (1000 * 60 * 60 * 24))).padStart(2, '0');
+        const d = String(Math.floor(distance / (1000 * 60 * 60 * 24)));
         const h = String(Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
         const m = String(Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
         const s = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
         timerElement.innerHTML = `${d}<small>d</small> : ${h}<small>h</small> : ${m}<small>m</small> : ${s}<small>s</small>`;
     }, 1000);
+}
+
+// --- INSTANT WIN MODAL LOGIC ---
+function showInstantWinModal(tokenCount) {
+    const modal = document.getElementById('instant-win-modal');
+    if (!modal) return;
+
+    document.getElementById('spin-modal-title').textContent = `You've Unlocked ${tokenCount} Instant Win Spin${tokenCount > 1 ? 's' : ''}!`;
+    
+    // Reset state
+    const spinButton = document.getElementById('spin-button');
+    spinButton.disabled = false;
+    spinButton.textContent = "SPIN THE WHEEL";
+    document.getElementById('spin-result').innerHTML = '';
+
+    modal.classList.add('show');
+    
+    // Only set up the wheel and button once
+    if (!modal.dataset.initialized) {
+        setupSpinWheel();
+        document.getElementById('spin-button').addEventListener('click', handleSpinButtonClick);
+        modal.dataset.initialized = 'true';
+    }
+}
+
+function setupSpinWheel() {
+    const wheel = document.getElementById('wheel');
+    const segmentCount = 12; // Based on the visual design of the wheel
+    wheel.innerHTML = ''; // Clear previous segments
+    for (let i = 0; i < segmentCount; i++) {
+        const segment = document.createElement('div');
+        segment.className = 'wheel-segment';
+        // You can add prize text here if desired, but the background image handles it
+        wheel.appendChild(segment);
+    }
+}
+
+async function handleSpinButtonClick() {
+    const spinButton = document.getElementById('spin-button');
+    const spinResultContainer = document.getElementById('spin-result');
+    const wheel = document.getElementById('wheel');
+
+    // Fetch the latest user tokens from Firestore to prevent double-spending
+    const userDocRef = doc(db, 'users', auth.currentUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const userTokens = userDocSnap.data().spinTokens || [];
+
+    if (userTokens.length === 0 || spinButton.disabled) return;
+
+    spinButton.disabled = true;
+    spinButton.textContent = 'SPINNING...';
+    spinResultContainer.innerHTML = '';
+    
+    const tokenToSpend = userTokens.sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000))[0];
+    const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
+
+    try {
+        const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
+        // The rest of the logic for spinning the wheel would go here, similar to instant-games.js
+        // For now, we'll just show the result and provide a link.
+        
+        const { won, prizeType, value } = result.data;
+        if (won) {
+            const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
+            const prizeText = prizeType === 'credit' ? `£${prizeValue} STORE CREDIT` : `£${prizeValue} CASH`;
+            spinResultContainer.innerHTML = `<p class="spin-win">🎉 YOU WON ${prizeText}! 🎉</p>`;
+        } else {
+            spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
+        }
+        
+    } catch (error) {
+        console.error("Error spending token:", error);
+        spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
+    } finally {
+        // After the spin, offer to go to the main games page or close
+        spinButton.textContent = 'GO TO INSTANT GAMES';
+        spinButton.onclick = () => window.location.href = 'instant-games.html';
+        spinButton.disabled = false;
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-secondary';
+        closeBtn.textContent = 'Close';
+        closeBtn.style.marginTop = '1rem';
+        closeBtn.onclick = () => {
+            document.getElementById('instant-win-modal').classList.remove('show');
+            window.location.reload();
+        };
+        spinResultContainer.appendChild(closeBtn);
+    }
 }

@@ -543,3 +543,137 @@ input:checked + .slider:before { transform: translateX(26px); }
     color: #aaa;
     min-height: 1.2em;
 }
+
+/* --- 22. ReCAPTCHA Badge Hiding --- */
+/* This rule is required by Google's ToS when displaying your own compliance text. */
+.grecaptcha-badge {
+    visibility: hidden !important;
+}
+
+/* --- 23. New Footer Design --- */
+.main-footer {
+    background-color: #0a0a0a; /* Slightly darker for contrast */
+    border-top: 2px solid var(--border-color);
+    padding: 3rem 0 0 0;
+    margin-top: 5rem;
+}
+
+.footer-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2rem;
+    padding-bottom: 2rem;
+}
+
+.footer-column {
+    flex: 1;
+    min-width: 220px;
+}
+
+.footer-brand .logo {
+    max-width: 150px;
+    margin-bottom: 1rem;
+}
+
+.footer-brand p {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.footer-column h4 {
+    font-family: var(--font-heading);
+    color: var(--primary-gold);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.1rem;
+}
+
+.footer-links ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-links li {
+    margin-bottom: 0.75rem;
+}
+
+.footer-links a {
+    color: #ccc;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer-links a:hover {
+    color: var(--primary-gold);
+}
+
+.footer-social-icons {
+    display: flex;
+    gap: 1rem;
+}
+
+.footer-social-icons a {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: #888;
+    transition: all 0.3s ease;
+}
+
+.footer-social-icons a:hover {
+    color: var(--primary-gold);
+    border-color: var(--primary-gold);
+    transform: translateY(-3px);
+}
+
+.footer-social-icons svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+.footer-bottom-bar {
+    flex-basis: 100%;
+    border-top: 1px solid var(--border-color);
+    margin-top: 2rem;
+    padding: 1.5rem 0;
+    text-align: center;
+}
+
+.recaptcha-notice {
+    font-size: 0.8rem;
+    color: #888;
+    line-height: 1.5;
+}
+
+.recaptcha-notice a {
+    color: #aaa;
+    text-decoration: none;
+}
+
+.recaptcha-notice a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .footer-container {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+    }
+    .footer-column h4 {
+        border-bottom: none;
+    }
+    .footer-social-icons {
+        justify-content: center;
+    }
+}

@@ -16,8 +16,6 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 let currentCompetitionData = null;
 
-// --- REFACTOR: The PRIZE_ANGLES map is no longer needed as the wheel's visual stopping point is now random. ---
-
 const tokenCountElement = document.getElementById('token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
@@ -97,22 +95,18 @@ function renderTokenAccordion() {
         (acc[groupTitle] = acc[groupTitle] || []).push(token);
         return acc;
     }, {});
-
     const fragment = document.createDocumentFragment();
     for (const groupTitle in groupedTokens) {
         const tokens = groupedTokens[groupTitle];
         const date = new Date(tokens[0].earnedAt.seconds * 1000).toLocaleDateString();
-        
         const content = createElement('div', { class: 'accordion-content' }, [
             createElement('ul', {}, tokens.map(t => createElement('li', { textContent: `Token ID: ...${t.tokenId.slice(-8)}` })))
         ]);
-
         const header = createElement('button', { class: 'accordion-header' }, [
             createElement('span', { textContent: groupTitle }),
             createElement('span', { class: 'accordion-meta', textContent: `${tokens.length} Token(s) - Earned ${date}` }),
             createElement('span', { class: 'accordion-arrow' })
         ]);
-        
         fragment.append(createElement('div', { class: 'accordion-item' }, [header, content]));
     }
     tokenAccordionContainer.append(fragment);
@@ -127,12 +121,34 @@ function renderPrizesTable(prizes) {
             createElement('td', { textContent: `1 in ${prize.odds.toLocaleString()}` })
         ]);
     });
-    
     const table = createElement('table', { class: 'prizes-table' }, [
         createElement('thead', {}, [createElement('tr', {}, [createElement('th', { textContent: 'Prize' }), createElement('th', { textContent: 'Odds' })])]),
         createElement('tbody', {}, tableRows)
     ]);
     prizesTableContainer.append(table);
+}
+
+function triggerConfetti() {
+    const container = document.querySelector('.spin-game-panel');
+    let confettiContainer = container.querySelector('.confetti-container');
+    if (confettiContainer) {
+        confettiContainer.remove();
+    }
+    confettiContainer = createElement('div', { class: 'confetti-container' });
+    container.style.position = 'relative'; // Ensure container can position the confetti
+    container.appendChild(confettiContainer);
+    
+    for (let i = 0; i < 100; i++) {
+        const confetti = createElement('div', { 
+            class: 'confetti',
+            style: {
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 4}s`,
+                animationDuration: `${2 + Math.random() * 2}s`
+            }
+        });
+        confettiContainer.appendChild(confetti);
+    }
 }
 
 async function handleSpin() {
@@ -142,6 +158,7 @@ async function handleSpin() {
     spinButton.disabled = true;
     spinButton.textContent = '...';
     spinResultContainer.innerHTML = '';
+    spinResultContainer.classList.remove('is-winner');
     
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
@@ -158,28 +175,33 @@ async function handleSpin() {
         
         const { won, prizeType, value } = result.data;
 
-        // --- REFACTOR: Simplified Random Spin Animation ---
-        const baseSpins = 360 * 8; 
+        // --- CHANGE: Reduced spin time and rotations ---
+        const baseSpins = 360 * 3; // 3 full rotations
         const randomAdditionalRotation = Math.random() * 360;
         const finalAngle = baseSpins + randomAdditionalRotation;
         
-        wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        wheel.style.transition = 'transform 3s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
-        // --- END OF REFACTOR ---
 
+        // --- CHANGE: Reduced timeout to match animation ---
         setTimeout(() => {
             spinResultContainer.innerHTML = '';
             if (won) {
                 const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
                 const prizeText = prizeType === 'credit' ? `£${prizeValue} SITE CREDIT` : `£${prizeValue} CASH`;
-                spinResultContainer.append(createElement('p', { class: 'spin-win', textContent: `🎉 YOU WON ${prizeText}! 🎉` }));
+                const prizeElement = createElement('p', { class: 'spin-win prize-pop-in', textContent: `🎉 YOU WON ${prizeText}! 🎉` });
+                
+                // --- ANIMATION: Trigger new effects ---
+                spinResultContainer.classList.add('is-winner');
+                spinResultContainer.append(prizeElement);
+                triggerConfetti();
             } else {
                 spinResultContainer.append(createElement('p', { textContent: 'Better luck next time!' }));
             }
             isSpinning = false;
             spinButton.textContent = 'SPIN';
             updateUI(); 
-        }, 8500);
+        }, 3500); // 3.5 seconds
 
     } catch (error) {
         console.error("Error spending token:", error);
@@ -190,6 +212,7 @@ async function handleSpin() {
         updateUI();
     }
 }
+
 
 spinButton.addEventListener('click', handleSpin);
 

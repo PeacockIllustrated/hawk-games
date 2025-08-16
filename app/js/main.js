@@ -7,17 +7,35 @@ const db = getFirestore(app);
 document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
     loadPastWinners();
-    initializeHeaderScroll(); // Activate the header scroll effect
-    initializeHowItWorks(); // Activate the interactive cards
+    initializeHeaderScroll(); 
+    initializeHowItWorks();
+    initializeSmoothScroll(); // Activate smooth scrolling for anchor links
 });
 
-// --- NEW FUNCTION: Initialize Header Scroll Effect ---
+// --- NEW FUNCTION: Smooth Scroll for Anchor Links ---
+const initializeSmoothScroll = () => {
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a[href*="#"]');
+        if (link && link.pathname === window.location.pathname) {
+            const hash = link.hash;
+            const targetElement = document.querySelector(hash);
+            if (targetElement) {
+                e.preventDefault();
+                targetElement.scrollIntoView({
+                    behavior: 'smooth'
+                });
+                // Update the URL hash without a jump
+                history.pushState(null, null, hash);
+            }
+        }
+    });
+};
+
 const initializeHeaderScroll = () => {
     const header = document.querySelector('.main-header');
     if (!header) return;
 
     const handleScroll = () => {
-        // Add 'scrolled' class if user scrolls more than 50px, otherwise remove it
         if (window.scrollY > 50) {
             header.classList.add('scrolled');
         } else {
@@ -28,18 +46,15 @@ const initializeHeaderScroll = () => {
     window.addEventListener('scroll', handleScroll);
 };
 
-// --- NEW FUNCTION: Initialize "How It Works" Interactive Cards ---
 const initializeHowItWorks = () => {
     const stepCards = document.querySelectorAll('.how-it-works-grid .step-card');
     if (stepCards.length === 0) return;
 
     stepCards.forEach(card => {
         card.addEventListener('click', () => {
-            // If the clicked card is already active, deactivate it.
             if (card.classList.contains('active')) {
                 card.classList.remove('active');
             } else {
-                // Otherwise, deactivate all other cards and activate this one.
                 stepCards.forEach(c => c.classList.remove('active'));
                 card.classList.add('active');
             }

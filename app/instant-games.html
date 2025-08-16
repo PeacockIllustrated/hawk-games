@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Instant Win Games | The Hawk Games</title>
+    <!-- SECURITY: Add reCAPTCHA script for App Check -->
+    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_RECAPTCHA_V3_SITE_KEY"></script>
     <link rel="stylesheet" href="css/hawk-games.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +27,6 @@
                     <div class="wheel-container">
                         <div class="wheel-pointer"></div>
                         <div id="wheel" class="wheel">
-                            <!-- JS handles rotation -->
                         </div>
                         <button id="spin-button" class="btn-spin-center" disabled>SPIN</button>
                     </div>
@@ -33,7 +34,6 @@
 
                 <div class="spin-panel-footer">
                     <div id="spin-result" class="spin-result-container">
-                        <!-- Result message will be injected here -->
                     </div>
                     <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
                 </div>
@@ -74,14 +74,11 @@
         </div>
     </main>
     
-    <!-- Purchase Modal -->
     <div id="purchase-modal" class="modal-container">
         <div id="purchase-modal-content" class="modal-content">
-            <!-- JS will populate this dynamically -->
         </div>
     </div>
     
-    <!-- Prizes & Odds Modal -->
     <div id="prizes-modal" class="modal-container">
         <div id="prizes-modal-content" class="modal-content">
             <h2>Prizes & Odds</h2>

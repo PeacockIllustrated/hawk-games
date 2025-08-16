@@ -2,30 +2,46 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
+const { z } = require("zod"); // --- SECURITY: Import Zod for schema validation ---
 
 initializeApp();
 const db = getFirestore();
 
 // --- Helpers ---
 const assertIsAdmin = async (context) => {
+    // --- SECURITY: App Check is enforced by functionOptions now ---
     if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
     const userDoc = await db.collection('users').doc(context.auth.uid).get();
     if (!userDoc.exists || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'Admin privileges required.');
 };
 const assertIsAuthenticated = (context) => {
+    // --- SECURITY: App Check is enforced by functionOptions now ---
     if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
 };
+
+// --- SECURITY: Enforce App Check on all callable functions ---
 const functionOptions = {
     region: "us-central1",
+    enforceAppCheck: true, // This is the crucial addition
     cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
 };
 
 // --- allocateTicketsAndAwardTokens ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
+    // --- SECURITY: Zod schema for strict input validation ---
+    const schema = z.object({
+      compId: z.string().min(1),
+      ticketsBought: z.number().int().positive(),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
+    }
+    const { compId, ticketsBought } = validation.data;
+
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { compId, ticketsBought } = request.data;
-    if (!compId || !ticketsBought || ticketsBought <= 0) throw new HttpsError('invalid-argument', 'Invalid parameters.');
     const compRef = db.collection('competitions').doc(compId);
     const userRef = db.collection('users').doc(uid);
     
@@ -73,13 +89,20 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
 
 // --- spendSpinToken ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
+    // --- SECURITY: Zod schema for strict input validation ---
+    const schema = z.object({
+        tokenId: z.string().min(1),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'A valid tokenId is required.');
+    }
+    const { tokenId } = validation.data;
+    
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
     const userRef = db.collection('users').doc(uid);
-    const { tokenId } = request.data;
-    if (!tokenId) {
-        throw new HttpsError('invalid-argument', 'A tokenId is required.');
-    }
 
     return db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
@@ -138,16 +161,27 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- enterSpinnerCompetition (MODIFIED) ---
+// --- enterSpinnerCompetition ---
 exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
+    // --- SECURITY: Zod schema for strict input validation ---
+    const schema = z.object({
+        compId: z.string().min(1),
+        bundle: z.object({
+            amount: z.number().int().positive(),
+            price: z.number().positive(),
+        }),
+        paymentMethod: z.enum(['credit', 'card']),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
+    }
+    const { compId, bundle, paymentMethod } = validation.data;
+
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { compId, bundle, paymentMethod } = request.data; // Added paymentMethod
-
-    if (!compId || !bundle || !bundle.amount || bundle.amount <= 0 || !bundle.price) {
-        throw new HttpsError('invalid-argument', 'Invalid competition or bundle specified.');
-    }
-
+    
     const userRef = db.collection('users').doc(uid);
     const spinnerCompRef = db.collection('spinner_competitions').doc(compId);
 
@@ -155,29 +189,20 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
         const userDoc = await transaction.get(userRef);
         const spinnerCompDoc = await transaction.get(spinnerCompRef);
 
-        if (!userDoc.exists) {
-            throw new HttpsError('not-found', 'User profile not found.');
-        }
-        if (!spinnerCompDoc.exists) {
-            throw new HttpsError('not-found', 'The spinner competition is not active.');
-        }
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+        if (!spinnerCompDoc.exists) throw new HttpsError('not-found', 'The spinner competition is not active.');
 
         const userData = userDoc.data();
         let amountPaid = bundle.price;
         let entryType = 'paid';
 
-        // Handle credit payment
         if (paymentMethod === 'credit') {
             entryType = 'credit';
             const userCredit = userData.creditBalance || 0;
             if (userCredit < bundle.price) {
                 throw new HttpsError('failed-precondition', 'Insufficient credit balance.');
             }
-            // Decrement user's credit balance
             transaction.update(userRef, { creditBalance: FieldValue.increment(-bundle.price) });
-        } else {
-            // Here you would normally integrate a payment provider like Stripe.
-            // For now, we assume payment was handled client-side if not using credit.
         }
 
         const entryRef = spinnerCompRef.collection('entries').doc();
@@ -206,12 +231,21 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
     });
 });
 
-
 // --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {
+    // --- SECURITY: Zod schema for strict input validation ---
+    const schema = z.object({
+        compId: z.string().min(1),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'Competition ID is required.');
+    }
+    const { compId } = validation.data;
+
     await assertIsAdmin(request);
-    const { compId } = request.data;
-    if (!compId) throw new HttpsError('invalid-argument', 'Competition ID is required.');
+    
     const compRef = db.collection('competitions').doc(compId);
     const entriesRef = compRef.collection('entries');
     const compDocForCheck = await compRef.get();

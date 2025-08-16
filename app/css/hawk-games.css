@@ -121,38 +121,42 @@ body.mobile-nav-open .hamburger-btn span:nth-child(3) { transform: rotate(-45deg
 .hawk-card__content { padding: 1.5rem; display: flex; flex-direction: column; flex-grow: 1; }
 .hawk-card__title { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; line-height: 1.3; margin-bottom: 1rem; flex-grow: 1; }
 .hawk-card__timer { font-size: 0.9rem; font-weight: 700; color: #ccc; margin-bottom: 1rem; text-align: center; }
-.progress-bar { width: 100%; height: 10px; background-color: var(--border-color); border-radius: 5px; overflow: hidden; }
+.progress-bar { width: 100%; height: 8px; background-color: #111; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; }
 .progress-bar-fill { height: 100%; background-color: var(--primary-gold); transition: width 0.5s ease; }
 .hawk-card__progress-text { font-size: 0.8rem; text-align: center; color: #aaa; margin-top: 0.5rem; margin-bottom: 1rem; }
 .hawk-card__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; }
 .hawk-card__price { font-family: var(--font-heading); font-size: 1.8rem; color: var(--primary-gold); }
 
-/* --- 5. Competition Detail Page --- */
-.competition-detail-view { display: grid; grid-template-columns: 1fr 0.8fr; gap: 3rem; margin-top: 3rem; }
-.prize-image-panel img { width: 100%; border-radius: 5px; border: 1px solid var(--border-color); }
-.entry-details-panel { background-color: var(--card-bg); padding: 2rem; border-radius: 5px; border: 1px solid var(--border-color); }
-.entry-details-panel h1 { font-family: var(--font-heading); font-size: 2.2rem; text-transform: uppercase; line-height: 1.2; }
-.cash-alternative { color: #ccc; font-weight: 700; margin-top: -0.5rem; margin-bottom: 1.5rem; }
+/* --- 5. Competition Detail Page (OVERHAUL) --- */
+.competition-detail-view { display: grid; grid-template-columns: 55% auto; gap: 3rem; margin-top: 3rem; align-items: flex-start; }
+.prize-image-panel img { width: 100%; border-radius: 5px; }
+.entry-details-panel { padding-top: 1rem; }
+.entry-details-panel h1 { font-family: var(--font-heading); font-size: 2.8rem; text-transform: uppercase; line-height: 1.1; letter-spacing: 1px; }
+.cash-alternative { color: #ccc; font-weight: 700; margin-top: 0.25rem; margin-bottom: 2rem; font-size: 1.1rem; }
 .cash-alternative span { color: var(--primary-gold); }
-.detail-section { padding: 1.5rem 0; border-top: 1px solid var(--border-color); }
-.detail-timer { font-family: var(--font-heading); font-size: 2.5rem; text-align: center; letter-spacing: 2px; display: flex; justify-content: center; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
-.detail-timer span { display: flex; flex-direction: column; align-items: center; line-height: 1; }
-.detail-timer small { font-family: var(--font-body); font-size: 0.7rem; color: #aaa; text-transform: none; letter-spacing: 1px; }
-.detail-progress p { font-size: 0.9rem; text-align: center; margin-top: 0.5rem; }
-.skill-question-box h3, .ticket-selector-box h3 { font-family: var(--font-heading); font-size: 1.2rem; text-transform: uppercase; margin-bottom: 1rem; }
-.question-text { font-size: 1.1rem; margin-bottom: 1rem; font-weight: 700; }
-.answer-options, .ticket-options { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
-.answer-btn, .ticket-option { background-color: transparent; border: 2px solid var(--border-color); color: var(--light-white); padding: 1rem; border-radius: 4px; text-align: left; font-size: 1rem; font-family: var(--font-body); cursor: pointer; transition: all 0.2s ease; }
-.answer-btn:hover, .ticket-option:hover { border-color: var(--primary-gold); }
+.detail-timer { font-family: var(--font-heading); font-size: 3.5rem; text-align: left; letter-spacing: 2px; margin-bottom: 1.5rem; line-height: 1; }
+.detail-timer small { font-family: var(--font-body); font-size: 0.8rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-left: 0.25rem; }
+.detail-progress { margin-bottom: 2.5rem; }
+.detail-progress p { font-size: 0.9rem; margin-top: 0.75rem; color: #aaa; }
+.detail-section h3 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 1rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+.detail-section h3 span { color: var(--primary-gold); margin-right: 0.5rem; }
+.question-text { font-size: 1.1rem; margin-bottom: 1.5rem; color: #eee; }
+.answer-options, .ticket-options { display: flex; flex-direction: column; gap: 0.75rem; }
+.answer-btn, .ticket-option { background-color: var(--card-bg); border: 1px solid var(--border-color); color: #ccc; padding: 1rem 1.5rem; border-radius: 4px; text-align: left; font-size: 1rem; font-family: var(--font-body); cursor: pointer; transition: all 0.2s ease; }
+.answer-btn:hover, .ticket-option:hover { border-color: #555; background-color: #222; }
 .answer-btn.selected, .ticket-option.selected { background-color: var(--primary-gold); color: var(--dark-bg); border-color: var(--primary-gold); font-weight: 700; }
-#entry-button { width: 100%; margin-top: 1.5rem; padding: 1rem; font-size: 1.2rem; }
+#entry-button { width: 100%; margin-top: 2rem; padding: 1.2rem; font-size: 1.3rem; }
 
-/* --- 6. Modal Styles --- */
+/* --- 6. Modal Styles (UPDATED) --- */
 .modal-container { position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .modal-container.show { opacity: 1; pointer-events: auto; }
 .modal-content { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 2rem; border-radius: 5px; width: 90%; max-width: 450px; text-align: center; }
 .modal-content h2 { font-family: var(--font-heading); font-size: 1.8rem; text-transform: uppercase; }
 .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+.loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid var(--primary-gold); width: 40px; height: 40px; margin: 1.5rem auto; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.celebration-modal .modal-icon-success { font-size: 3rem; width: 80px; height: 80px; line-height: 80px; margin: 0 auto 1.5rem auto; border-radius: 50%; background-color: #27ae60; color: white; }
+.spin-wheel-modal .wheel-container { margin-top: 2rem; margin-bottom: 2rem; }
 
 /* --- 7. Account Page Styles --- */
 .account-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: flex-start; margin-top: 3rem; }
@@ -179,6 +183,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* --- 8. Homepage & Universal Section Styles --- */
 #hero-competition-section, #how-it-works-section, #instant-win-section, #main-competitions-section, #spinner-competition-section, #past-winners-section { padding: 5rem 0; }
+#hero-competition-section { padding-top: 3rem; } /* Less padding at the top */
 .section-subtitle { font-size: 1.1rem; color: #ccc; text-align: center; max-width: 800px; margin: -2.5rem auto 3rem auto; line-height: 1.7; }
 #past-winners-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
 .winner-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; text-align: center; padding: 1.5rem; }
@@ -200,15 +205,10 @@ input:checked + .slider:before { transform: translateX(26px); }
 .entry-numbers { color: #ccc; font-family: monospace; }
 .instant-win-tag { background-color: var(--primary-gold); color: var(--dark-bg); font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; justify-self: end; }
 
-/* --- 10. Spin Token Indicator (Legacy) --- */
-.spin-token-balance { display: flex; align-items: center; gap: 0.5rem; background-color: #2a2a2a; border: 1px solid var(--border-color); padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; font-size: 0.9rem; color: var(--light-white); transition: all 0.2s ease-in-out; }
-.spin-token-balance:hover { border-color: #555; }
+/* --- 10. Spin Token Indicator --- */
 .token-icon { display: inline-block; width: 16px; height: 16px; background-color: var(--primary-gold); border-radius: 3px; box-shadow: 0 0 5px var(--primary-gold); }
-.spin-token-balance .token-text { display: none; } /* Hidden on desktop */
-.spin-token-balance.active {
-    border-color: var(--primary-gold);
-}
-/* --- 11. Instant Win Page & Wheel Styles (NEW LAYOUT) --- */
+
+/* --- 11. Instant Win Page & Wheel Styles --- */
 .instant-win-container { display: flex; flex-direction: column; align-items: center; gap: 4rem; padding: 2rem 0; }
 .spin-game-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2rem; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; }
 .spin-game-panel .section-title { margin-bottom: 0; }
@@ -224,10 +224,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 .spin-result-container { min-height: 50px; margin-top: 1.5rem; font-size: 1.2rem; font-weight: bold; }
 .spin-result-container .spin-win { color: var(--primary-gold); }
 .spin-result-container .spin-error { color: #e74c3c; }
-.token-bundles { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
-.bundle-btn { display: flex; justify-content: space-between; align-items: center; background-color: #2a2a2a; border: 1px solid #444; padding: 0.75rem 1rem; }
-.bundle-btn .bundle-amount { font-weight: bold; }
-.bundle-btn .bundle-price { color: var(--primary-gold); font-family: var(--font-heading); }
 .token-inventory { width: 100%; max-width: 800px; }
 .token-inventory h3 { font-family: var(--font-heading); text-transform: uppercase; text-align: center; margin-bottom: 2rem; }
 .accordion-item { border-bottom: 1px solid var(--border-color); }
@@ -243,159 +239,31 @@ input:checked + .slider:before { transform: translateX(26px); }
 .prizes-table th, .prizes-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
 .prizes-table th { font-family: var(--font-heading); }
 
-/* --- 12. HERO SECTION (FINAL DESIGN) --- */
-.hero-home {
-    position: relative;
-    height: 85vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    color: white;
-    padding: 1rem;
-    overflow: hidden;
-    background-image: url('../assets/hero-bg.png');
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-size: cover;
-}
-.hero-overlay {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle, rgba(18,18,18,0.4) 0%, rgba(18,18,18,0.85) 80%);
-    z-index: 1;
-}
-.hero-content {
-    position: relative;
-    z-index: 2;
-    max-width: 800px;
-}
-.hero-logo {
-    display: block;
-    margin: 0 auto 2rem auto;
-    width: clamp(200px, 40vw, 500px); /* Responsive width: min 200px, preferred 40% of viewport, max 500px */
-    height: auto;
-}
-.hero-content h1 {
-    font-family: var(--font-heading);
-    font-size: clamp(2.2rem, 5vw, 4rem);
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-    line-height: 1.2;
-    margin-top: 1.5rem;
-}
-.hero-content p {
-    font-size: 1.2rem;
-    max-width: 600px;
-    margin: 1.5rem auto 2.5rem;
-    color: #ccc;
-    line-height: 1.7;
-}
+/* --- 12. HERO SECTION --- */
+.hero-home { position: relative; height: 85vh; display: flex; align-items: center; justify-content: center; text-align: center; color: white; padding: 1rem; overflow: hidden; background-image: url('../assets/hero-bg.png'); background-position: center center; background-repeat: no-repeat; background-size: cover; }
+.hero-overlay { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(18,18,18,0.4) 0%, rgba(18,18,18,0.85) 80%); z-index: 1; }
+.hero-content { position: relative; z-index: 2; max-width: 800px; }
+.hero-logo { display: block; margin: 0 auto 2rem auto; width: clamp(200px, 40vw, 500px); height: auto; }
+.hero-content h1 { font-family: var(--font-heading); font-size: clamp(2.2rem, 5vw, 4rem); text-transform: uppercase; letter-spacing: 3px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); line-height: 1.2; margin-top: 1.5rem; }
+.hero-content p { font-size: 1.2rem; max-width: 600px; margin: 1.5rem auto 2.5rem; color: #ccc; line-height: 1.7; }
 
-/* --- 13. How It Works - Interactive 3D Card (NEW) --- */
-.how-it-works-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
-    margin-top: 3rem;
-}
-.step-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 2.5rem 2rem;
-    text-align: center;
-    cursor: pointer;
-    perspective: 1000px; /* Creates the 3D space */
-}
-.step-content {
-    position: relative;
-    width: 100%;
-    min-height: 100px; /* Ensures space for content */
-    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-style: preserve-3d; /* This is crucial for 3D children */
-}
-.step-icon {
-    width: 60px;
-    height: 60px;
-    line-height: 60px;
-    border-radius: 50%;
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    font-family: var(--font-heading);
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0 auto 1.5rem;
-    border: 3px solid var(--primary-gold);
-    position: relative; /* Needed for transform */
-    transform: translateZ(40px); /* Make the icon pop out in 3D space */
-    transition: transform 0.3s ease;
-}
-.step-card:hover .step-icon {
-    transform: translateZ(50px); /* Slightly more pop on hover */
-}
-.step-front, .step-back {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    backface-visibility: hidden; /* Hide the back when facing away */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    transform: translateZ(20px); /* This makes the text appear raised */
-}
-.step-back {
-    transform: rotateX(180deg) translateZ(20px); /* Pre-rotate and raise */
-}
-.step-front h3 {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-.step-front span {
-    color: #888;
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    letter-spacing: 1px;
-}
-.step-back p {
-    color: #aaa;
-    margin: 0;
-}
-@media (hover: hover) {
-    .step-card:hover .step-content {
-        transform: rotateX(180deg);
-    }
-}
-.step-card.active .step-content {
-    transform: rotateX(180deg);
-}
+/* --- 13. How It Works - Interactive Card --- */
+.how-it-works-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem; }
+.step-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2.5rem 2rem; text-align: center; cursor: pointer; perspective: 1000px; }
+.step-content { position: relative; width: 100%; min-height: 100px; transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+.step-icon { width: 60px; height: 60px; line-height: 60px; border-radius: 50%; background-color: var(--primary-gold); color: var(--dark-bg); font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 auto 1.5rem; border: 3px solid var(--primary-gold); position: relative; transform: translateZ(40px); transition: transform 0.3s ease; }
+.step-card:hover .step-icon { transform: translateZ(50px); }
+.step-front, .step-back { position: absolute; top: 0; left: 0; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; transform: translateZ(20px); }
+.step-back { transform: rotateX(180deg) translateZ(20px); }
+.step-front h3 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; margin-bottom: 0.5rem; }
+.step-front span { color: #888; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
+.step-back p { color: #aaa; margin: 0; }
+@media (hover: hover) { .step-card:hover .step-content { transform: rotateX(180deg); } }
+.step-card.active .step-content { transform: rotateX(180deg); }
 
 /* --- 14. Hero Competition Card --- */
-.hero-competition-card {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    overflow: hidden;
-    text-decoration: none;
-    color: var(--light-white);
-    transition: all 0.3s ease;
-}
-.hero-competition-card:hover {
-    border-color: var(--primary-gold);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-}
+.hero-competition-card { display: grid; grid-template-columns: 1fr 1fr; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; text-decoration: none; color: var(--light-white); transition: all 0.3s ease; }
+.hero-competition-card:hover { border-color: var(--primary-gold); box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
 .hero-card-image img { width: 100%; height: 100%; object-fit: cover; }
 .hero-card-content { padding: 3rem; display: flex; flex-direction: column; }
 .hero-card-tagline { font-family: var(--font-heading); color: var(--primary-gold); text-transform: uppercase; letter-spacing: 2px; }
@@ -429,6 +297,8 @@ input:checked + .slider:before { transform: translateX(26px); }
     .hero-home { background-image: url('../assets/hero-bg-mobile.png'); }
     .hero-card-title { font-size: 2rem; }
     .hero-card-content { padding: 2rem; }
+    .entry-details-panel h1 { font-size: 2rem; }
+    .detail-timer { font-size: 2.5rem; }
 }
 
 @media (max-width: 480px) {

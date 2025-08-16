@@ -1,4 +1,3 @@
-
 import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js'; // Import the initialized app
 
@@ -207,7 +206,7 @@ function createHeroCompetitionCard(compData) {
                 <p class="hawk-card__progress-text">${compData.ticketsSold || 0} / ${compData.totalTickets} sold</p>
                 <div class="hero-card-footer">
                     <span class="hawk-card__price">£${price.toFixed(2)}</span>
-                    <span class="btn">Enter!</span>
+                    <span class="btn">Enter</span>
                 </div>
             </div>
         </a>

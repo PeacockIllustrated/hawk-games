@@ -16,6 +16,7 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: var(--font-body); background-color: var(--dark-bg); color: var(--light-white); line-height: 1.6; }
+main { padding-top: 120px; /* Added to prevent content from hiding under the fixed header */ }
 .container { width: 90%; max-width: 1400px; margin: 0 auto; }
 
 /* --- 2. Universal Components --- */
@@ -128,7 +129,15 @@ body.mobile-nav-open .hamburger-btn span:nth-child(3) { transform: rotate(-45deg
 .hawk-card__price { font-family: var(--font-heading); font-size: 1.8rem; color: var(--primary-gold); }
 
 /* --- 5. Competition Detail Page (OVERHAUL) --- */
-.competition-detail-view { display: grid; grid-template-columns: 55% auto; gap: 3rem; margin-top: 3rem; align-items: flex-start; }
+.competition-detail-view {
+    display: grid;
+    grid-template-columns: 1fr; /* Changed to single column for vertical stack */
+    gap: 2.5rem; /* Adjusted gap for vertical layout */
+    margin-top: 1rem; /* Reduced top margin as padding is on main */
+    max-width: 900px; /* Constrain width for better readability */
+    margin-left: auto;
+    margin-right: auto;
+}
 .prize-image-panel img { width: 100%; border-radius: 5px; }
 .entry-details-panel { padding-top: 1rem; }
 .entry-details-panel h1 { font-family: var(--font-heading); font-size: 2.8rem; text-transform: uppercase; line-height: 1.1; letter-spacing: 1px; }
@@ -287,9 +296,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* --- 17. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {
     .account-layout { grid-template-columns: 1fr; }
-    .competition-detail-view { grid-template-columns: 1fr; }
     .hero-competition-card { grid-template-columns: 1fr; }
     .hero-logo { width: clamp(150px, 60vw, 250px); }
+    .competition-detail-view { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {

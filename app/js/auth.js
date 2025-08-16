@@ -39,7 +39,7 @@ const db = getFirestore(app);
 let userProfileUnsubscribe = null; 
 
 onAuthStateChanged(auth, (user) => {
-    renderHeader(!!user); 
+    renderHeader(user); 
     
     if (user) {
         createUserProfileIfNotExists(user);
@@ -49,15 +49,20 @@ onAuthStateChanged(auth, (user) => {
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             const tokenBalanceEl = document.getElementById('spin-token-balance');
-            if (tokenBalanceEl) {
-                if (docSnap.exists() && docSnap.data().spinTokens && docSnap.data().spinTokens.length > 0) {
-                    const tokenCount = docSnap.data().spinTokens.length;
-                    tokenBalanceEl.querySelector('.token-count').textContent = tokenCount;
-                    tokenBalanceEl.style.display = 'flex';
-                } else {
-                    tokenBalanceEl.style.display = 'none';
+            const mobileTokenBalanceEl = document.getElementById('mobile-spin-token-balance');
+            const elements = [tokenBalanceEl, mobileTokenBalanceEl];
+            
+            elements.forEach(el => {
+                if (el) {
+                    if (docSnap.exists() && docSnap.data().spinTokens && docSnap.data().spinTokens.length > 0) {
+                        const tokenCount = docSnap.data().spinTokens.length;
+                        el.querySelector('.token-count').textContent = tokenCount;
+                        el.style.display = 'flex';
+                    } else {
+                        el.style.display = 'none';
+                    }
                 }
-            }
+            });
         });
     } else {
         if (userProfileUnsubscribe) {
@@ -88,36 +93,78 @@ const createUserProfileIfNotExists = async (user) => {
 };
 
 // --- UI RENDERING FUNCTIONS (UPDATED) ---
-function renderHeader(isLoggedIn) {
+function renderHeader(user) {
     const headerEl = document.querySelector('.main-header');
     if (!headerEl) return;
-    let navLinks;
-    if (isLoggedIn) {
-        navLinks = `
-            <a href="index.html">Competitions</a>
-            <a href="instant-games.html" id="spin-token-balance" class="spin-token-balance" style="display: none;">
-                <span class="token-icon"></span>
-                <span class="token-count">0</span>
+
+    const currentPage = document.body.dataset.page || '';
+
+    const navItems = [
+        { href: 'index.html', page: 'competitions', text: 'Competitions' },
+        // The instant-games link will be handled separately due to its dynamic nature
+    ];
+
+    const createNavLinks = (isMobile = false) => {
+        let linksHTML = navItems.map(item => `
+            <a href="${item.href}" data-page-link="${item.page}" class="${currentPage === item.page ? 'active' : ''}">
+                ${item.text}
             </a>
-            <a href="account.html" class="btn">My Account</a>
-        `;
-    } else {
-        navLinks = `
-            <a href="index.html">Competitions</a>
-            <a href="login.html" class="btn">Login / Sign Up</a>
-        `;
-    }
-    // UPDATED: The logo is now an image tag for proper branding.
+        `).join('');
+
+        // Add dynamic instant games link
+        linksHTML += `
+            <a href="instant-games.html" data-page-link="instant-games" id="${isMobile ? 'mobile-' : ''}spin-token-balance" class="spin-token-balance ${currentPage === 'instant-games' ? 'active' : ''}" style="display: none;">
+                 <span class="token-icon"></span>
+                 <span class="token-count">0</span>
+                 <span class="token-text">${isMobile ? 'Instant Win' : ''}</span>
+            </a>`;
+
+        // Add account/login button
+        if (user) {
+            linksHTML += `<a href="account.html" data-page-link="account" class="btn ${currentPage === 'account' ? 'active' : ''}">My Account</a>`;
+        } else {
+            linksHTML += `<a href="login.html" data-page-link="login" class="btn">Login / Sign Up</a>`;
+        }
+        return linksHTML;
+    };
+
     const headerHTML = `
         <div class="container">
             <a href="index.html" class="logo">
                 <img src="assets/logo-icon.png" alt="The Hawk Games">
             </a>
-            <nav class="main-nav">${navLinks}</nav>
+            <nav class="main-nav-desktop">${createNavLinks(false)}</nav>
+            <button id="hamburger-btn" class="hamburger-btn" aria-label="Open menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+        <div id="mobile-nav-overlay" class="mobile-nav-overlay">
+             <nav class="mobile-nav-links">${createNavLinks(true)}</nav>
         </div>
     `;
     headerEl.innerHTML = headerHTML;
+
+    // Attach event listeners for the new mobile navigation
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', () => {
+            document.body.classList.toggle('mobile-nav-open');
+        });
+    }
+
+    // Close mobile nav when a link is clicked
+    const mobileNavLinks = document.querySelector('.mobile-nav-links');
+    if (mobileNavLinks) {
+        mobileNavLinks.addEventListener('click', (e) => {
+            if (e.target.tagName === 'A') {
+                document.body.classList.remove('mobile-nav-open');
+            }
+        });
+    }
 }
+
 
 function renderFooter() {
     const footerEl = document.querySelector('.main-footer');
@@ -135,49 +182,30 @@ function renderFooter() {
 
 // --- Event listeners for auth pages ---
 document.addEventListener('DOMContentLoaded', () => {
-    if (document.getElementById('login-form') || document.getElementById('register-form')) {
-        const googleLoginBtn = document.getElementById('google-login-btn');
-        const googleRegisterBtn = document.getElementById('google-register-btn');
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
+    // This logic is specifically for the login.html and register.html pages
+    const loginBtn = document.getElementById('google-login-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            try {
+                await signInWithPopup(auth, new GoogleAuthProvider());
+                window.location.href = 'account.html';
+            } catch (error) {
+                console.error('Google Sign-In Error:', error);
+                // Optionally show a user-friendly error message on the page
+            }
+        });
+    }
 
-        if (googleLoginBtn) {
-            googleLoginBtn.addEventListener('click', async () => {
-                try {
-                    await signInWithPopup(auth, new GoogleAuthProvider());
-                    window.location.href = 'account.html';
-                } catch (error) { console.error('Google Sign-In Error:', error); }
-            });
-        }
-        if (googleRegisterBtn) {
-            googleRegisterBtn.addEventListener('click', async () => {
-                try {
-                    await signInWithPopup(auth, new GoogleAuthProvider());
-                    window.location.href = 'account.html';
-                } catch (error) { console.error('Google Sign-Up Error:', error); }
-            });
-        }
-        if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                    window.location.href = 'account.html';
-                } catch (error) { console.error('Email/Password Sign-In Error:', error); }
-            });
-        }
-        if (registerForm) {
-            registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('register-email').value;
-                const password = document.getElementById('register-password').value;
-                try {
-                    await createUserWithEmailAndPassword(auth, email, password);
-                    window.location.href = 'account.html';
-                } catch (error) { console.error('Email/Password Sign-Up Error:', error); }
-            });
-        }
+    // Consolidate register logic as it was identical
+    const registerBtn = document.getElementById('google-register-btn');
+    if(registerBtn) {
+         registerBtn.addEventListener('click', async () => {
+            try {
+                await signInWithPopup(auth, new GoogleAuthProvider());
+                window.location.href = 'account.html';
+            } catch (error) { 
+                console.error('Google Sign-Up Error:', error); 
+            }
+        });
     }
 });

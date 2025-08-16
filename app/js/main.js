@@ -190,9 +190,13 @@ function createHeroCompetitionCard(compData) {
     const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
     const endDate = compData.endDate.toDate();
     const price = compData.ticketTiers?.[0]?.price || 0.00;
+    const instantWinBadge = compData.instantWinsConfig?.enabled 
+        ? `<div class="hawk-card__instant-win-badge">⚡️ Instant Wins</div>` 
+        : '';
 
     return `
         <a href="competition.html?id=${compData.id}" class="hero-competition-card">
+            ${instantWinBadge}
             <div class="hero-card-image">
                  <img src="${compData.prizeImage}" alt="${compData.title}">
             </div>

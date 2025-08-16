@@ -25,6 +25,7 @@ const createCompViewHTML = `
         <form id="create-comp-form" class="admin-form">
             <fieldset><legend>Core Details</legend>
                 <div class="form-group"><label for="title">Competition Title</label><input type="text" id="title" required></div>
+                <div class="form-group"><label for="prizeImage">Prize Image URL</label><input type="url" id="prizeImage" required></div>
                 <div class="form-group-inline">
                     <div class="form-group"><label for="totalTickets">Total Tickets</label><input type="number" id="totalTickets" required></div>
                     <div class="form-group"><label for="userEntryLimit">Max Entries Per User</label><input type="number" id="userEntryLimit" value="75" required></div>
@@ -68,7 +69,7 @@ const createCompViewHTML = `
                     </label>
                 </div>
                  <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">
-                    Select ONE of the options above. If neither is checked, it will be a standard Main Competition. A competition cannot be both Hero and Instant Win.
+                    A Hero competition can also award Instant Win spins to boost engagement. If neither box is checked, it will be a standard Main Competition.
                  </p>
             </fieldset>
 
@@ -201,12 +202,14 @@ function renderCompetitionRow(comp) {
     const progress = (comp.ticketsSold / comp.totalTickets) * 100;
     let buttons = '';
     
-    let titleBadge;
+    let titleBadge = '';
     if (comp.isHeroComp) {
-        titleBadge = '<span class="title-badge title-badge-hero">⭐ Hero Comp</span>';
-    } else if (comp.instantWinsConfig?.enabled) {
-        titleBadge = '<span class="title-badge title-badge-instant">⚡️ Instant Win</span>';
-    } else {
+        titleBadge += '<span class="title-badge title-badge-hero">⭐ Hero Comp</span>';
+    }
+    if (comp.instantWinsConfig?.enabled) {
+        titleBadge += '<span class="title-badge title-badge-instant">⚡️ Instant Win</span>';
+    } 
+    if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) {
         titleBadge = '<span class="title-badge title-badge-main">Main Prize</span>';
     }
     
@@ -274,18 +277,11 @@ async function handleCreateFormSubmit(e) {
     submitButton.disabled = true;
     submitButton.textContent = 'Saving...';
 
-    const isHero = form.querySelector('#isHeroComp').checked;
-    const isInstant = form.querySelector('#enable-spin-tokens').checked;
-    const hasParallax = form.querySelector('#hasParallax').checked;
-
-    if (isHero && isInstant) {
-        alert("Error: A competition cannot be both a Hero and an Instant Win competition. Please choose one.");
-        submitButton.disabled = false;
-        submitButton.textContent = 'Create Competition';
-        return;
-    }
-
     try {
+        const isHero = form.querySelector('#isHeroComp').checked;
+        const isInstant = form.querySelector('#enable-spin-tokens').checked;
+        const hasParallax = form.querySelector('#hasParallax').checked;
+        
         const ticketTiers = Array.from(document.querySelectorAll('.ticket-tier-row')).map(row => ({ amount: parseInt(row.querySelector('.tier-amount').value), price: parseFloat(row.querySelector('.tier-price').value) }));
         const correctAnswer = form.querySelector('#correctAnswer').value.trim();
         const otherAnswers = form.querySelector('#otherAnswers').value.split(',').map(a => a.trim());

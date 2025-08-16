@@ -14,7 +14,7 @@ let userCreditBalance = 0;
 let spinnerPrizes = [];
 let isSpinning = false;
 let userProfileUnsubscribe = null;
-let currentCompetitionData = null; // FIX: Added missing state variable
+let currentCompetitionData = null;
 
 // ===================================================================
 // == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
@@ -204,7 +204,7 @@ buyMoreBtn.addEventListener('click', async () => {
         const docSnap = await getDoc(compRef);
         if (!docSnap.exists()) throw new Error('No active spinner competition found.');
         
-        currentCompetitionData = docSnap.data(); // FIX: Populate the missing variable
+        currentCompetitionData = docSnap.data();
         const answersHTML = Object.entries(currentCompetitionData.skillQuestion.answers)
             .map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
 
@@ -237,7 +237,7 @@ buyMoreBtn.addEventListener('click', async () => {
         const form = document.getElementById('spinner-entry-form');
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleSpinnerCompEntry(form, currentCompetitionData.skillQuestion.correctAnswer);
+            handleSpinnerCompEntry(form, currentCompetitionData.skillQuestion.correctAnswer, 'card');
         });
 
     } catch (error) {
@@ -259,7 +259,7 @@ async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card
     if(submitBtn) submitBtn.disabled = true;
     if(creditBtn) creditBtn.disabled = true;
     
-    const originalText = paymentMethod === 'credit' ? creditBtn.textContent : submitBtn.textContent;
+    const originalText = paymentMethod === 'credit' ? (creditBtn ? creditBtn.textContent : '') : (submitBtn ? submitBtn.textContent : '');
     const targetBtn = paymentMethod === 'credit' ? creditBtn : submitBtn;
     if(targetBtn) targetBtn.textContent = 'Processing...';
 

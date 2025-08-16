@@ -1,5 +1,12 @@
-import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, addDoc, updateDoc, serverTimestamp, Timestamp, getDocs, query, orderBy, where, runTransaction, limit, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+'use strict';
+
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+// --- BUG FIX: Added all required Firestore functions to the import list ---
+import { 
+    getFirestore, doc, getDoc, collection, addDoc, updateDoc, 
+    serverTimestamp, Timestamp, getDocs, query, orderBy, where, 
+    runTransaction, limit, setDoc 
+} from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
@@ -18,8 +25,8 @@ function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
-            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
-            else if (value) el.classList.add(value);
+            const classes = Array.isArray(value) ? value : String(value).split(' ');
+            classes.forEach(c => { if (c) el.classList.add(c); });
         } else if (key === 'textContent') {
             el.textContent = value;
         } else if (key === 'style') {
@@ -33,7 +40,7 @@ function createElement(tag, options = {}, children = []) {
 }
 
 // Admin Gatekeeper and Page Initialization
-auth.onAuthStateChanged(user => {
+onAuthStateChanged(auth, user => {
     const authWall = document.getElementById('auth-wall');
     if (user) {
         checkAdminStatus(user);
@@ -100,7 +107,7 @@ function renderView(viewName) {
     }
 }
 
-// --- View Rendering Functions (Fully Programmatic) ---
+// --- View Rendering Functions ---
 
 function renderDashboardView() {
     const listContainer = createElement('div', { id: 'competition-list' }, [
@@ -228,12 +235,69 @@ function renderSpinnerCompsView() {
     initializeSpinnerCompsListeners();
 }
 
+async function loadAndRenderCompetitions(listDiv) {
+    try {
+        const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        allCompetitions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        listDiv.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        allCompetitions.forEach(comp => fragment.appendChild(renderCompetitionRow(comp)));
+        listDiv.appendChild(fragment);
 
-// --- Logic and Listener Functions ---
-// (These functions are largely unchanged logically, but now attach to programmatically created elements)
+        listDiv.addEventListener('click', handleDashboardClick);
+    } catch (error) {
+        console.error("Error loading competitions:", error);
+        listDiv.innerHTML = '';
+        listDiv.append(createElement('p', { style: { color: 'red' }, textContent: 'Failed to load competitions. Check Firestore index and security rules.' }));
+    }
+}
 
-async function loadAndRenderCompetitions(listDiv) { /* ... same as previous message, no change ... */ }
-function renderCompetitionRow(comp) { /* ... same as previous message, no change ... */ }
+function renderCompetitionRow(comp) {
+    const progress = (comp.ticketsSold / comp.totalTickets) * 100;
+
+    let titleBadges = [];
+    if (comp.isHeroComp) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
+    if (comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
+    if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
+    
+    let statusContent;
+    if (comp.status === 'live') {
+        statusContent = [
+            createElement('div', { class: ['status-badge', 'status-live'], textContent: 'Live' }),
+            createElement('div', { class: 'comp-actions' }, [
+                createElement('button', { class: ['btn', 'btn-small', 'btn-secondary'], 'data-action': 'end' }, ['End Now']),
+                createElement('button', { class: ['btn', 'btn-small', 'btn-secondary'], 'data-action': 'add-fer' }, ['Add Free Entry'])
+            ])
+        ];
+    } else if (comp.status === 'drawn') {
+        statusContent = [
+            createElement('div', { class: ['status-badge', 'status-drawn'], textContent: 'Drawn' }),
+            createElement('div', { class: 'comp-actions' }, [
+                createElement('div', { class: 'winner-info', textContent: `Winner: ${comp.winnerDisplayName || 'N/A'}` })
+            ])
+        ];
+    } else if (comp.status === 'ended') {
+        statusContent = [
+            createElement('div', { class: ['status-badge', 'status-ended'], textContent: 'Ended' }),
+            createElement('div', { class: 'comp-actions' }, [
+                createElement('button', { class: ['btn', 'btn-small', 'btn-primary'], 'data-action': 'draw-winner' }, ['Draw Winner'])
+            ])
+        ];
+    }
+
+    return createElement('div', { class: 'competition-row', 'data-comp-id': comp.id }, [
+        createElement('div', { class: 'comp-row-main' }, [
+            createElement('h4', { class: 'comp-title' }, [comp.title, ' ', ...titleBadges]),
+            createElement('div', { class: 'comp-progress-text', textContent: `${comp.ticketsSold || 0} / ${comp.totalTickets}` }),
+            createElement('div', { class: 'progress-bar' }, [
+                createElement('div', { class: 'progress-bar-fill', style: { width: `${progress}%` } })
+            ])
+        ]),
+        createElement('div', { class: 'comp-row-status' }, statusContent)
+    ]);
+}
 
 function initializeCreateFormListeners() {
     const form = document.getElementById('create-comp-form');
@@ -264,7 +328,7 @@ function initializeCreateFormListeners() {
     form.addEventListener('submit', handleCreateFormSubmit);
 }
 
-async function handleCreateFormSubmit(e) { /* ... same logic as original ... */ 
+async function handleCreateFormSubmit(e) { 
     e.preventDefault();
     const form = e.target;
     const submitButton = form.querySelector('button[type="submit"]');
@@ -367,7 +431,7 @@ function initializeSpinnerSettingsListeners() {
     prizesContainer.addEventListener('input', calculateRTP);
     addPrizeBtn.addEventListener('click', () => addPrizeTier());
 
-    const loadSettings = async () => { /* ... same logic as original ... */ 
+    const loadSettings = async () => { 
         const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(defaultsRef);
         prizesContainer.innerHTML = '';
@@ -379,7 +443,7 @@ function initializeSpinnerSettingsListeners() {
     };
     loadSettings();
 
-    form.addEventListener('submit', async (e) => { /* ... same logic as original ... */ 
+    form.addEventListener('submit', async (e) => { 
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
@@ -403,7 +467,7 @@ function initializeSpinnerSettingsListeners() {
     });
 }
 
-function initializeSpinnerCompsListeners() { /* ... same logic as original ... */ 
+function initializeSpinnerCompsListeners() { 
     const form = document.getElementById('spinner-comp-form');
     const compId = form.querySelector('#spinner-comp-id').value;
     
@@ -462,8 +526,7 @@ function initializeSpinnerCompsListeners() { /* ... same logic as original ... *
     });
 }
 
-// Unchanged event handlers and modal functions
-function handleDashboardClick(e) { /* ... same logic as original ... */ 
+function handleDashboardClick(e) { 
     const button = e.target.closest('button');
     if (!button) return;
 
@@ -484,7 +547,7 @@ function handleDashboardClick(e) { /* ... same logic as original ... */
     }
 }
 
-async function handleEndCompetition(compId, button) { /* ... same logic as original ... */ 
+async function handleEndCompetition(compId, button) { 
     if (!confirm('Are you sure you want to end this competition? This cannot be undone.')) {
         button.disabled = false;
         return;
@@ -501,7 +564,7 @@ async function handleEndCompetition(compId, button) { /* ... same logic as origi
     }
 }
 
-async function handleDrawWinner(compId, button) { /* ... same logic as original ... */ 
+async function handleDrawWinner(compId, button) { 
     if (!confirm('This will draw a winner and publicly announce them. Are you absolutely sure?')) {
         button.disabled = false;
         return;
@@ -550,7 +613,7 @@ function showAddFerModal(compId) {
     document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
 }
 
-async function handleAddFerSubmit(e, compId) { /* ... same logic as original ... */ 
+async function handleAddFerSubmit(e, compId) { 
     e.preventDefault();
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
@@ -619,6 +682,15 @@ function setupModal() {
     modalContainer.addEventListener('click', (e) => {
         if (e.target === modalContainer) closeModal();
     });
+}
+function openModal(content) {
+    modalBody.innerHTML = '';
+    if (typeof content === 'string') {
+        modalBody.innerHTML = content;
+    } else {
+        modalBody.append(content);
+    }
+    modalContainer.classList.add('show');
 }
 function closeModal() {
     modalContainer.classList.remove('show');

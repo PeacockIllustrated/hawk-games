@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Account | The Hawk Games</title>
+    <!-- SECURITY: Add reCAPTCHA script for App Check -->
+    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_RECAPTCHA_V3_SITE_KEY"></script>
     <link rel="stylesheet" href="css/hawk-games.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,19 +17,17 @@
     <main class="container">
         <h2 class="section-title">My Account</h2>
         <div class="account-layout">
-            <!-- This is the updated profile card structure -->
             <aside class="profile-card">
                 <img id="account-user-avatar" class="profile-avatar" alt="User Avatar" src="https://i.pravatar.cc/150">
                 <h2 id="account-user-name" class="profile-name">Loading...</h2>
                 <p id="account-user-email" class="profile-email">...</p>
-                <div id="admin-panel-container"></div> <!-- Admin button will be injected here -->
+                <div id="admin-panel-container"></div>
                 <div class="profile-actions">
                     <button id="sign-out-btn" class="btn">Sign Out</button>
                 </div>
             </aside>
 
             <div class="account-main-content">
-                <!-- Communication Preferences -->
                 <div class="content-panel">
                     <h3>Communication Preferences</h3>
                     <div class="preference-row">
@@ -40,10 +40,8 @@
                     <p id="preference-feedback" class="feedback-message"></p>
                 </div>
                 
-                <!-- User Entries Section -->
                 <div class="content-panel">
                     <h3>Your Competition Entries</h3>
-                    <!-- The new account.js will fill this div -->
                     <div id="entries-list">
                         <div class="placeholder">Loading your entries...</div>
                     </div>
@@ -54,10 +52,7 @@
 
     <footer class="main-footer"></footer>
 
-    <!-- Load the final, corrected account script -->
     <script type="module" src="js/account.js"></script>
-    
-    <!-- Auth script is needed for header/footer rendering -->
     <script type="module" src="js/auth.js"></script>
 </body>
 </html>

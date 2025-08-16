@@ -220,7 +220,7 @@ function renderCompetitionRow(comp) {
     if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) {
         titleBadge = '<span class="title-badge title-badge-main">Main Prize</span>';
     }
-    
+
     let statusContent = '';
     if (comp.status === 'live') {
         statusContent = `
@@ -311,17 +311,19 @@ async function handleCreateFormSubmit(e) {
              if (allAnswers[i] === correctAnswer) correctKey = key;
         });
 
+        // Construct the imageSet based on the form state
         const imageSet = {
             main: form.querySelector('#prizeImage').value,
             background: form.querySelector('#prizeImageBg').value,
             foreground: form.querySelector('#prizeImageFg').value
         };
+        // The prizeImage for cards is the foreground for parallax, otherwise the main image
         const prizeImage = hasParallax ? imageSet.foreground : imageSet.main;
 
         const competitionData = {
             title: form.querySelector('#title').value,
-            prizeImage: prizeImage,
-            imageSet: imageSet,
+            prizeImage: prizeImage, // This is the main card image
+            imageSet: imageSet, // This contains all image URLs
             hasParallax: hasParallax,
             totalTickets: parseInt(form.querySelector('#totalTickets').value),
             userEntryLimit: parseInt(form.querySelector('#userEntryLimit').value),
@@ -376,14 +378,10 @@ function initializeSpinnerSettingsView() {
         const prizeEl = document.createElement('div');
         prizeEl.className = 'form-group-inline spinner-prize-row';
         prizeEl.innerHTML = `
-            <div class="form-group" style="flex: 1;"><label>Prize Type</label><select class="spinner-prize-type"><option value="credit">Spin Tokens</option><option value="cash">Cash</option></select></div>
-            <div class="form-group" style="flex: 1;"><label>Value (£) or Amount</label><input type="number" step="0.01" class="spinner-prize-value" value="${value}" required></div>
+            <div class="form-group" style="flex: 1;"><label>Prize Type</label><select class="spinner-prize-type"><option value="credit" ${type === 'credit' ? 'selected' : ''}>Credit</option><option value="cash" ${type === 'cash' ? 'selected' : ''}>Cash</option></select></div>
+            <div class="form-group" style="flex: 1;"><label>Value (£)</label><input type="number" step="0.01" class="spinner-prize-value" value="${value}" required></div>
             <div class="form-group" style="flex: 1;"><label>Odds (1 in X)</label><input type="number" class="spinner-prize-odds" value="${odds}" required></div>
             <button type="button" class="btn-remove-tier">×</button>`;
-        
-        const typeSelect = prizeEl.querySelector('.spinner-prize-type');
-        typeSelect.value = type;
-        
         prizesContainer.appendChild(prizeEl);
         prizeEl.querySelector('.btn-remove-tier').addEventListener('click', () => {
             prizeEl.remove();

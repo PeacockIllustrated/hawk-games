@@ -25,15 +25,6 @@ const createCompViewHTML = `
         <form id="create-comp-form" class="admin-form">
             <fieldset><legend>Core Details</legend>
                 <div class="form-group"><label for="title">Competition Title</label><input type="text" id="title" required></div>
-                <div class="form-group"><label for="prizeImage">Prize Image URL</label><input type="url" id="prizeImage" required></div>
-                <div class="form-group-inline">
-                    <div class="form-group"><label for="totalTickets">Total Tickets</label><input type="number" id="totalTickets" required></div>
-                    <div class="form-group"><label for="userEntryLimit">Max Entries Per User</label><input type="number" id="userEntryLimit" value="75" required></div>
-                </div>
-                <div class="form-group-inline">
-                    <div class="form-group"><label for="cashAlternative">Cash Alternative (£)</label><input type="number" id="cashAlternative" required></div>
-                    <div class="form-group"><label for="endDate">End Date & Time</label><input type="datetime-local" id="endDate" required></div>
-                </div>
             </fieldset>
 
             <fieldset><legend>Image Setup</legend>
@@ -50,6 +41,17 @@ const createCompViewHTML = `
                 <div id="parallax-image-group" style="display:none;">
                     <div class="form-group"><label for="prizeImageBg">Background Image URL (e.g., storm)</label><input type="url" id="prizeImageBg"></div>
                     <div class="form-group"><label for="prizeImageFg">Foreground Image URL (e.g., car)</label><input type="url" id="prizeImageFg"></div>
+                </div>
+            </fieldset>
+
+            <fieldset><legend>Competition Details</legend>
+                <div class="form-group-inline">
+                    <div class="form-group"><label for="totalTickets">Total Tickets</label><input type="number" id="totalTickets" required></div>
+                    <div class="form-group"><label for="userEntryLimit">Max Entries Per User</label><input type="number" id="userEntryLimit" value="75" required></div>
+                </div>
+                <div class="form-group-inline">
+                    <div class="form-group"><label for="cashAlternative">Cash Alternative (£)</label><input type="number" id="cashAlternative" required></div>
+                    <div class="form-group"><label for="endDate">End Date & Time</label><input type="datetime-local" id="endDate" required></div>
                 </div>
             </fieldset>
 
@@ -149,6 +151,11 @@ function initializeAdminPage() {
     setupNavigation();
     setupModal();
     renderView('dashboard');
+
+    // Setup mobile menu toggle for admin sidebar
+    document.getElementById('admin-menu-toggle').addEventListener('click', () => {
+        document.querySelector('.admin-layout').classList.toggle('nav-open');
+    });
 }
 
 function setupNavigation() {
@@ -159,6 +166,8 @@ function setupNavigation() {
         document.querySelectorAll('.admin-nav-link').forEach(l => l.classList.remove('active'));
         link.classList.add('active');
         renderView(link.dataset.view);
+        // Close nav on selection in mobile view
+        document.querySelector('.admin-layout').classList.remove('nav-open');
     });
 }
 
@@ -200,7 +209,6 @@ async function loadAndRenderCompetitions() {
 
 function renderCompetitionRow(comp) {
     const progress = (comp.ticketsSold / comp.totalTickets) * 100;
-    let buttons = '';
     
     let titleBadge = '';
     if (comp.isHeroComp) {
@@ -212,29 +220,39 @@ function renderCompetitionRow(comp) {
     if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) {
         titleBadge = '<span class="title-badge title-badge-main">Main Prize</span>';
     }
-    
+
+    let statusContent = '';
     if (comp.status === 'live') {
-        buttons = `
-            <button class="btn btn-small btn-secondary" data-action="end">End Now</button>
-            <button class="btn btn-small btn-secondary" data-action="add-fer">Add Free Entry</button>
-        `;
-    } else if (comp.status === 'ended' && !comp.winnerId) {
-        buttons = `<button class="btn btn-small btn-primary" data-action="draw-winner">Draw Winner</button>`;
+        statusContent = `
+            <div class="status-badge status-live">Live</div>
+            <div class="comp-actions">
+                <button class="btn btn-small btn-secondary" data-action="end">End Now</button>
+                <button class="btn btn-small btn-secondary" data-action="add-fer">Add Free Entry</button>
+            </div>`;
     } else if (comp.status === 'drawn') {
-        buttons = `<div class="status-badge status-won">Winner: ${comp.winnerDisplayName || 'N/A'}</div>`;
-    } else {
-         buttons = `<span class="status-badge">${comp.status}</span>`;
+        statusContent = `
+            <div class="status-badge status-drawn">Drawn</div>
+            <div class="comp-actions">
+                <div class="winner-info">Winner: ${comp.winnerDisplayName || 'N/A'}</div>
+            </div>`;
+    } else if (comp.status === 'ended') {
+        statusContent = `
+            <div class="status-badge status-ended">Ended</div>
+            <div class="comp-actions">
+                <button class="btn btn-small btn-primary" data-action="draw-winner">Draw Winner</button>
+            </div>`;
     }
 
     return `
         <div class="competition-row" data-comp-id="${comp.id}">
-            <div class="comp-info">
-                <h4>${comp.title} ${titleBadge}</h4>
+            <div class="comp-row-main">
+                <h4 class="comp-title">${comp.title} ${titleBadge}</h4>
+                <div class="comp-progress-text">${comp.ticketsSold || 0} / ${comp.totalTickets}</div>
                 <div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
-                <span>${comp.ticketsSold || 0} / ${comp.totalTickets}</span>
             </div>
-            <div class="comp-status"><span class="status-badge status-${comp.status}">${comp.status}</span></div>
-            <div class="comp-actions">${buttons}</div>
+            <div class="comp-row-status">
+                ${statusContent}
+            </div>
         </div>`;
 }
 

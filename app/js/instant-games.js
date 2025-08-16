@@ -14,6 +14,7 @@ let userCreditBalance = 0;
 let spinnerPrizes = [];
 let isSpinning = false;
 let userProfileUnsubscribe = null;
+let currentCompetitionData = null; // FIX: Added missing state variable
 
 // ===================================================================
 // == CONFIGURATION: PRIZE ANGLES ALIGNED WITH YOUR WHEEL IMAGE     ==
@@ -56,7 +57,6 @@ onAuthStateChanged(auth, (user) => {
             }
         });
         loadPrizeSettings();
-        wheel.innerHTML = '';
     } else {
         window.location.replace('login.html');
     }
@@ -134,8 +134,65 @@ function renderPrizesTable(prizes) {
     prizesTableContainer.innerHTML = tableHTML;
 }
 
+async function handleSpin() {
+    if (userTokens.length === 0 || isSpinning) return;
+
+    isSpinning = true;
+    spinButton.textContent = 'SPINNING...';
+    updateUI();
+    spinResultContainer.innerHTML = '';
+    
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'rotate(0deg)';
+    void wheel.offsetWidth;
+
+    const tokenToSpend = userTokens[0];
+    const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
+
+    try {
+        const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
+        const { won, prizeType, value } = result.data;
+
+        let targetAngle;
+        if (won) {
+            const prizeKey = `${prizeType}-${value}`;
+            targetAngle = PRIZE_ANGLES[prizeKey];
+        }
+        
+        if (targetAngle === undefined) {
+            const noWinAngles = PRIZE_ANGLES['no-win'];
+            targetAngle = noWinAngles[Math.floor(Math.random() * noWinAngles.length)];
+        }
+        
+        const baseSpins = 360 * 8;
+        const randomOffsetInSegment = (Math.random() - 0.5) * 20;
+        const finalAngle = baseSpins + (360 - targetAngle) + randomOffsetInSegment;
+        
+        wheel.style.transition = 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)';
+        wheel.style.transform = `rotate(${finalAngle}deg)`;
+
+        setTimeout(() => {
+            if (won) {
+                const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
+                const prizeText = prizeType === 'credit' ? `£${prizeValue} SITE CREDIT` : `£${prizeValue} CASH`;
+                spinResultContainer.innerHTML = `<p class="spin-win">🎉 YOU WON ${prizeText}! 🎉</p>`;
+            } else {
+                spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
+            }
+            isSpinning = false;
+            updateUI();
+        }, 8500);
+
+    } catch (error) {
+        console.error("Error spending token:", error);
+        spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
+        isSpinning = false;
+        updateUI();
+    }
+}
+
 // --- Event Handlers ---
-spinButton.addEventListener('click', async () => { /* ... existing implementation ... */ });
+spinButton.addEventListener('click', handleSpin);
 
 buyMoreBtn.addEventListener('click', async () => {
     const modalContent = document.getElementById('purchase-modal-content');
@@ -147,8 +204,8 @@ buyMoreBtn.addEventListener('click', async () => {
         const docSnap = await getDoc(compRef);
         if (!docSnap.exists()) throw new Error('No active spinner competition found.');
         
-        const compData = docSnap.data();
-        const answersHTML = Object.entries(compData.skillQuestion.answers)
+        currentCompetitionData = docSnap.data(); // FIX: Populate the missing variable
+        const answersHTML = Object.entries(currentCompetitionData.skillQuestion.answers)
             .map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
 
         const bundles = [
@@ -159,11 +216,11 @@ buyMoreBtn.addEventListener('click', async () => {
         const bundlesHTML = bundles.map(b => `<button class="ticket-option" data-amount="${b.amount}" data-price="${b.price}">${b.amount} Entries for £${b.price.toFixed(2)}</button>`).join('');
 
         modalContent.innerHTML = `
-            <h2>${compData.title}</h2>
-            <p>Enter our weekly draw for a chance to win <strong>${compData.prize}</strong> and get bonus spin tokens instantly!</p>
+            <h2>${currentCompetitionData.title}</h2>
+            <p>Enter our weekly draw for a chance to win <strong>${currentCompetitionData.prize}</strong> and get bonus spin tokens instantly!</p>
             <form id="spinner-entry-form" class="modal-form">
                 <div class="skill-question-box" style="padding: 1rem 0;">
-                    <p class="question-text">${compData.skillQuestion.text}</p>
+                    <p class="question-text">${currentCompetitionData.skillQuestion.text}</p>
                     <div class="answer-options">${answersHTML}</div>
                 </div>
                 <div class="ticket-selector-box" style="padding: 1rem 0;">
@@ -180,7 +237,7 @@ buyMoreBtn.addEventListener('click', async () => {
         const form = document.getElementById('spinner-entry-form');
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleSpinnerCompEntry(form, compData.skillQuestion.correctAnswer);
+            handleSpinnerCompEntry(form, currentCompetitionData.skillQuestion.correctAnswer);
         });
 
     } catch (error) {
@@ -217,7 +274,6 @@ async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card
             paymentMethod: paymentMethod
         });
         purchaseModal.classList.remove('show');
-        // Success will be reflected by the onSnapshot listener updating the token count
     } catch (error) {
         console.error("Spinner comp entry failed:", error);
         alert(`Entry failed: ${error.message}`);
@@ -240,7 +296,6 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
         target.closest('.ticket-options').querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
         bundle.classList.add('selected');
 
-        // Show/hide credit payment option
         const creditOptionDiv = document.getElementById('credit-payment-option');
         if (userCreditBalance >= price) {
             creditOptionDiv.innerHTML = `<button type="button" id="pay-with-credit-btn" class="btn btn-credit">Pay with £${price.toFixed(2)} Credit</button>`;

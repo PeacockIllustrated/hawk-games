@@ -206,14 +206,14 @@ buyMoreBtn.addEventListener('click', async () => {
         
         currentCompetitionData = docSnap.data();
         const answersHTML = Object.entries(currentCompetitionData.skillQuestion.answers)
-            .map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
+            .map(([key, value]) => `<button type="button" class="answer-btn" data-answer="${key}">${value}</button>`).join('');
 
         const bundles = [
             { amount: 5, price: 4.50 },
             { amount: 10, price: 8.00 },
             { amount: 25, price: 15.00 },
         ];
-        const bundlesHTML = bundles.map(b => `<button class="ticket-option" data-amount="${b.amount}" data-price="${b.price}">${b.amount} Entries for £${b.price.toFixed(2)}</button>`).join('');
+        const bundlesHTML = bundles.map(b => `<button type="button" class="ticket-option" data-amount="${b.amount}" data-price="${b.price}">${b.amount} Entries for £${b.price.toFixed(2)}</button>`).join('');
 
         modalContent.innerHTML = `
             <h2>${currentCompetitionData.title}</h2>
@@ -286,20 +286,24 @@ async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card
 
 document.getElementById('purchase-modal').addEventListener('click', (e) => {
     const target = e.target;
+    // Handle selection of answer buttons
     if (target.closest('.answer-btn')) {
         target.closest('.answer-options').querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
         target.closest('.answer-btn').classList.add('selected');
     }
+    // Handle selection of ticket bundles
     if (target.closest('.ticket-option')) {
         const bundle = target.closest('.ticket-option');
         const price = parseFloat(bundle.dataset.price);
         target.closest('.ticket-options').querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
         bundle.classList.add('selected');
 
+        // Show/hide credit payment option based on selection
         const creditOptionDiv = document.getElementById('credit-payment-option');
         if (userCreditBalance >= price) {
             creditOptionDiv.innerHTML = `<button type="button" id="pay-with-credit-btn" class="btn btn-credit">Pay with £${price.toFixed(2)} Credit</button>`;
             creditOptionDiv.style.display = 'block';
+            // Attach the specific handler for the credit button
             document.getElementById('pay-with-credit-btn').onclick = () => {
                  handleSpinnerCompEntry(target.closest('form'), currentCompetitionData.skillQuestion.correctAnswer, 'credit');
             };

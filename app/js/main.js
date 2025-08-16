@@ -1,16 +1,18 @@
+'use strict';
+
 import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js'; 
 
 const db = getFirestore(app);
 
-// --- SECURITY: Corrected helper function for safe element creation ---
+// --- SECURITY: Helper for safe element creation ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
             const classes = Array.isArray(value) ? value : String(value).split(' ');
             classes.forEach(c => {
-                if (c) el.classList.add(c); // Check for empty strings
+                if (c) el.classList.add(c);
             });
         } else if (key === 'textContent') {
             el.textContent = value;
@@ -23,7 +25,6 @@ function createElement(tag, options = {}, children = []) {
     children.forEach(child => child && el.append(child));
     return el;
 }
-
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
@@ -125,17 +126,17 @@ const loadAllCompetitions = async () => {
 const loadSpinnerCompetitions = async () => {
     const spinnerGrid = document.getElementById('spinner-competition-grid');
     if (!spinnerGrid) return;
-    spinnerGrid.innerHTML = '';
 
     try {
         const q = query(collection(db, "spinner_competitions"), where("isActive", "==", true));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No spinner competitions are active.'}));
+            spinnerGrid.innerHTML = '<div class="hawk-card placeholder">No spinner competitions are active.</div>';
             return;
         }
 
+        spinnerGrid.innerHTML = '';
         querySnapshot.forEach(doc => {
             const data = { id: doc.id, ...doc.data() };
             spinnerGrid.append(createSpinnerCompetitionCard(data));
@@ -143,7 +144,7 @@ const loadSpinnerCompetitions = async () => {
 
     } catch (error) {
         console.error("Error loading spinner competitions:", error);
-        spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', style: {color: 'red'}, textContent: 'Could not load spinner competitions.'}));
+        spinnerGrid.innerHTML = '<div class="hawk-card placeholder" style="color:red;">Could not load spinner competitions.</div>';
     }
 };
 
@@ -167,7 +168,7 @@ const loadPastWinners = async () => {
 
     } catch (error) {
         console.error("Error loading past winners:", error);
-        winnersGrid.append(createElement('div', { class: 'placeholder', style: {color: 'red'}, textContent: 'Could not load winner information.'}));
+        winnersGrid.innerHTML = '<div class="placeholder" style="color:red;">Could not load winner information.</div>';
     }
 };
 
@@ -235,13 +236,19 @@ function createCompetitionCard(compData) {
 }
 
 function createSpinnerCompetitionCard(data) {
+    let priceText = 'From £0.00';
+    if (data.ticketBundles && data.ticketBundles.length > 0) {
+        const lowestPrice = Math.min(...data.ticketBundles.map(b => b.price));
+        priceText = `From £${lowestPrice.toFixed(2)}`;
+    }
+
     return createElement('a', { href: 'instant-games.html', class: ['hawk-card', 'spinner-comp-card'] }, [
         createElement('div', { class: 'hawk-card__content' }, [
-            createElement('h3', { class: 'hawk-card__title', textContent: data.title }),
-            createElement('p', { class: 'spinner-comp-prize' }, ['Prize: ', createElement('strong', { textContent: data.prize })]),
-            createElement('p', { class: 'spinner-comp-cta-text', textContent: 'Enter the weekly draw to get bonus spin tokens instantly!' }),
+             createElement('h3', { class: 'hawk-card__title', textContent: data.title }),
+             createElement('p', { class: 'spinner-comp-prize' }, ['Prize: ', createElement('strong', { textContent: data.prize })]),
+             createElement('p', { class: 'spinner-comp-cta-text', textContent: 'Enter the weekly draw to get bonus spin tokens instantly!' }),
             createElement('div', { class: 'hawk-card__footer' }, [
-                createElement('span', { class: 'hawk-card__price', textContent: 'From £4.50' }),
+                createElement('span', { class: 'hawk-card__price', textContent: priceText }),
                 createElement('span', { class: 'btn', textContent: 'Get Spins' })
             ])
         ])
@@ -256,7 +263,7 @@ function startAllCountdowns() {
         timerElements.forEach(timer => {
             const endDate = new Date(timer.dataset.endDate);
             const distance = endDate.getTime() - new Date().getTime();
-            timer.innerHTML = ''; // Clear previous content
+            timer.innerHTML = ''; 
 
             if (distance < 0) {
                 timer.append(createElement('strong', { textContent: "Competition Closed" }));

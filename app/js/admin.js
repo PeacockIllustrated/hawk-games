@@ -206,13 +206,23 @@ function renderSpinnerSettingsView() {
     initializeSpinnerSettingsListeners();
 }
 
+// --- CHANGE: Spinner Comps View now has a bundle editor ---
 function renderSpinnerCompsView() {
+    const bundlesContainer = createElement('div', { id: 'spinner-bundles-container' });
+    const addBundleBtn = createElement('button', { type: 'button', id: 'add-spinner-bundle-btn', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Bundle']);
+
     const form = createElement('form', { id: 'spinner-comp-form', class: 'admin-form', style: { marginTop: '2rem' } }, [
         createElement('input', { type: 'hidden', id: 'spinner-comp-id', value: 'active' }),
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Competition Details' }),
             createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-title', textContent: 'Title' }), createElement('input', { type: 'text', id: 'spinner-title', required: true, value: 'Weekly £50 Spinner Draw' })]),
             createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-prize', textContent: 'Prize Description' }), createElement('input', { type: 'text', id: 'spinner-prize', required: true, value: '£50 Cash' })])
+        ]),
+        // --- NEW BUNDLE EDITOR FIELDSET ---
+        createElement('fieldset', {}, [
+            createElement('legend', { textContent: 'Ticket Bundles' }),
+            bundlesContainer,
+            addBundleBtn
         ]),
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Skill Question' }),
@@ -232,245 +242,29 @@ function renderSpinnerCompsView() {
     ]);
 
     mainContentContainer.append(panel);
-    initializeSpinnerCompsListeners();
+    initializeSpinnerCompsListeners(); // Changed function name for clarity
 }
 
-async function loadAndRenderCompetitions(listDiv) {
-    try {
-        const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
-        const snapshot = await getDocs(q);
-        allCompetitions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        listDiv.innerHTML = '';
-        const fragment = document.createDocumentFragment();
-        allCompetitions.forEach(comp => fragment.appendChild(renderCompetitionRow(comp)));
-        listDiv.appendChild(fragment);
-
-        listDiv.addEventListener('click', handleDashboardClick);
-    } catch (error) {
-        console.error("Error loading competitions:", error);
-        listDiv.innerHTML = '';
-        listDiv.append(createElement('p', { style: { color: 'red' }, textContent: 'Failed to load competitions. Check Firestore index and security rules.' }));
-    }
-}
-
-function renderCompetitionRow(comp) {
-    const progress = (comp.ticketsSold / comp.totalTickets) * 100;
-
-    let titleBadges = [];
-    if (comp.isHeroComp) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
-    if (comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
-    if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
-    
-    let statusContent;
-    if (comp.status === 'live') {
-        statusContent = [
-            createElement('div', { class: ['status-badge', 'status-live'], textContent: 'Live' }),
-            createElement('div', { class: 'comp-actions' }, [
-                createElement('button', { class: ['btn', 'btn-small', 'btn-secondary'], 'data-action': 'end' }, ['End Now']),
-                createElement('button', { class: ['btn', 'btn-small', 'btn-secondary'], 'data-action': 'add-fer' }, ['Add Free Entry'])
-            ])
-        ];
-    } else if (comp.status === 'drawn') {
-        statusContent = [
-            createElement('div', { class: ['status-badge', 'status-drawn'], textContent: 'Drawn' }),
-            createElement('div', { class: 'comp-actions' }, [
-                createElement('div', { class: 'winner-info', textContent: `Winner: ${comp.winnerDisplayName || 'N/A'}` })
-            ])
-        ];
-    } else if (comp.status === 'ended') {
-        statusContent = [
-            createElement('div', { class: ['status-badge', 'status-ended'], textContent: 'Ended' }),
-            createElement('div', { class: 'comp-actions' }, [
-                createElement('button', { class: ['btn', 'btn-small', 'btn-primary'], 'data-action': 'draw-winner' }, ['Draw Winner'])
-            ])
-        ];
-    }
-
-    return createElement('div', { class: 'competition-row', 'data-comp-id': comp.id }, [
-        createElement('div', { class: 'comp-row-main' }, [
-            createElement('h4', { class: 'comp-title' }, [comp.title, ' ', ...titleBadges]),
-            createElement('div', { class: 'comp-progress-text', textContent: `${comp.ticketsSold || 0} / ${comp.totalTickets}` }),
-            createElement('div', { class: 'progress-bar' }, [
-                createElement('div', { class: 'progress-bar-fill', style: { width: `${progress}%` } })
-            ])
-        ]),
-        createElement('div', { class: 'comp-row-status' }, statusContent)
-    ]);
-}
-
-function initializeCreateFormListeners() {
-    const form = document.getElementById('create-comp-form');
-    const addTierBtn = document.getElementById('add-tier-btn');
-    const tiersContainer = document.getElementById('ticket-tiers-container');
-    const hasParallaxCheck = document.getElementById('hasParallax');
-    
-    hasParallaxCheck.addEventListener('change', (e) => {
-        const mainImageGroup = document.getElementById('main-image-group');
-        const parallaxImageGroup = document.getElementById('parallax-image-group');
-        mainImageGroup.style.display = e.target.checked ? 'none' : 'block';
-        parallaxImageGroup.style.display = e.target.checked ? 'block' : 'none';
-    });
-
-    const addTier = () => {
-        const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
-        const tierEl = createElement('div', { class: ['form-group-inline', 'ticket-tier-row'] }, [
-            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Tickets' }), createElement('input', { type: 'number', class: 'tier-amount', required: true })]),
-            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Price (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'tier-price', required: true })]),
-            removeBtn
-        ]);
-        tiersContainer.appendChild(tierEl);
-        removeBtn.addEventListener('click', () => tierEl.remove());
-    };
-    addTierBtn.addEventListener('click', addTier);
-    addTier();
-    
-    form.addEventListener('submit', handleCreateFormSubmit);
-}
-
-async function handleCreateFormSubmit(e) { 
-    e.preventDefault();
-    const form = e.target;
-    const submitButton = form.querySelector('button[type="submit"]');
-    submitButton.disabled = true;
-    submitButton.textContent = 'Saving...';
-
-    try {
-        const isHero = form.querySelector('#isHeroComp').checked;
-        const isInstant = form.querySelector('#enable-spin-tokens').checked;
-        const hasParallax = form.querySelector('#hasParallax').checked;
-        
-        const ticketTiers = Array.from(document.querySelectorAll('.ticket-tier-row')).map(row => ({ amount: parseInt(row.querySelector('.tier-amount').value), price: parseFloat(row.querySelector('.tier-price').value) }));
-        const correctAnswer = form.querySelector('#correctAnswer').value.trim();
-        const otherAnswers = form.querySelector('#otherAnswers').value.split(',').map(a => a.trim());
-        const allAnswers = [correctAnswer, ...otherAnswers].sort(() => Math.random() - 0.5);
-        const answers = {};
-        let correctKey = '';
-        ['A', 'B', 'C', 'D'].slice(0, allAnswers.length).forEach((key, i) => {
-             answers[key] = allAnswers[i];
-             if (allAnswers[i] === correctAnswer) correctKey = key;
-        });
-
-        const imageSet = {
-            main: form.querySelector('#prizeImage').value,
-            background: form.querySelector('#prizeImageBg').value,
-            foreground: form.querySelector('#prizeImageFg').value,
-            thumbnail: form.querySelector('#prizeImageThumb').value,
-        };
-        const prizeImage = hasParallax ? imageSet.thumbnail : imageSet.main;
-
-        const competitionData = {
-            title: form.querySelector('#title').value,
-            prizeImage: prizeImage,
-            imageSet: imageSet,
-            hasParallax: hasParallax,
-            totalTickets: parseInt(form.querySelector('#totalTickets').value),
-            userEntryLimit: parseInt(form.querySelector('#userEntryLimit').value),
-            cashAlternative: parseFloat(form.querySelector('#cashAlternative').value),
-            endDate: Timestamp.fromDate(new Date(form.querySelector('#endDate').value)),
-            skillQuestion: { text: form.querySelector('#questionText').value, answers, correctAnswer: correctKey },
-            ticketTiers,
-            ticketsSold: 0,
-            status: 'live',
-            createdAt: serverTimestamp(),
-            winnerId: null,
-            isHeroComp: isHero,
-            instantWinsConfig: { 
-                enabled: isInstant
-            }
-        };
-        
-        await addDoc(collection(db, "competitions"), competitionData);
-        alert('Competition created successfully!');
-        renderView('dashboard');
-
-    } catch (error) {
-        console.error("Error creating competition:", error);
-        alert(`Error: ${error.message}`);
-    } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = 'Create Competition';
-    }
-}
-
-function initializeSpinnerSettingsListeners() {
-    const form = document.getElementById('spinner-settings-form');
-    const prizesContainer = document.getElementById('spinner-prizes-container');
-    const addPrizeBtn = document.getElementById('add-spinner-prize-btn');
-    const rtpDisplay = document.getElementById('total-rtp-display');
-
-    const calculateRTP = () => {
-        let totalRTP = 0;
-        prizesContainer.querySelectorAll('.spinner-prize-row').forEach(row => {
-            const value = parseFloat(row.querySelector('.spinner-prize-value').value) || 0;
-            const odds = parseInt(row.querySelector('.spinner-prize-odds').value) || 0;
-            if (value > 0 && odds > 0) totalRTP += (value / odds);
-        });
-        rtpDisplay.textContent = `${((totalRTP / 1.00) * 100).toFixed(2)}%`;
-    };
-
-    const addPrizeTier = (type = 'credit', value = '', odds = '') => {
-        const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
-        const prizeEl = createElement('div', { class: ['form-group-inline', 'spinner-prize-row'] }, [
-            createElement('div', { class: 'form-group', style: { flex: '1' } }, [
-                createElement('label', { textContent: 'Prize Type' }),
-                createElement('select', { class: 'spinner-prize-type' }, [
-                    createElement('option', { value: 'credit', textContent: 'Site Credit' }),
-                    createElement('option', { value: 'cash', textContent: 'Cash' })
-                ])
-            ]),
-            createElement('div', { class: 'form-group', style: { flex: '1' } }, [createElement('label', { textContent: 'Value (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'spinner-prize-value', value: value, required: true })]),
-            createElement('div', { class: 'form-group', style: { flex: '1' } }, [createElement('label', { textContent: 'Odds (1 in X)' }), createElement('input', { type: 'number', class: 'spinner-prize-odds', value: odds, required: true })]),
-            removeBtn
-        ]);
-        prizeEl.querySelector('.spinner-prize-type').value = type;
-        prizesContainer.appendChild(prizeEl);
-        removeBtn.addEventListener('click', () => { prizeEl.remove(); calculateRTP(); });
-    };
-
-    prizesContainer.addEventListener('input', calculateRTP);
-    addPrizeBtn.addEventListener('click', () => addPrizeTier());
-
-    const loadSettings = async () => { 
-        const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
-        const docSnap = await getDoc(defaultsRef);
-        prizesContainer.innerHTML = '';
-        if (docSnap.exists() && docSnap.data().prizes) {
-            docSnap.data().prizes.forEach(p => addPrizeTier(p.type, p.value, p.odds));
-        }
-        if (prizesContainer.children.length === 0) addPrizeTier();
-        calculateRTP();
-    };
-    loadSettings();
-
-    form.addEventListener('submit', async (e) => { 
-        e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
-        try {
-            const prizes = Array.from(document.querySelectorAll('.spinner-prize-row')).map(row => ({
-                type: row.querySelector('.spinner-prize-type').value,
-                value: parseFloat(row.querySelector('.spinner-prize-value').value),
-                odds: parseInt(row.querySelector('.spinner-prize-odds').value)
-            }));
-            const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
-            await setDoc(defaultsRef, { prizes });
-            alert('Spinner settings saved successfully!');
-        } catch (error) {
-            console.error('Error saving spinner settings:', error);
-            alert('Error: ' + error.message);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Spinner Settings';
-        }
-    });
-}
-
-function initializeSpinnerCompsListeners() { 
+// --- CHANGE: Updated to handle the new bundle editor ---
+function initializeSpinnerCompsListeners() {
     const form = document.getElementById('spinner-comp-form');
     const compId = form.querySelector('#spinner-comp-id').value;
+    const bundlesContainer = document.getElementById('spinner-bundles-container');
+    const addBundleBtn = document.getElementById('add-spinner-bundle-btn');
+
+    const addBundleRow = (amount = '', price = '') => {
+        const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
+        const bundleEl = createElement('div', { class: ['form-group-inline', 'spinner-bundle-row'] }, [
+            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Entries' }), createElement('input', { type: 'number', class: 'bundle-amount', value: amount, required: true })]),
+            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Price (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'bundle-price', value: price, required: true })]),
+            removeBtn
+        ]);
+        bundlesContainer.appendChild(bundleEl);
+        removeBtn.addEventListener('click', () => bundleEl.remove());
+    };
     
+    addBundleBtn.addEventListener('click', () => addBundleRow());
+
     const loadData = async () => {
         const compRef = doc(db, 'spinner_competitions', compId);
         const docSnap = await getDoc(compRef);
@@ -478,12 +272,25 @@ function initializeSpinnerCompsListeners() {
             const data = docSnap.data();
             form.querySelector('#spinner-title').value = data.title || '';
             form.querySelector('#spinner-prize').value = data.prize || '';
-            form.querySelector('#spinner-questionText').value = data.skillQuestion.text || '';
             
-            const answers = data.skillQuestion.answers;
-            const correct = data.skillQuestion.correctAnswer;
-            form.querySelector('#spinner-correctAnswer').value = answers[correct];
-            form.querySelector('#spinner-otherAnswers').value = Object.keys(answers).filter(k => k !== correct).map(k => answers[k]).join(', ');
+            // Load bundles
+            bundlesContainer.innerHTML = '';
+            if (data.ticketBundles && data.ticketBundles.length > 0) {
+                data.ticketBundles.forEach(bundle => addBundleRow(bundle.amount, bundle.price));
+            } else {
+                addBundleRow(5, 4.50); // Add a default if none exist
+            }
+
+            // Load skill question
+            if (data.skillQuestion) {
+                form.querySelector('#spinner-questionText').value = data.skillQuestion.text || '';
+                const answers = data.skillQuestion.answers;
+                const correct = data.skillQuestion.correctAnswer;
+                form.querySelector('#spinner-correctAnswer').value = answers[correct];
+                form.querySelector('#spinner-otherAnswers').value = Object.keys(answers).filter(k => k !== correct).map(k => answers[k]).join(', ');
+            }
+        } else {
+             addBundleRow(5, 4.50); // Add a default for a new competition
         }
     };
     loadData();
@@ -503,10 +310,17 @@ function initializeSpinnerCompsListeners() {
                  answers[key] = allAnswers[i];
                  if (allAnswers[i] === correctAnswer) correctKey = key;
             });
+            
+            // Read bundles from the form
+            const ticketBundles = Array.from(document.querySelectorAll('.spinner-bundle-row')).map(row => ({
+                amount: parseInt(row.querySelector('.bundle-amount').value),
+                price: parseFloat(row.querySelector('.bundle-price').value)
+            }));
 
             const compData = {
                 title: form.querySelector('#spinner-title').value,
                 prize: form.querySelector('#spinner-prize').value,
+                ticketBundles: ticketBundles, // Save to Firestore
                 skillQuestion: {
                     text: form.querySelector('#spinner-questionText').value,
                     answers,
@@ -525,7 +339,6 @@ function initializeSpinnerCompsListeners() {
         }
     });
 }
-
 function handleDashboardClick(e) { 
     const button = e.target.closest('button');
     if (!button) return;

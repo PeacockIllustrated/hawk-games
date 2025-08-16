@@ -1,7 +1,6 @@
 'use strict';
 
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-// --- BUG FIX: Added all required Firestore functions to the import list ---
 import { 
     getFirestore, doc, getDoc, collection, addDoc, updateDoc, 
     serverTimestamp, Timestamp, getDocs, query, orderBy, where, 
@@ -20,7 +19,7 @@ const mainContentContainer = document.getElementById('admin-main-content');
 const modalContainer = document.getElementById('modal-container');
 const modalBody = document.getElementById('modal-body');
 
-// --- SECURITY: Helper for safe element creation ---
+// --- Helper for safe element creation ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
@@ -39,7 +38,7 @@ function createElement(tag, options = {}, children = []) {
     return el;
 }
 
-// Admin Gatekeeper and Page Initialization
+// --- App Initialization & Auth ---
 onAuthStateChanged(auth, user => {
     const authWall = document.getElementById('auth-wall');
     if (user) {
@@ -77,6 +76,7 @@ function initializeAdminPage() {
     });
 }
 
+// --- Navigation & View Rendering ---
 function setupNavigation() {
     document.getElementById('admin-nav').addEventListener('click', (e) => {
         e.preventDefault();
@@ -92,22 +92,12 @@ function setupNavigation() {
 function renderView(viewName) {
     mainContentContainer.innerHTML = '';
     switch (viewName) {
-        case 'dashboard':
-            renderDashboardView();
-            break;
-        case 'create':
-            renderCreateCompView();
-            break;
-        case 'spinner-settings':
-            renderSpinnerSettingsView();
-            break;
-        case 'spinner-comps':
-            renderSpinnerCompsView();
-            break;
+        case 'dashboard': renderDashboardView(); break;
+        case 'create': renderCreateCompView(); break;
+        case 'spinner-settings': renderSpinnerSettingsView(); break;
+        case 'spinner-comps': renderSpinnerCompsView(); break;
     }
 }
-
-// --- View Rendering Functions ---
 
 function renderDashboardView() {
     const listContainer = createElement('div', { id: 'competition-list' }, [
@@ -206,7 +196,6 @@ function renderSpinnerSettingsView() {
     initializeSpinnerSettingsListeners();
 }
 
-// --- CHANGE: Spinner Comps View now has a bundle editor ---
 function renderSpinnerCompsView() {
     const bundlesContainer = createElement('div', { id: 'spinner-bundles-container' });
     const addBundleBtn = createElement('button', { type: 'button', id: 'add-spinner-bundle-btn', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Bundle']);
@@ -218,7 +207,6 @@ function renderSpinnerCompsView() {
             createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-title', textContent: 'Title' }), createElement('input', { type: 'text', id: 'spinner-title', required: true, value: 'Weekly £50 Spinner Draw' })]),
             createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-prize', textContent: 'Prize Description' }), createElement('input', { type: 'text', id: 'spinner-prize', required: true, value: '£50 Cash' })])
         ]),
-        // --- NEW BUNDLE EDITOR FIELDSET ---
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Ticket Bundles' }),
             bundlesContainer,
@@ -242,11 +230,181 @@ function renderSpinnerCompsView() {
     ]);
 
     mainContentContainer.append(panel);
-    initializeSpinnerCompsListeners(); // Changed function name for clarity
+    initializeSpinnerCompsListeners();
 }
 
-// --- CHANGE: Updated to handle the new bundle editor ---
-function initializeSpinnerCompsListeners() {
+// --- Data Fetching & Rendering Logic ---
+
+async function loadAndRenderCompetitions(listDiv) {
+    try {
+        const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        allCompetitions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        listDiv.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        allCompetitions.forEach(comp => fragment.appendChild(renderCompetitionRow(comp)));
+        listDiv.appendChild(fragment);
+
+        listDiv.addEventListener('click', handleDashboardClick);
+    } catch (error) {
+        console.error("Error loading competitions:", error);
+        listDiv.innerHTML = '';
+        listDiv.append(createElement('p', { style: { color: 'red' }, textContent: 'Failed to load competitions. Check Firestore index and security rules.' }));
+    }
+}
+
+function renderCompetitionRow(comp) {
+    const progress = (comp.ticketsSold / comp.totalTickets) * 100;
+
+    let titleBadges = [];
+    if (comp.isHeroComp) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
+    if (comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
+    if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
+    
+    let statusContent;
+    if (comp.status === 'live') {
+        statusContent = [
+            createElement('div', { class: ['status-badge', 'status-live'], textContent: 'Live' }),
+            createElement('div', { class: 'comp-actions' }, [
+                createElement('button', { class: ['btn', 'btn-small', 'btn-secondary'], 'data-action': 'end' }, ['End Now']),
+                createElement('button', { class: ['btn', 'btn-small', 'btn-secondary'], 'data-action': 'add-fer' }, ['Add Free Entry'])
+            ])
+        ];
+    } else if (comp.status === 'drawn') {
+        statusContent = [
+            createElement('div', { class: ['status-badge', 'status-drawn'], textContent: 'Drawn' }),
+            createElement('div', { class: 'comp-actions' }, [
+                createElement('div', { class: 'winner-info', textContent: `Winner: ${comp.winnerDisplayName || 'N/A'}` })
+            ])
+        ];
+    } else if (comp.status === 'ended') {
+        statusContent = [
+            createElement('div', { class: ['status-badge', 'status-ended'], textContent: 'Ended' }),
+            createElement('div', { class: 'comp-actions' }, [
+                createElement('button', { class: ['btn', 'btn-small', 'btn-primary'], 'data-action': 'draw-winner' }, ['Draw Winner'])
+            ])
+        ];
+    }
+
+    return createElement('div', { class: 'competition-row', 'data-comp-id': comp.id }, [
+        createElement('div', { class: 'comp-row-main' }, [
+            createElement('h4', { class: 'comp-title' }, [comp.title, ' ', ...titleBadges]),
+            createElement('div', { class: 'comp-progress-text', textContent: `${comp.ticketsSold || 0} / ${comp.totalTickets}` }),
+            createElement('div', { class: 'progress-bar' }, [
+                createElement('div', { class: 'progress-bar-fill', style: { width: `${progress}%` } })
+            ])
+        ]),
+        createElement('div', { class: 'comp-row-status' }, statusContent)
+    ]);
+}
+
+// --- Event Listener Initialization ---
+
+function initializeCreateFormListeners() {
+    const form = document.getElementById('create-comp-form');
+    const addTierBtn = document.getElementById('add-tier-btn');
+    const tiersContainer = document.getElementById('ticket-tiers-container');
+    const hasParallaxCheck = document.getElementById('hasParallax');
+    
+    hasParallaxCheck.addEventListener('change', (e) => {
+        const mainImageGroup = document.getElementById('main-image-group');
+        const parallaxImageGroup = document.getElementById('parallax-image-group');
+        mainImageGroup.style.display = e.target.checked ? 'none' : 'block';
+        parallaxImageGroup.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    const addTier = () => {
+        const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
+        const tierEl = createElement('div', { class: ['form-group-inline', 'ticket-tier-row'] }, [
+            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Tickets' }), createElement('input', { type: 'number', class: 'tier-amount', required: true })]),
+            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Price (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'tier-price', required: true })]),
+            removeBtn
+        ]);
+        tiersContainer.appendChild(tierEl);
+        removeBtn.addEventListener('click', () => tierEl.remove());
+    };
+    addTierBtn.addEventListener('click', addTier);
+    addTier();
+    
+    form.addEventListener('submit', handleCreateFormSubmit);
+}
+
+function initializeSpinnerSettingsListeners() {
+    const form = document.getElementById('spinner-settings-form');
+    const prizesContainer = document.getElementById('spinner-prizes-container');
+    const addPrizeBtn = document.getElementById('add-spinner-prize-btn');
+    const rtpDisplay = document.getElementById('total-rtp-display');
+
+    const calculateRTP = () => {
+        let totalRTP = 0;
+        prizesContainer.querySelectorAll('.spinner-prize-row').forEach(row => {
+            const value = parseFloat(row.querySelector('.spinner-prize-value').value) || 0;
+            const odds = parseInt(row.querySelector('.spinner-prize-odds').value) || 0;
+            if (value > 0 && odds > 0) totalRTP += (value / odds);
+        });
+        rtpDisplay.textContent = `${((totalRTP / 1.00) * 100).toFixed(2)}%`;
+    };
+
+    const addPrizeTier = (type = 'credit', value = '', odds = '') => {
+        const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
+        const prizeEl = createElement('div', { class: ['form-group-inline', 'spinner-prize-row'] }, [
+            createElement('div', { class: 'form-group', style: { flex: '1' } }, [
+                createElement('label', { textContent: 'Prize Type' }),
+                createElement('select', { class: 'spinner-prize-type' }, [
+                    createElement('option', { value: 'credit', textContent: 'Site Credit' }),
+                    createElement('option', { value: 'cash', textContent: 'Cash' })
+                ])
+            ]),
+            createElement('div', { class: 'form-group', style: { flex: '1' } }, [createElement('label', { textContent: 'Value (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'spinner-prize-value', value: value, required: true })]),
+            createElement('div', { class: 'form-group', style: { flex: '1' } }, [createElement('label', { textContent: 'Odds (1 in X)' }), createElement('input', { type: 'number', class: 'spinner-prize-odds', value: odds, required: true })]),
+            removeBtn
+        ]);
+        prizeEl.querySelector('.spinner-prize-type').value = type;
+        prizesContainer.appendChild(prizeEl);
+        removeBtn.addEventListener('click', () => { prizeEl.remove(); calculateRTP(); });
+    };
+
+    prizesContainer.addEventListener('input', calculateRTP);
+    addPrizeBtn.addEventListener('click', () => addPrizeTier());
+
+    const loadSettings = async () => { 
+        const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
+        const docSnap = await getDoc(defaultsRef);
+        prizesContainer.innerHTML = '';
+        if (docSnap.exists() && docSnap.data().prizes) {
+            docSnap.data().prizes.forEach(p => addPrizeTier(p.type, p.value, p.odds));
+        }
+        if (prizesContainer.children.length === 0) addPrizeTier();
+        calculateRTP();
+    };
+    loadSettings();
+
+    form.addEventListener('submit', async (e) => { 
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        try {
+            const prizes = Array.from(document.querySelectorAll('.spinner-prize-row')).map(row => ({
+                type: row.querySelector('.spinner-prize-type').value,
+                value: parseFloat(row.querySelector('.spinner-prize-value').value),
+                odds: parseInt(row.querySelector('.spinner-prize-odds').value)
+            }));
+            const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
+            await setDoc(defaultsRef, { prizes });
+            alert('Spinner settings saved successfully!');
+        } catch (error) {
+            console.error('Error saving spinner settings:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Spinner Settings';
+        }
+    });
+}
+
+function initializeSpinnerCompsListeners() { 
     const form = document.getElementById('spinner-comp-form');
     const compId = form.querySelector('#spinner-comp-id').value;
     const bundlesContainer = document.getElementById('spinner-bundles-container');
@@ -273,15 +431,13 @@ function initializeSpinnerCompsListeners() {
             form.querySelector('#spinner-title').value = data.title || '';
             form.querySelector('#spinner-prize').value = data.prize || '';
             
-            // Load bundles
             bundlesContainer.innerHTML = '';
             if (data.ticketBundles && data.ticketBundles.length > 0) {
                 data.ticketBundles.forEach(bundle => addBundleRow(bundle.amount, bundle.price));
             } else {
-                addBundleRow(5, 4.50); // Add a default if none exist
+                addBundleRow(5, 4.50);
             }
 
-            // Load skill question
             if (data.skillQuestion) {
                 form.querySelector('#spinner-questionText').value = data.skillQuestion.text || '';
                 const answers = data.skillQuestion.answers;
@@ -290,7 +446,7 @@ function initializeSpinnerCompsListeners() {
                 form.querySelector('#spinner-otherAnswers').value = Object.keys(answers).filter(k => k !== correct).map(k => answers[k]).join(', ');
             }
         } else {
-             addBundleRow(5, 4.50); // Add a default for a new competition
+             addBundleRow(5, 4.50);
         }
     };
     loadData();
@@ -311,7 +467,6 @@ function initializeSpinnerCompsListeners() {
                  if (allAnswers[i] === correctAnswer) correctKey = key;
             });
             
-            // Read bundles from the form
             const ticketBundles = Array.from(document.querySelectorAll('.spinner-bundle-row')).map(row => ({
                 amount: parseInt(row.querySelector('.bundle-amount').value),
                 price: parseFloat(row.querySelector('.bundle-price').value)
@@ -320,7 +475,7 @@ function initializeSpinnerCompsListeners() {
             const compData = {
                 title: form.querySelector('#spinner-title').value,
                 prize: form.querySelector('#spinner-prize').value,
-                ticketBundles: ticketBundles, // Save to Firestore
+                ticketBundles: ticketBundles,
                 skillQuestion: {
                     text: form.querySelector('#spinner-questionText').value,
                     answers,
@@ -339,6 +494,9 @@ function initializeSpinnerCompsListeners() {
         }
     });
 }
+
+// --- Event Handlers & Modal Logic ---
+
 function handleDashboardClick(e) { 
     const button = e.target.closest('button');
     if (!button) return;
@@ -479,7 +637,6 @@ async function handleAddFerSubmit(e, compId) {
             });
         });
 
-
         alert('Free entry added successfully!');
         closeModal();
         renderView('dashboard');
@@ -496,6 +653,7 @@ function setupModal() {
         if (e.target === modalContainer) closeModal();
     });
 }
+
 function openModal(content) {
     modalBody.innerHTML = '';
     if (typeof content === 'string') {
@@ -505,6 +663,7 @@ function openModal(content) {
     }
     modalContainer.classList.add('show');
 }
+
 function closeModal() {
     modalContainer.classList.remove('show');
 }

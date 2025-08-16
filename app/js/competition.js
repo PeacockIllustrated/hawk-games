@@ -245,7 +245,6 @@ function createStandardPageHTML(data) {
 function createHeroPageHTML(data) {
     const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<div class="answer-btn" data-answer="${key}">${value}</div>`).join('');
     
-    // --- BEST VALUE CALCULATION LOGIC ---
     let bestValueAmount = -1;
     if (data.ticketTiers && data.ticketTiers.length > 1) {
         const tiersWithCost = data.ticketTiers.map(tier => ({
@@ -267,7 +266,6 @@ function createHeroPageHTML(data) {
                     <span class="ticket-price">£${tier.price.toFixed(2)}</span>
                 </div>`;
     }).join('');
-
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
     const prizeSpecs = `

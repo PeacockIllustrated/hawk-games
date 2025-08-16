@@ -27,8 +27,8 @@ This checklist is derived from the legal handbook and must be used to audit all 
 - [x] Is there a `winners.html` page to display past winners? (Ref: `index.html` has a past winners section)
 - [x] Are all entries logged in a way that can be archived? (Ref: `entries` sub-collection in `DATA_MODELS.md`)
 
- ### 5. Instant Win Integrity (NEW)
-- [x] Are instant win ticket numbers securely pre-generated and stored before a competition goes live? (Ref: `functions/index.js` `seedInstantWins` function)
-- [x] Is there a mechanism to publish the full list of instant win ticket numbers after a competition closes for transparency? (Admin can access via `server_meta` subcollection, can be exposed on frontend later)
-- [x] Do tickets that win an instant prize remain in the main prize draw, ensuring their full value? (Yes, the logic is separate. `drawWinner` considers all tickets.)
+ ### 5. Instant Win Integrity (UPDATED)
+- [x] Is the outcome of an instant win spin determined securely on the server using a provably fair, odds-based system? (Ref: `functions/index.js` `spendSpinToken` function)
+- [x] Is the prize pool and the odds for winning each prize centrally managed and transparent? (Admin can manage in `spinnerPrizes` settings, can be exposed on frontend)
+- [x] Do tickets that are part of an Instant Win Competition remain in the main prize draw, ensuring their full value? (Yes, the logic is separate. `drawWinner` considers all tickets.)
 - [x] Is the process of claiming an instant win atomic to prevent race conditions and double-claims? (Ref: `functions/index.js` `spendSpinToken` uses a Firestore transaction)

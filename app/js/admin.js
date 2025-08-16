@@ -25,7 +25,6 @@ const createCompViewHTML = `
         <form id="create-comp-form" class="admin-form">
             <fieldset><legend>Core Details</legend>
                 <div class="form-group"><label for="title">Competition Title</label><input type="text" id="title" required></div>
-                <div class="form-group"><label for="prizeImage">Prize Image URL</label><input type="url" id="prizeImage" required></div>
                 <div class="form-group-inline">
                     <div class="form-group"><label for="totalTickets">Total Tickets</label><input type="number" id="totalTickets" required></div>
                     <div class="form-group"><label for="userEntryLimit">Max Entries Per User</label><input type="number" id="userEntryLimit" value="75" required></div>
@@ -35,6 +34,24 @@ const createCompViewHTML = `
                     <div class="form-group"><label for="endDate">End Date & Time</label><input type="datetime-local" id="endDate" required></div>
                 </div>
             </fieldset>
+
+            <fieldset><legend>Image Setup</legend>
+                <div class="form-group" id="main-image-group">
+                    <label for="prizeImage">Main Image URL (for cards)</label>
+                    <input type="url" id="prizeImage">
+                </div>
+                <div class="form-group-inline">
+                     <label for="hasParallax" style="display:flex; align-items: center; gap: 10px;">
+                        Use Parallax Hero Image?
+                        <input type="checkbox" id="hasParallax" style="width:auto; height:auto;">
+                    </label>
+                </div>
+                <div id="parallax-image-group" style="display:none;">
+                    <div class="form-group"><label for="prizeImageBg">Background Image URL (e.g., storm)</label><input type="url" id="prizeImageBg"></div>
+                    <div class="form-group"><label for="prizeImageFg">Foreground Image URL (e.g., car)</label><input type="url" id="prizeImageFg"></div>
+                </div>
+            </fieldset>
+
             <fieldset><legend>Ticket Pricing</legend><div id="ticket-tiers-container"></div><button type="button" id="add-tier-btn" class="btn btn-secondary btn-small">Add Tier</button></fieldset>
             
             <fieldset><legend>Competition Type</legend>
@@ -223,7 +240,20 @@ function initializeCreateFormView() {
     const form = document.getElementById('create-comp-form');
     const addTierBtn = document.getElementById('add-tier-btn');
     const tiersContainer = document.getElementById('ticket-tiers-container');
+    const hasParallaxCheck = document.getElementById('hasParallax');
+    const mainImageGroup = document.getElementById('main-image-group');
+    const parallaxImageGroup = document.getElementById('parallax-image-group');
     
+    hasParallaxCheck.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            mainImageGroup.style.display = 'none';
+            parallaxImageGroup.style.display = 'block';
+        } else {
+            mainImageGroup.style.display = 'block';
+            parallaxImageGroup.style.display = 'none';
+        }
+    });
+
     const addTier = () => {
         const tierEl = document.createElement('div');
         tierEl.className = 'form-group-inline ticket-tier-row';
@@ -246,6 +276,7 @@ async function handleCreateFormSubmit(e) {
 
     const isHero = form.querySelector('#isHeroComp').checked;
     const isInstant = form.querySelector('#enable-spin-tokens').checked;
+    const hasParallax = form.querySelector('#hasParallax').checked;
 
     if (isHero && isInstant) {
         alert("Error: A competition cannot be both a Hero and an Instant Win competition. Please choose one.");
@@ -266,9 +297,20 @@ async function handleCreateFormSubmit(e) {
              if (allAnswers[i] === correctAnswer) correctKey = key;
         });
 
+        // Construct the imageSet based on the form state
+        const imageSet = {
+            main: form.querySelector('#prizeImage').value,
+            background: form.querySelector('#prizeImageBg').value,
+            foreground: form.querySelector('#prizeImageFg').value
+        };
+        // The prizeImage for cards is the foreground for parallax, otherwise the main image
+        const prizeImage = hasParallax ? imageSet.foreground : imageSet.main;
+
         const competitionData = {
             title: form.querySelector('#title').value,
-            prizeImage: form.querySelector('#prizeImage').value,
+            prizeImage: prizeImage, // This is the main card image
+            imageSet: imageSet, // This contains all image URLs
+            hasParallax: hasParallax,
             totalTickets: parseInt(form.querySelector('#totalTickets').value),
             userEntryLimit: parseInt(form.querySelector('#userEntryLimit').value),
             cashAlternative: parseFloat(form.querySelector('#cashAlternative').value),

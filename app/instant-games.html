@@ -9,47 +9,68 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
-<body data-page="instant-games">
+<body data-page="instant-wins">
     <header class="main-header"></header>
 
     <main class="container">
-        <div class="instant-win-container">
-            <!-- Game Section -->
-            <section id="spin-game-container" class="spin-game-panel">
-                <h2 class="section-title">Instant Win</h2>
-                <p class="section-subtitle">Use your tokens for a chance to win cash prizes & credit instantly!</p>
+        <div class="instant-win-layout">
+            <!-- Game Column -->
+            <section class="spin-game-panel">
+                <div class="spin-panel-header">
+                    <h1 class="section-title">Instant Win</h1>
+                    <p class="section-subtitle">Use your tokens for a chance to win cash prizes & site credit instantly!</p>
+                </div>
                 
-                <div class="wheel-container">
-                    <div class="wheel-pointer"></div>
-                    <div id="wheel" class="wheel">
-                        <!-- The background is now a static image, JS only handles rotation -->
+                <div class="wheel-area">
+                    <div class="wheel-container">
+                        <div class="wheel-pointer"></div>
+                        <div id="wheel" class="wheel">
+                            <!-- JS handles rotation -->
+                        </div>
+                        <button id="spin-button" class="btn-spin-center" disabled>SPIN</button>
                     </div>
                 </div>
 
-                <div class="spin-controls">
-                    <div class="token-counter">
-                        <span class="token-icon"></span>
-                        <span id="token-count">0</span>
-                        <span>Spins Available</span>
+                <div class="spin-panel-footer">
+                    <div id="spin-result" class="spin-result-container">
+                        <!-- Result message will be injected here -->
                     </div>
-                    <button id="spin-button" class="btn btn-spin" disabled>SPIN THE WHEEL</button>
-                    <button id="buy-more-tokens-btn" class="btn btn-buy-tokens">+</button>
-                </div>
-                
-                <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
-
-                <div id="spin-result" class="spin-result-container">
-                    <!-- Result message will be injected here -->
+                    <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
                 </div>
             </section>
 
-            <!-- Token Inventory Section -->
-            <section class="token-inventory">
-                <h3>Your Token Inventory</h3>
-                <div id="token-accordion-container">
-                    <div class="placeholder">Loading your tokens...</div>
+            <!-- Inventory Column -->
+            <aside class="inventory-panel">
+                <div class="inventory-card">
+                    <h3>Your Balance</h3>
+                    <div class="balance-row">
+                        <div class="balance-item">
+                            <span class="token-icon"></span>
+                            <div class="balance-details">
+                                <span id="token-count" class="balance-value">0</span>
+                                <span>Spin Tokens</span>
+                            </div>
+                        </div>
+                         <button id="buy-more-tokens-btn" class="btn-buy-tokens">+</button>
+                    </div>
+                    <div class="balance-row">
+                        <div class="balance-item">
+                             <span class="credit-icon">£</span>
+                            <div class="balance-details">
+                                <span id="credit-balance-display" class="balance-value">£0.00</span>
+                                <span>Site Credit</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </section>
+
+                <div class="token-inventory">
+                    <h3>Token Inventory</h3>
+                    <div id="token-accordion-container">
+                        <div class="placeholder">Loading your tokens...</div>
+                    </div>
+                </div>
+            </aside>
         </div>
     </main>
     
@@ -57,8 +78,6 @@
     <div id="purchase-modal" class="modal-container">
         <div id="purchase-modal-content" class="modal-content">
             <!-- JS will populate this dynamically -->
-            <h2>Get More Spins</h2>
-            <p>Loading competition...</p>
         </div>
     </div>
     

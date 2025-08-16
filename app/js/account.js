@@ -1,24 +1,10 @@
-// /js/account.js
-
 'use strict';
 
 import { app } from './auth.js';
 import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js';
-// --- BUG FIX: Added the missing 'collection' function to the import list ---
 import { 
-    getFirestore, 
-    doc, 
-    getDoc, 
-    setDoc, 
-    updateDoc, 
-    serverTimestamp, 
-    collection, 
-    collectionGroup, 
-    query, 
-    where, 
-    getDocs, 
-    orderBy, 
-    documentId 
+    getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, 
+    collection, collectionGroup, query, where, getDocs, orderBy, documentId 
 } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
 
 const auth = getAuth(app);
@@ -33,7 +19,6 @@ const elMarketingFeedback = document.getElementById('preference-feedback');
 const elEntriesList = document.getElementById('entries-list');
 const elAdminContainer = document.getElementById('admin-panel-container');
 
-// --- (createElement helper and other functions are correct and unchanged) ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
@@ -63,20 +48,25 @@ function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
     if (!elEntriesList) return;
     elEntriesList.innerHTML = ''; 
 
-    const competitionIds = Object.keys(groupedEntries);
-    if (competitionIds.length === 0) {
+    const competitionIdsInOrder = Object.keys(groupedEntries).sort((a, b) => {
+        const dateA = groupedEntries[a][0].enteredAt?.toDate() || 0;
+        const dateB = groupedEntries[b][0].enteredAt?.toDate() || 0;
+        return dateB - dateA; // Sort by most recent entry first
+    });
+
+    if (competitionIdsInOrder.length === 0) {
         elEntriesList.append(createElement('div', { class: 'placeholder', textContent: "You haven't entered any competitions yet." }));
         return;
     }
 
     const fragment = document.createDocumentFragment();
-    for (const compId of competitionIds) {
+    for (const compId of competitionIdsInOrder) {
         const compData = competitionsMap.get(compId);
         const entriesForComp = groupedEntries[compId];
         if (!compData || !entriesForComp) continue;
 
-        let statusText = compData.status.toUpperCase();
-        let statusClass = `status-${compData.status}`;
+        let statusText = compData.status ? compData.status.toUpperCase() : 'LIVE';
+        let statusClass = `status-${compData.status || 'live'}`;
 
         if (compData.status === 'drawn' && compData.winnerId === currentUid) {
             statusText = 'YOU WON THE MAIN PRIZE!';
@@ -112,6 +102,7 @@ function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
     elEntriesList.appendChild(fragment);
 }
 
+
 async function loadUserEntries(user) {
   if (!elEntriesList) return;
   elEntriesList.innerHTML = `<div class="placeholder">Loading your entries...</div>`;
@@ -123,23 +114,50 @@ async function loadUserEntries(user) {
     const entriesSnapshot = await getDocs(entriesQuery);
 
     const groupedEntries = {};
+    const competitionIds = new Set();
+    const spinnerCompIds = new Set();
+
     entriesSnapshot.docs.forEach(doc => {
         const entryData = doc.data();
+        const parentCollectionPath = doc.ref.parent.parent.path;
         const compId = doc.ref.parent.parent.id;
+        
         if (!groupedEntries[compId]) groupedEntries[compId] = [];
         groupedEntries[compId].push(entryData);
+
+        if (parentCollectionPath.startsWith('competitions/')) {
+            competitionIds.add(compId);
+        } else if (parentCollectionPath.startsWith('spinner_competitions/')) {
+            spinnerCompIds.add(compId);
+        }
     });
     
-    const competitionIds = Object.keys(groupedEntries);
     const competitionsMap = new Map();
-    if (competitionIds.length > 0) {
-        // Batch requests in chunks of 10 to satisfy Firestore 'in' query limit
-        for (let i = 0; i < competitionIds.length; i += 10) {
-            const chunk = competitionIds.slice(i, i + 10);
-            // This is the line that was failing because 'collection' was not defined
+    const mainCompIdsArray = Array.from(competitionIds);
+    const spinnerCompIdsArray = Array.from(spinnerCompIds);
+
+    if (mainCompIdsArray.length > 0) {
+        for (let i = 0; i < mainCompIdsArray.length; i += 30) { // Firestore 'in' query limit is 30
+            const chunk = mainCompIdsArray.slice(i, i + 30);
             const compsQuery = query(collection(db, 'competitions'), where(documentId(), 'in', chunk));
             const compsSnapshot = await getDocs(compsQuery);
             compsSnapshot.forEach(doc => competitionsMap.set(doc.id, doc.data()));
+        }
+    }
+    if (spinnerCompIdsArray.length > 0) {
+        for (let i = 0; i < spinnerCompIdsArray.length; i += 30) {
+            const chunk = spinnerCompIdsArray.slice(i, i + 30);
+            const compsQuery = query(collection(db, 'spinner_competitions'), where(documentId(), 'in', chunk));
+            const compsSnapshot = await getDocs(compsQuery);
+            compsSnapshot.forEach(doc => {
+                // Adapt spinner comp data to match the template's expected fields
+                const data = doc.data();
+                competitionsMap.set(doc.id, { 
+                    prizeImage: 'assets/logo-icon.png', 
+                    title: data.title,
+                    status: 'live' // Spinner comps are always considered live
+                });
+            });
         }
     }
     

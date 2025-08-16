@@ -48,18 +48,38 @@ onAuthStateChanged(auth, (user) => {
         }
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+            const data = docSnap.exists() ? docSnap.data() : {};
+            
+            // Update Spin Token Indicator
             const tokenIndicator = document.getElementById('spin-token-indicator');
             const mobileTokenIndicator = document.getElementById('mobile-spin-token-indicator');
-            const elements = [tokenIndicator, mobileTokenIndicator];
-
-            elements.forEach(el => {
+            const tokenElements = [tokenIndicator, mobileTokenIndicator];
+            const tokenCount = data.spinTokens?.length || 0;
+            
+            tokenElements.forEach(el => {
                 if (el) {
-                    if (docSnap.exists() && docSnap.data().spinTokens && docSnap.data().spinTokens.length > 0) {
-                        const tokenCount = docSnap.data().spinTokens.length;
+                    if (tokenCount > 0) {
                         el.querySelector('.token-count').textContent = tokenCount;
-                        el.style.display = 'flex'; // Show the indicator
+                        el.style.display = 'flex';
                     } else {
-                        el.style.display = 'none'; // Hide if no tokens
+                        el.style.display = 'none';
+                    }
+                }
+            });
+
+            // Update Credit Balance Indicator
+            const creditIndicator = document.getElementById('credit-balance-indicator');
+            const mobileCreditIndicator = document.getElementById('mobile-credit-balance-indicator');
+            const creditElements = [creditIndicator, mobileCreditIndicator];
+            const creditBalance = data.creditBalance || 0;
+            
+            creditElements.forEach(el => {
+                if (el) {
+                    if (creditBalance > 0) {
+                        el.querySelector('.credit-amount').textContent = `£${creditBalance.toFixed(2)}`;
+                        el.style.display = 'flex';
+                    } else {
+                        el.style.display = 'none';
                     }
                 }
             });
@@ -87,7 +107,7 @@ const createUserProfileIfNotExists = async (user) => {
             uid: user.uid, email: user.email, displayName: user.displayName,
             photoURL: user.photoURL, createdAt: serverTimestamp(),
             isAdmin: false, entryCount: {}, marketingConsent: false,
-            spinTokens: []
+            spinTokens: [], creditBalance: 0
         };
         try {
             await setDoc(userRef, userData);
@@ -103,13 +123,11 @@ function renderHeader(user) {
     if (!headerEl) return;
 
     let currentPage = document.body.dataset.page || '';
-    // Special case for the "Winners" anchor on the homepage
     if (window.location.pathname.endsWith('index.html') && window.location.hash === '#past-winners-section') {
         currentPage = 'winners';
     }
 
     const createNavLinks = (isMobile = false) => {
-        // Define navigation items
         const navItems = [
             { href: 'index.html', page: 'competitions', text: 'Competitions' },
             { href: 'index.html#past-winners-section', page: 'winners', text: 'Winners' },
@@ -120,14 +138,16 @@ function renderHeader(user) {
             <a href="${item.href}" class="${currentPage === item.page ? 'active' : ''}">${item.text}</a>
         `).join('');
 
-        // Add Account or Login link
         if (user) {
             linksHTML += `<a href="account.html" class="${currentPage === 'account' ? 'active' : ''}">Account</a>`;
+            linksHTML += `
+                <div id="${isMobile ? 'mobile-' : ''}credit-balance-indicator" class="credit-balance" style="display: none;">
+                    <span class="credit-amount">£0.00</span>
+                </div>`;
         } else {
             linksHTML += `<a href="login.html" class="${currentPage === 'login' ? 'active' : ''}">Login</a>`;
         }
         
-        // Add the Instant Wins CTA and Token Indicator
         linksHTML += `
             <div class="instant-win-nav-item">
                 <a href="instant-games.html" class="btn ${currentPage === 'instant-wins' ? 'active' : ''}">Instant Wins</a>
@@ -158,7 +178,6 @@ function renderHeader(user) {
     `;
     headerEl.innerHTML = headerHTML;
 
-    // Attach event listeners for the new mobile navigation
     const hamburgerBtn = document.getElementById('hamburger-btn');
     if (hamburgerBtn) {
         hamburgerBtn.addEventListener('click', () => {
@@ -169,7 +188,7 @@ function renderHeader(user) {
     const mobileNavLinks = document.querySelector('.mobile-nav-links');
     if (mobileNavLinks) {
         mobileNavLinks.addEventListener('click', (e) => {
-            if (e.target.tagName === 'A') {
+            if (e.target.tagName === 'A' || e.target.closest('a')) {
                 document.body.classList.remove('mobile-nav-open');
             }
         });
@@ -192,7 +211,6 @@ function renderFooter() {
 
 // --- Event listeners for auth pages ---
 document.addEventListener('DOMContentLoaded', () => {
-    // This logic is specifically for the login.html and register.html pages
     const loginBtn = document.getElementById('google-login-btn');
     if (loginBtn) {
         loginBtn.addEventListener('click', async () => {
@@ -201,18 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = 'account.html';
             } catch (error) {
                 console.error('Google Sign-In Error:', error);
-            }
-        });
-    }
-
-    const registerBtn = document.getElementById('google-register-btn');
-    if(registerBtn) {
-         registerBtn.addEventListener('click', async () => {
-            try {
-                await signInWithPopup(auth, new GoogleAuthProvider());
-                window.location.href = 'account.html';
-            } catch (error) { 
-                console.error('Google Sign-Up Error:', error); 
             }
         });
     }

@@ -136,7 +136,7 @@ function triggerConfetti() {
         confettiContainer.remove();
     }
     confettiContainer = createElement('div', { class: 'confetti-container' });
-    container.style.position = 'relative'; // Ensure container can position the confetti
+    container.style.position = 'relative';
     container.appendChild(confettiContainer);
     
     for (let i = 0; i < 100; i++) {
@@ -172,7 +172,7 @@ function showWinCelebrationModal(prizeType, value) {
     
     spinAgainBtn.addEventListener('click', () => {
         closeWinCelebrationModal();
-        setTimeout(handleSpin, 400); // Small delay for close animation
+        setTimeout(handleSpin, 400);
     }, { once: true });
 
     const closeBtn = createElement('button', { class: 'btn btn-secondary', textContent: 'Close' });
@@ -282,9 +282,13 @@ buyMoreBtn.addEventListener('click', async () => {
         const answers = Object.entries(currentCompetitionData.skillQuestion.answers)
             .map(([key, value]) => createElement('button', { type: 'button', class: 'answer-btn', 'data-answer': key, textContent: value }));
 
-        const bundles = [ { amount: 5, price: 4.50 }, { amount: 10, price: 8.00 }, { amount: 25, price: 15.00 } ];
-        const bundleButtons = bundles.map(b => createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` }));
-
+        let bundlesHTML = [createElement('p', {textContent: 'No bundles available.'})];
+        if (currentCompetitionData.ticketBundles && currentCompetitionData.ticketBundles.length > 0) {
+            bundlesHTML = currentCompetitionData.ticketBundles.map(b => 
+                createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` })
+            );
+        }
+        
         modalContent.innerHTML = '';
         const form = createElement('form', { id: 'spinner-entry-form', class: 'modal-form' }, [
             createElement('div', { class: 'skill-question-box', style: { padding: '1rem 0' } }, [
@@ -292,7 +296,7 @@ buyMoreBtn.addEventListener('click', async () => {
                 createElement('div', { class: 'answer-options' }, answers)
             ]),
             createElement('div', { class: 'ticket-selector-box', style: { padding: '1rem 0' } }, [
-                 createElement('div', { class: 'ticket-options' }, bundleButtons)
+                 createElement('div', { class: 'ticket-options' }, bundlesHTML)
             ]),
             createElement('div', { id: 'credit-payment-option', style: { display: 'none', marginTop: '1rem' } }),
             createElement('div', { class: 'modal-actions' }, [

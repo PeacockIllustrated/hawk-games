@@ -18,13 +18,15 @@ const PRIZE_ANGLES = {
     'credit-20': 30, 'credit-10': 270, 'credit-5': 120, 'no-win': [90, 180, 240, 330] 
 };
 
-// --- SECURITY: Helper for safe element creation ---
+// --- SECURITY: Corrected helper function for safe element creation ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
-            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
-            else if (value) el.classList.add(value);
+            const classes = Array.isArray(value) ? value : String(value).split(' ');
+            classes.forEach(c => {
+                if (c) el.classList.add(c);
+            });
         } else if (key === 'textContent') {
             el.textContent = value;
         } else if (key === 'style') {
@@ -36,6 +38,7 @@ function createElement(tag, options = {}, children = []) {
     children.forEach(child => child && el.append(child));
     return el;
 }
+
 
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -54,7 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- Core Functions ---
+// ... (The rest of the file's logic remains exactly the same as the complete version I provided previously)
+// The key fix was the helper function above. I will include the rest of the file for absolute certainty.
+
 async function loadCompetitionDetails(id) {
     const pageContent = document.getElementById('competition-page-content');
     const competitionRef = doc(db, 'competitions', id);
@@ -84,7 +89,6 @@ async function loadCompetitionDetails(id) {
         pageContent.append(createElement('main', {}, [createElement('div', { class: 'container' }, [createElement('div', { class: 'hawk-card placeholder', style: { color: 'red' }, textContent: 'Could not load competition details.' })])]));
     }
 }
-
 
 function setupEntryLogic(correctAnswer) {
     const entryButton = document.getElementById('entry-button');
@@ -175,8 +179,6 @@ async function handleEntry(ticketsBought) {
     }
 }
 
-
-// --- UTILITY & MODAL FUNCTIONS ---
 function openModal(contentElement) {
     const modal = document.getElementById('modal-container');
     const modalContent = document.getElementById('modal-content');
@@ -202,7 +204,7 @@ function setupCountdown(endDate) {
     if (!timerElement) return;
     const interval = setInterval(() => {
         const distance = endDate.getTime() - new Date().getTime();
-        timerElement.innerHTML = ''; // Clear previous content
+        timerElement.innerHTML = ''; 
         if (distance < 0) {
             clearInterval(interval);
             timerElement.textContent = "COMPETITION CLOSED";
@@ -231,15 +233,12 @@ function initializeParallax() {
     const bg = document.querySelector('.hero-comp-header-bg');
     const fg = document.querySelector('.hero-comp-header-fg');
     if (!bg || !fg) return;
-
     window.addEventListener('scroll', () => {
         const scrollValue = window.scrollY;
         bg.style.transform = `translateY(${scrollValue * 0.1}px)`;
         fg.style.transform = `translateY(-${scrollValue * 0.15}px)`;
     });
 }
-
-// --- HTML Generation Functions ---
 
 function createStandardPageElement(data) {
     const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('button', { class: 'answer-btn', 'data-answer': key, textContent: value }));
@@ -345,6 +344,7 @@ function createHeroPageElements(data) {
     ]);
     return [header, main];
 }
+
 
 
 // --- INSTANT WIN MODAL LOGIC ---

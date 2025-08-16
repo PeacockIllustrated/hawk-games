@@ -16,7 +16,6 @@ import {
     serverTimestamp,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-// --- SECURITY: Import App Check modules ---
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app-check.js";
 
 
@@ -36,9 +35,7 @@ export const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- SECURITY: Initialize App Check ---
-// IMPORTANT: Replace 'YOUR_RECAPTCHA_V3_SITE_KEY' with your actual key from Google Cloud Console
-// You must also enable the App Check service in your Firebase project settings.
+// Initialize App Check
 const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider('6Lcr96crAAAAAEKx64UgZjizVpwm1HUq_yWrrMlk'),
   isTokenAutoRefreshEnabled: true
@@ -53,17 +50,12 @@ onAuthStateChanged(auth, (user) => {
     
     if (user) {
         createUserProfileIfNotExists(user);
-        if (userProfileUnsubscribe) {
-            userProfileUnsubscribe();
-        }
+        if (userProfileUnsubscribe) userProfileUnsubscribe();
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             const data = docSnap.exists() ? docSnap.data() : {};
-            
             const tokenCount = data.spinTokens?.length || 0;
             const creditBalance = data.creditBalance || 0;
-
-            // Update Spin Token & Credit Indicators in both headers (desktop/mobile)
             updateIndicator('spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
             updateIndicator('mobile-spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
             updateIndicator('credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, val > 0);
@@ -89,8 +81,6 @@ function updateIndicator(id, value, updateFn, condition = value > 0) {
     }
 }
 
-
-// Re-render header on hash change to update active link for "Winners"
 window.addEventListener('hashchange', () => {
     renderHeader(auth.currentUser);
 });
@@ -98,7 +88,6 @@ window.addEventListener('hashchange', () => {
 const createUserProfileIfNotExists = async (user) => {
     const userRef = doc(db, 'users', user.uid);
     const docSnap = await getDoc(userRef);
-
     if (!docSnap.exists()) {
         const userData = {
             uid: user.uid, email: user.email, displayName: user.displayName,
@@ -114,13 +103,15 @@ const createUserProfileIfNotExists = async (user) => {
     }
 };
 
-// --- SECURITY: Helper function for safe element creation ---
+// --- SECURITY: Corrected helper function for safe element creation ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
-            if (Array.isArray(value)) el.classList.add(...value);
-            else el.classList.add(value);
+            const classes = Array.isArray(value) ? value : String(value).split(' ');
+            classes.forEach(c => {
+                if (c) el.classList.add(c); // Check for empty strings
+            });
         } else if (key === 'textContent') {
             el.textContent = value;
         } else {
@@ -131,11 +122,10 @@ function createElement(tag, options = {}, children = []) {
     return el;
 }
 
-// --- SECURITY: Refactored UI RENDERING FUNCTIONS (No innerHTML) ---
 function renderHeader(user) {
     const headerEl = document.querySelector('.main-header');
     if (!headerEl) return;
-    headerEl.innerHTML = ''; // Clear previous content
+    headerEl.innerHTML = '';
 
     let currentPage = document.body.dataset.page || '';
     if (window.location.pathname.endsWith('index.html') && window.location.hash === '#past-winners-section') {
@@ -203,10 +193,10 @@ function renderHeader(user) {
 function renderFooter() {
     const footerEl = document.querySelector('.main-footer');
     if (!footerEl) return;
-    footerEl.innerHTML = ''; // Clear previous
+    footerEl.innerHTML = '';
 
     const copyright = createElement('div', { class: 'copyright' }, [
-        createElement('p', {}, [`© ${new Date().getFullYear()} Hawk Games Ltd.`])
+        createElement('p', { textContent: `© ${new Date().getFullYear()} Hawk Games Ltd.` })
     ]);
     const footerLinks = createElement('div', { class: 'footer-links' }, [
         createElement('a', { href: 'terms-and-conditions.html' }, ['T&Cs']),
@@ -218,7 +208,6 @@ function renderFooter() {
     footerEl.append(container);
 }
 
-// --- Event listeners for auth pages ---
 document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('google-login-btn');
     if (loginBtn) {

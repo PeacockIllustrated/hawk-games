@@ -1,6 +1,6 @@
 'use strict';
 
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
@@ -44,16 +44,34 @@ const prizesModal = document.getElementById('prizes-modal');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
-onAuthStateChanged(auth, (user) => {
+// --- SECURITY: Helper for safe element creation ---
+function createElement(tag, options = {}, children = []) {
+    const el = document.createElement(tag);
+    Object.entries(options).forEach(([key, value]) => {
+        if (key === 'class') {
+            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
+            else if (value) el.classList.add(value);
+        } else if (key === 'textContent') {
+            el.textContent = value;
+        } else if (key === 'style') {
+            Object.assign(el.style, value);
+        } else {
+            el.setAttribute(key, value);
+        }
+    });
+    children.forEach(child => child && el.append(child));
+    return el;
+}
+
+auth.onAuthStateChanged((user) => {
     if (user) {
         if (userProfileUnsubscribe) userProfileUnsubscribe();
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                const tokens = data.spinTokens || [];
                 userCreditBalance = data.creditBalance || 0;
-                userTokens = tokens.sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
+                userTokens = (data.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
                 updateUI();
             }
         });
@@ -64,16 +82,10 @@ onAuthStateChanged(auth, (user) => {
 });
 
 function updateUI() {
-    const tokenCount = userTokens.length;
-    tokenCountElement.textContent = tokenCount;
+    tokenCountElement.textContent = userTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
-    spinButton.disabled = tokenCount === 0 || isSpinning;
-
-    if (tokenCount === 0) {
-        tokenAccordionContainer.innerHTML = `<div class="placeholder">You have no Spin Tokens. Enter a competition to earn them!</div>`;
-    } else {
-        renderTokenAccordion();
-    }
+    spinButton.disabled = userTokens.length === 0 || isSpinning;
+    renderTokenAccordion();
 }
 
 async function loadPrizeSettings() {
@@ -92,44 +104,52 @@ async function loadPrizeSettings() {
 }
 
 function renderTokenAccordion() {
-    if (!tokenAccordionContainer) return;
+    tokenAccordionContainer.innerHTML = '';
+    if (userTokens.length === 0) {
+        tokenAccordionContainer.append(createElement('div', { class: 'placeholder', textContent: 'You have no Spin Tokens. Enter a competition to earn them!' }));
+        return;
+    }
     const groupedTokens = userTokens.reduce((acc, token) => {
         const groupTitle = token.compTitle || "Purchased Tokens";
         (acc[groupTitle] = acc[groupTitle] || []).push(token);
         return acc;
     }, {});
-    let html = '';
+
+    const fragment = document.createDocumentFragment();
     for (const groupTitle in groupedTokens) {
         const tokens = groupedTokens[groupTitle];
         const date = new Date(tokens[0].earnedAt.seconds * 1000).toLocaleDateString();
-        html += `
-            <div class="accordion-item">
-                <button class="accordion-header">
-                    <span>${groupTitle}</span>
-                    <span class="accordion-meta">${tokens.length} Token(s) - Earned ${date}</span>
-                    <span class="accordion-arrow"></span>
-                </button>
-                <div class="accordion-content">
-                    <ul>
-                        ${tokens.map(t => `<li>Token ID: ...${t.tokenId.slice(-8)}</li>`).join('')}
-                    </ul>
-                </div>
-            </div>`;
+        
+        const content = createElement('div', { class: 'accordion-content' }, [
+            createElement('ul', {}, tokens.map(t => createElement('li', { textContent: `Token ID: ...${t.tokenId.slice(-8)}` })))
+        ]);
+
+        const header = createElement('button', { class: 'accordion-header' }, [
+            createElement('span', { textContent: groupTitle }),
+            createElement('span', { class: 'accordion-meta', textContent: `${tokens.length} Token(s) - Earned ${date}` }),
+            createElement('span', { class: 'accordion-arrow' })
+        ]);
+        
+        fragment.append(createElement('div', { class: 'accordion-item' }, [header, content]));
     }
-    tokenAccordionContainer.innerHTML = html || `<div class="placeholder">No tokens found.</div>`;
+    tokenAccordionContainer.append(fragment);
 }
 
 function renderPrizesTable(prizes) {
-    let tableHTML = `
-        <table class="prizes-table">
-            <thead><tr><th>Prize</th><th>Odds</th></tr></thead>
-            <tbody>`;
-    prizes.forEach(prize => {
-        const prizeText = prize.type === 'credit' ? `£${prize.value} Site Credit` : `£${prize.value} Cash`;
-        tableHTML += `<tr><td>${prizeText}</td><td>1 in ${prize.odds.toLocaleString()}</td></tr>`;
+    prizesTableContainer.innerHTML = '';
+    const tableRows = prizes.map(prize => {
+        const prizeText = prize.type === 'credit' ? `£${prize.value.toFixed(2)} Site Credit` : `£${prize.value.toFixed(2)} Cash`;
+        return createElement('tr', {}, [
+            createElement('td', { textContent: prizeText }),
+            createElement('td', { textContent: `1 in ${prize.odds.toLocaleString()}` })
+        ]);
     });
-    tableHTML += `</tbody></table>`;
-    prizesTableContainer.innerHTML = tableHTML;
+    
+    const table = createElement('table', { class: 'prizes-table' }, [
+        createElement('thead', {}, [createElement('tr', {}, [createElement('th', { textContent: 'Prize' }), createElement('th', { textContent: 'Odds' })])]),
+        createElement('tbody', {}, tableRows)
+    ]);
+    prizesTableContainer.append(table);
 }
 
 async function handleSpin() {
@@ -142,7 +162,7 @@ async function handleSpin() {
     
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
-    void wheel.offsetWidth;
+    void wheel.offsetWidth; // Force reflow
 
     const tokenToSpend = userTokens[0];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
@@ -170,21 +190,23 @@ async function handleSpin() {
         wheel.style.transform = `rotate(${finalAngle}deg)`;
 
         setTimeout(() => {
+            spinResultContainer.innerHTML = '';
             if (won) {
                 const prizeValue = (typeof value === 'number') ? value.toFixed(2) : '0.00';
                 const prizeText = prizeType === 'credit' ? `£${prizeValue} SITE CREDIT` : `£${prizeValue} CASH`;
-                spinResultContainer.innerHTML = `<p class="spin-win">🎉 YOU WON ${prizeText}! 🎉</p>`;
+                spinResultContainer.append(createElement('p', { class: 'spin-win', textContent: `🎉 YOU WON ${prizeText}! 🎉` }));
             } else {
-                spinResultContainer.innerHTML = `<p>Better luck next time!</p>`;
+                spinResultContainer.append(createElement('p', { textContent: 'Better luck next time!' }));
             }
             isSpinning = false;
             spinButton.textContent = 'SPIN';
-            updateUI();
+            // onSnapshot listener will call updateUI() automatically
         }, 8500);
 
     } catch (error) {
         console.error("Error spending token:", error);
-        spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
+        spinResultContainer.innerHTML = '';
+        spinResultContainer.append(createElement('p', { class: 'spin-error', textContent: `Error: ${error.message}` }));
         isSpinning = false;
         spinButton.textContent = 'SPIN';
         updateUI();
@@ -196,7 +218,8 @@ spinButton.addEventListener('click', handleSpin);
 
 buyMoreBtn.addEventListener('click', async () => {
     const modalContent = document.getElementById('purchase-modal-content');
-    modalContent.innerHTML = `<h2>Get More Spins</h2><p class="placeholder">Loading competition...</p>`;
+    modalContent.innerHTML = '';
+    modalContent.append(createElement('h2', { textContent: 'Get More Spins' }), createElement('p', { class: 'placeholder', textContent: 'Loading competition...' }));
     purchaseModal.classList.add('show');
     
     try {
@@ -205,36 +228,34 @@ buyMoreBtn.addEventListener('click', async () => {
         if (!docSnap.exists()) throw new Error('No active spinner competition found.');
         
         currentCompetitionData = docSnap.data();
-        const answersHTML = Object.entries(currentCompetitionData.skillQuestion.answers)
-            .map(([key, value]) => `<button type="button" class="answer-btn" data-answer="${key}">${value}</button>`).join('');
+        const answers = Object.entries(currentCompetitionData.skillQuestion.answers)
+            .map(([key, value]) => createElement('button', { type: 'button', class: 'answer-btn', 'data-answer': key, textContent: value }));
 
-        const bundles = [
-            { amount: 5, price: 4.50 },
-            { amount: 10, price: 8.00 },
-            { amount: 25, price: 15.00 },
-        ];
-        const bundlesHTML = bundles.map(b => `<button type="button" class="ticket-option" data-amount="${b.amount}" data-price="${b.price}">${b.amount} Entries for £${b.price.toFixed(2)}</button>`).join('');
+        const bundles = [ { amount: 5, price: 4.50 }, { amount: 10, price: 8.00 }, { amount: 25, price: 15.00 } ];
+        const bundleButtons = bundles.map(b => createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` }));
 
-        modalContent.innerHTML = `
-            <h2>${currentCompetitionData.title}</h2>
-            <p>Enter our weekly draw for a chance to win <strong>${currentCompetitionData.prize}</strong> and get bonus spin tokens instantly!</p>
-            <form id="spinner-entry-form" class="modal-form">
-                <div class="skill-question-box" style="padding: 1rem 0;">
-                    <p class="question-text">${currentCompetitionData.skillQuestion.text}</p>
-                    <div class="answer-options">${answersHTML}</div>
-                </div>
-                <div class="ticket-selector-box" style="padding: 1rem 0;">
-                     <div class="ticket-options">${bundlesHTML}</div>
-                </div>
-                <div id="credit-payment-option" style="display:none; margin-top: 1rem;"></div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
-                    <button type="submit" class="btn">Confirm & Pay</button>
-                </div>
-            </form>
-        `;
+        modalContent.innerHTML = '';
+        const form = createElement('form', { id: 'spinner-entry-form', class: 'modal-form' }, [
+            createElement('div', { class: 'skill-question-box', style: { padding: '1rem 0' } }, [
+                createElement('p', { class: 'question-text', textContent: currentCompetitionData.skillQuestion.text }),
+                createElement('div', { class: 'answer-options' }, answers)
+            ]),
+            createElement('div', { class: 'ticket-selector-box', style: { padding: '1rem 0' } }, [
+                 createElement('div', { class: 'ticket-options' }, bundleButtons)
+            ]),
+            createElement('div', { id: 'credit-payment-option', style: { display: 'none', marginTop: '1rem' } }),
+            createElement('div', { class: 'modal-actions' }, [
+                createElement('button', { type: 'button', class: ['btn', 'btn-secondary'], 'data-close-modal': true }, ['Cancel']),
+                createElement('button', { type: 'submit', class: 'btn' }, ['Confirm & Pay'])
+            ])
+        ]);
+        
+        modalContent.append(
+            createElement('h2', { textContent: currentCompetitionData.title }),
+            createElement('p', {}, ['Enter our weekly draw for a chance to win ', createElement('strong', { textContent: currentCompetitionData.prize }), ' and get bonus spin tokens instantly!']),
+            form
+        );
 
-        const form = document.getElementById('spinner-entry-form');
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             handleSpinnerCompEntry(form, currentCompetitionData.skillQuestion.correctAnswer, 'card');
@@ -242,7 +263,12 @@ buyMoreBtn.addEventListener('click', async () => {
 
     } catch (error) {
         console.error(error);
-        modalContent.innerHTML = `<h2>Error</h2><p>${error.message}</p><button class="btn" data-close-modal>Close</button>`;
+        modalContent.innerHTML = '';
+        modalContent.append(
+            createElement('h2', { textContent: 'Error' }),
+            createElement('p', { textContent: error.message }),
+            createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
+        );
     }
 });
 
@@ -259,8 +285,8 @@ async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card
     if(submitBtn) submitBtn.disabled = true;
     if(creditBtn) creditBtn.disabled = true;
     
-    const originalText = paymentMethod === 'credit' ? (creditBtn ? creditBtn.textContent : '') : (submitBtn ? submitBtn.textContent : '');
     const targetBtn = paymentMethod === 'credit' ? creditBtn : submitBtn;
+    const originalText = targetBtn ? targetBtn.textContent : '';
     if(targetBtn) targetBtn.textContent = 'Processing...';
 
     try {
@@ -297,12 +323,14 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
         bundle.classList.add('selected');
 
         const creditOptionDiv = document.getElementById('credit-payment-option');
+        creditOptionDiv.innerHTML = '';
         if (userCreditBalance >= price) {
-            creditOptionDiv.innerHTML = `<button type="button" id="pay-with-credit-btn" class="btn btn-credit">Pay with £${price.toFixed(2)} Credit</button>`;
-            creditOptionDiv.style.display = 'block';
-            document.getElementById('pay-with-credit-btn').onclick = () => {
+            const creditButton = createElement('button', { type: 'button', id: 'pay-with-credit-btn', class: ['btn', 'btn-credit'], textContent: `Pay with £${price.toFixed(2)} Credit` });
+            creditButton.onclick = () => {
                  handleSpinnerCompEntry(target.closest('form'), currentCompetitionData.skillQuestion.correctAnswer, 'credit');
             };
+            creditOptionDiv.append(creditButton);
+            creditOptionDiv.style.display = 'block';
         } else {
             creditOptionDiv.style.display = 'none';
         }
@@ -322,9 +350,5 @@ tokenAccordionContainer.addEventListener('click', (e) => {
     if (!header) return;
     const content = header.nextElementSibling;
     header.classList.toggle('active');
-    if (content.style.maxHeight) {
-        content.style.maxHeight = null;
-    } else {
-        content.style.maxHeight = content.scrollHeight + "px";
-    }
+    content.style.maxHeight = content.style.maxHeight ? null : `${content.scrollHeight}px`;
 });

@@ -12,28 +12,45 @@ const functions = getFunctions(app);
 let currentCompetitionData = null;
 let competitionId = null;
 
-// --- PRIZE ANGLE CONFIGURATION (Copied from instant-games.js) ---
+// --- PRIZE ANGLE CONFIGURATION ---
 const PRIZE_ANGLES = {
-    'cash-1000': 150,
-    'cash-500': 210,
-    'cash-250': 300,
-    'cash-100': 0,
-    'cash-50': 60,
-    'credit-20': 30,
-    'credit-10': 270,
-    'credit-5': 120,
-    'no-win': [90, 180, 240, 330] 
+    'cash-1000': 150, 'cash-500': 210, 'cash-250': 300, 'cash-100': 0, 'cash-50': 60,
+    'credit-20': 30, 'credit-10': 270, 'credit-5': 120, 'no-win': [90, 180, 240, 330] 
 };
 
+// --- SECURITY: Helper for safe element creation ---
+function createElement(tag, options = {}, children = []) {
+    const el = document.createElement(tag);
+    Object.entries(options).forEach(([key, value]) => {
+        if (key === 'class') {
+            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
+            else if (value) el.classList.add(value);
+        } else if (key === 'textContent') {
+            el.textContent = value;
+        } else if (key === 'style') {
+            Object.assign(el.style, value);
+        } else {
+            el.setAttribute(key, value);
+        }
+    });
+    children.forEach(child => child && el.append(child));
+    return el;
+}
 
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     competitionId = params.get('id');
+    const pageContent = document.getElementById('competition-page-content');
     if (competitionId) {
         loadCompetitionDetails(competitionId);
     } else {
-        document.getElementById('competition-page-content').innerHTML = '<main><div class="container"><div class="hawk-card placeholder">Error: No competition specified.</div></div></main>';
+        pageContent.innerHTML = '';
+        pageContent.append(createElement('main', {}, [
+            createElement('div', { class: 'container' }, [
+                createElement('div', { class: 'hawk-card placeholder', textContent: 'Error: No competition specified.' })
+            ])
+        ]));
     }
 });
 
@@ -47,21 +64,24 @@ async function loadCompetitionDetails(id) {
             currentCompetitionData = docSnap.data();
             document.title = `${currentCompetitionData.title} | The Hawk Games`;
 
+            pageContent.innerHTML = ''; // Clear placeholders
             if (currentCompetitionData.isHeroComp && currentCompetitionData.hasParallax) {
-                pageContent.innerHTML = createHeroPageHTML(currentCompetitionData);
+                pageContent.append(...createHeroPageElements(currentCompetitionData));
                 initializeParallax();
             } else {
-                pageContent.innerHTML = createStandardPageHTML(currentCompetitionData);
+                pageContent.append(createStandardPageElement(currentCompetitionData));
             }
             
             setupCountdown(currentCompetitionData.endDate.toDate());
             setupEntryLogic(currentCompetitionData.skillQuestion.correctAnswer);
         } else {
-            pageContent.innerHTML = '<main><div class="container"><div class="hawk-card placeholder">Error: Competition not found.</div></div></main>';
+            pageContent.innerHTML = '';
+            pageContent.append(createElement('main', {}, [createElement('div', { class: 'container' }, [createElement('div', { class: 'hawk-card placeholder', textContent: 'Error: Competition not found.' })])]));
         }
     } catch (error) {
         console.error("Error fetching competition details:", error);
-        pageContent.innerHTML = '<main><div class="container"><div class="hawk-card placeholder" style="color:red">Could not load competition details.</div></div></main>';
+        pageContent.innerHTML = '';
+        pageContent.append(createElement('main', {}, [createElement('div', { class: 'container' }, [createElement('div', { class: 'hawk-card placeholder', style: { color: 'red' }, textContent: 'Could not load competition details.' })])]));
     }
 }
 
@@ -84,16 +104,23 @@ function setupEntryLogic(correctAnswer) {
         document.querySelectorAll('.ticket-options .ticket-option').forEach(opt => opt.classList.remove('selected'));
         option.classList.add('selected');
         entryButton.disabled = false;
-        // The hero button has different text, so we don't change it here.
     });
 
     entryButton.addEventListener('click', () => {
         if (!auth.currentUser) {
-            openModal(`<h2>Login Required</h2><p>Please log in or register to enter.</p><a href="login.html" class="btn">Login</a>`);
+            openModal(createElement('div', {}, [
+                createElement('h2', { textContent: 'Login Required' }),
+                createElement('p', { textContent: 'Please log in or register to enter.' }),
+                createElement('a', { href: 'login.html', class: 'btn' }, ['Login'])
+            ]));
             return;
         }
         if (!isAnswerCorrect) {
-            openModal(`<h2>Incorrect Answer</h2><p>You must select the correct answer to enter.</p><button data-close-modal class="btn">Try Again</button>`);
+            openModal(createElement('div', {}, [
+                createElement('h2', { textContent: 'Incorrect Answer' }),
+                createElement('p', { textContent: 'You must select the correct answer to enter.' }),
+                createElement('button', { 'data-close-modal': true, class: 'btn' }, ['Try Again'])
+            ]));
             return;
         }
         showConfirmationModal();
@@ -103,27 +130,27 @@ function setupEntryLogic(correctAnswer) {
 function showConfirmationModal() {
     const selectedTicket = document.querySelector('.ticket-option.selected');
     if (!selectedTicket) {
-        openModal(`<h2>Select Tickets</h2><p>Please choose a ticket bundle.</p><button data-close-modal class="btn">OK</button>`);
+        openModal(createElement('div',{},[ createElement('h2', {textContent: 'Select Tickets'}), createElement('p', {textContent: 'Please choose a ticket bundle.'}), createElement('button', {'data-close-modal': true, class:'btn'},['OK']) ]));
         return;
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
     const price = parseFloat(selectedTicket.dataset.price).toFixed(2);
     
-    openModal(`
-        <h2>Confirm Your Entry</h2>
-        <p>You are about to purchase <strong>${tickets}</strong> entries for <strong>£${price}</strong>.</p>
-        <div class="modal-actions">
-            <button data-close-modal class="btn btn-secondary">Cancel</button>
-            <button id="confirm-entry-btn" class="btn">Confirm & Pay</button>
-        </div>
-    `);
-    
-    const confirmBtn = document.getElementById('confirm-entry-btn');
+    const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn' }, ['Confirm & Pay']);
+    const content = createElement('div', {}, [
+        createElement('h2', { textContent: 'Confirm Your Entry' }),
+        createElement('p', {}, [`You are about to purchase `, createElement('strong', { textContent: `${tickets}` }), ` entries for `, createElement('strong', { textContent: `£${price}` }), `.`]),
+        createElement('div', { class: 'modal-actions' }, [
+            createElement('button', { 'data-close-modal': true, class: ['btn', 'btn-secondary'] }, ['Cancel']),
+            confirmBtn
+        ])
+    ]);
+    openModal(content);
     confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
 }
 
 async function handleEntry(ticketsBought) {
-    openModal(`<h2>Processing Entry...</h2><div class="loader"></div><p>Please wait, do not close this window.</p>`);
+    openModal(createElement('div', {}, [createElement('h2', { textContent: 'Processing Entry...' }), createElement('div', { class: 'loader' }), createElement('p', { textContent: 'Please wait, do not close this window.' })]));
     try {
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
         const result = await allocateTicketsAndAwardTokens({ compId: competitionId, ticketsBought });
@@ -132,29 +159,30 @@ async function handleEntry(ticketsBought) {
         if (data.awardedTokens && data.awardedTokens.length > 0) {
             showInstantWinModal(data.awardedTokens.length);
         } else {
-            let successMessage = `<p>Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} have been successfully registered. Good luck in the draw!</p>`;
-            openModal(`
-                <div class="celebration-modal">
-                    <div class="modal-icon-success">✓</div>
-                    <h2>Entry Successful!</h2>
-                    ${successMessage}
-                    <button data-close-modal class="btn" style="margin-top:1rem;" onclick="window.location.reload()">Done</button>
-                </div>
-            `);
+            const successMessage = `Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} have been successfully registered. Good luck in the draw!`;
+            const doneBtn = createElement('button', { 'data-close-modal': true, class: 'btn', style: { marginTop: '1rem' } }, ['Done']);
+            doneBtn.onclick = () => window.location.reload();
+            openModal(createElement('div', { class: 'celebration-modal' }, [
+                createElement('div', { class: 'modal-icon-success', textContent: '✓' }),
+                createElement('h2', { textContent: 'Entry Successful!' }),
+                createElement('p', { textContent: successMessage }),
+                doneBtn
+            ]));
         }
     } catch (error) {
         console.error("Entry failed:", error);
-        openModal(`<h2>Error</h2><p>${error.message}</p><button data-close-modal class="btn">Close</button>`);
+        openModal(createElement('div', {}, [ createElement('h2', {textContent: 'Error'}), createElement('p', {textContent: error.message}), createElement('button', {'data-close-modal': true, class: 'btn'}, ['Close']) ]));
     }
 }
 
 
 // --- UTILITY & MODAL FUNCTIONS ---
-function openModal(content) {
+function openModal(contentElement) {
     const modal = document.getElementById('modal-container');
     const modalContent = document.getElementById('modal-content');
     if (!modal || !modalContent) return;
-    modalContent.innerHTML = content;
+    modalContent.innerHTML = '';
+    modalContent.append(contentElement);
     modal.classList.add('show');
 }
 
@@ -174,9 +202,10 @@ function setupCountdown(endDate) {
     if (!timerElement) return;
     const interval = setInterval(() => {
         const distance = endDate.getTime() - new Date().getTime();
+        timerElement.innerHTML = ''; // Clear previous content
         if (distance < 0) {
             clearInterval(interval);
-            timerElement.innerHTML = "COMPETITION CLOSED";
+            timerElement.textContent = "COMPETITION CLOSED";
             document.querySelectorAll('#entry-button, .answer-btn, .ticket-option').forEach(el => el.disabled = true);
             return;
         }
@@ -186,9 +215,14 @@ function setupCountdown(endDate) {
         const s = String(Math.floor((distance % (1000 * 60)) / 1000)).padStart(2, '0');
         
         if (timerElement.classList.contains('hero-digital-timer')) {
-             timerElement.innerHTML = `${d}:${h}:${m}:${s}`;
+             timerElement.textContent = `${d}:${h}:${m}:${s}`;
         } else {
-            timerElement.innerHTML = `${d}<small>d</small> : ${h}<small>h</small> : ${m}<small>m</small> : ${s}<small>s</small>`;
+            timerElement.append(
+                d, createElement('small', { textContent: 'd' }), ` : ${h}`,
+                createElement('small', { textContent: 'h' }), ` : ${m}`,
+                createElement('small', { textContent: 'm' }), ` : ${s}`,
+                createElement('small', { textContent: 's' })
+            );
         }
     }, 1000);
 }
@@ -205,142 +239,113 @@ function initializeParallax() {
     });
 }
 
-// --- HTML Generation ---
+// --- HTML Generation Functions ---
 
-function createStandardPageHTML(data) {
-    const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<button class="answer-btn" data-answer="${key}">${value}</button>`).join('');
-    const ticketTiersHTML = data.ticketTiers.map(tier => `<button class="ticket-option" data-amount="${tier.amount}" data-price="${tier.price}">${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}</button>`).join('');
+function createStandardPageElement(data) {
+    const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('button', { class: 'answer-btn', 'data-answer': key, textContent: value }));
+    const ticketTiers = data.ticketTiers.map(tier => createElement('button', { class: 'ticket-option', 'data-amount': tier.amount, 'data-price': tier.price, textContent: `${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}` }));
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
     
-    return `
-    <main>
-        <div id="competition-container" class="container">
-            <div class="competition-detail-view">
-                <div class="prize-image-panel"><img src="${data.prizeImage}" alt="${data.title}"></div>
-                <div class="entry-details-panel">
-                    <h1>${data.title}</h1>
-                    <p class="cash-alternative">Or <span>£${(data.cashAlternative || 0).toLocaleString()}</span> Cash Alternative</p>
-                    <div id="timer" class="detail-timer"></div>
-                    <div class="detail-progress">
-                        <div class="progress-bar"><div class="progress-bar-fill" style="width: ${progressPercent}%;"></div></div>
-                        <p>${data.ticketsSold || 0} / ${data.totalTickets} sold</p>
-                    </div>
-                    <div class="detail-section skill-question-box">
-                        <h3><span>1.</span> Answer The Question</h3>
-                        <p class="question-text">${data.skillQuestion.text}</p>
-                        <div class="answer-options">${answersHTML}</div>
-                    </div>
-                    <div class="detail-section ticket-selector-box">
-                        <h3><span>2.</span> Choose Your Tickets</h3>
-                        <div class="ticket-options">${ticketTiersHTML}</div>
-                    </div>
-                    <button id="entry-button" class="btn" disabled>Select Tickets</button>
-                </div>
-            </div>
-        </div>
-    </main>
-    `;
+    return createElement('main', {}, [
+        createElement('div', { id: 'competition-container', class: 'container' }, [
+            createElement('div', { class: 'competition-detail-view' }, [
+                createElement('div', { class: 'prize-image-panel' }, [createElement('img', { src: data.prizeImage, alt: data.title })]),
+                createElement('div', { class: 'entry-details-panel' }, [
+                    createElement('h1', { textContent: data.title }),
+                    createElement('p', { class: 'cash-alternative' }, ['Or ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
+                    createElement('div', { id: 'timer', class: 'detail-timer' }),
+                    createElement('div', { class: 'detail-progress' }, [
+                        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })]),
+                        createElement('p', { textContent: `${data.ticketsSold || 0} / ${data.totalTickets} sold` })
+                    ]),
+                    createElement('div', { class: 'detail-section skill-question-box' }, [
+                        createElement('h3', {}, [createElement('span', { textContent: '1.' }), ' Answer The Question']),
+                        createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
+                        createElement('div', { class: 'answer-options' }, answers)
+                    ]),
+                    createElement('div', { class: 'detail-section ticket-selector-box' }, [
+                        createElement('h3', {}, [createElement('span', { textContent: '2.' }), ' Choose Your Tickets']),
+                        createElement('div', { class: 'ticket-options' }, ticketTiers)
+                    ]),
+                    createElement('button', { id: 'entry-button', class: 'btn', disabled: true }, ['Select Tickets'])
+                ])
+            ])
+        ])
+    ]);
 }
 
-function createHeroPageHTML(data) {
-    const answersHTML = Object.entries(data.skillQuestion.answers).map(([key, value]) => `<div class="answer-btn" data-answer="${key}">${value}</div>`).join('');
+function createHeroPageElements(data) {
+    const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value }));
     
     let bestValueAmount = -1;
     if (data.ticketTiers && data.ticketTiers.length > 1) {
-        const tiersWithCost = data.ticketTiers.map(tier => ({
-            ...tier,
-            costPerTicket: tier.price / tier.amount
-        }));
-        const bestTier = tiersWithCost.reduce((best, current) => {
-            return current.costPerTicket < best.costPerTicket ? current : best;
-        });
+        const bestTier = data.ticketTiers.reduce((best, current) => (current.price / current.amount < best.price / best.amount) ? current : best);
         bestValueAmount = bestTier.amount;
     }
 
-    const ticketTiersHTML = data.ticketTiers.map(tier => {
+    const ticketTiers = data.ticketTiers.map(tier => {
         const isBestValue = tier.amount === bestValueAmount;
-        return `<div class="ticket-option card-style-option ${isBestValue ? 'best-value' : ''}" data-amount="${tier.amount}" data-price="${tier.price}">
-                    ${isBestValue ? '<div class="best-value-badge">BEST VALUE</div>' : ''}
-                    <span class="ticket-amount">${tier.amount}</span>
-                    <span class="ticket-label">Entr${tier.amount > 1 ? 'ies' : 'y'}</span>
-                    <span class="ticket-price">£${tier.price.toFixed(2)}</span>
-                </div>`;
-    }).join('');
+        return createElement('div', { class: ['ticket-option', 'card-style-option', isBestValue ? 'best-value' : ''], 'data-amount': tier.amount, 'data-price': tier.price }, [
+            isBestValue ? createElement('div', { class: 'best-value-badge', textContent: 'BEST VALUE' }) : null,
+            createElement('span', { class: 'ticket-amount', textContent: tier.amount }),
+            createElement('span', { class: 'ticket-label', textContent: `Entr${tier.amount > 1 ? 'ies' : 'y'}` }),
+            createElement('span', { class: 'ticket-price', textContent: `£${tier.price.toFixed(2)}` })
+        ]);
+    });
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
-    const prizeSpecs = `
-        <li>AMG Spec</li>
-        <li>Diesel Coupe</li>
-        <li>Premium Black Finish</li>
-        <li>Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}</li>
-    `;
+    const prizeSpecs = [
+        'AMG Spec', 'Diesel Coupe', 'Premium Black Finish', `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
+    ].map(spec => createElement('li', { textContent: spec }));
 
-    return `
-        <header class="hero-comp-header">
-            <div class="hero-comp-header-bg" style="background-image: url('${data.imageSet.background}')"></div>
-            <img class="hero-comp-header-fg" src="${data.imageSet.foreground}" alt="${data.title}">
-        </header>
-        <main class="hero-comp-main">
-            <div class="container">
-                <section class="hero-comp-title-section">
-                    <h1>Win a ${data.title}</h1>
-                    <p class="cash-alternative-hero">Or take <span>£${(data.cashAlternative || 0).toLocaleString()}</span> Cash Alternative</p>
-                    <div class="time-remaining">TIME REMAINING</div>
-                    <div id="timer" class="hero-digital-timer"></div>
-                </section>
-                
-                <section class="hero-comp-progress-section">
-                     <label>Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}</label>
-                     <div class="progress-bar">
-                        <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
-                    </div>
-                </section>
+    const header = createElement('header', { class: 'hero-comp-header' }, [
+        createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
+        createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
+    ]);
 
-                <section class="hero-comp-entry-flow">
-                    <div class="entry-step question-step">
-                        <h2>1. Answer The Question</h2>
-                        <p class="question-text">${data.skillQuestion.text}</p>
-                        <div class="answer-options">${answersHTML}</div>
-                    </div>
-                    <div class="entry-step tickets-step">
-                        <h2>2. Choose Your Tickets</h2>
-                        <div class="ticket-options">${ticketTiersHTML}</div>
-                    </div>
-                </section>
-                
-                <section class="hero-comp-confirm-section">
-                    <button id="entry-button" class="btn hero-cta-btn" disabled>
-                        Enter Now
-                        <span>Secure Your Chance</span>
-                    </button>
-                </section>
-
-                <section class="hero-comp-glance-section">
-                    <h2>3. Prize At a Glance</h2>
-                    <div class="glance-content">
-                        <img src="${data.imageSet.foreground}" alt="Prize image">
-                        <ul>${prizeSpecs}</ul>
-                    </div>
-                </section>
-                
-                <section class="hero-comp-trust-section">
-                    <div class="trust-badge">
-                        <span class="trust-icon">🛡️</span>
-                        <h3>100% Secure Payments</h3>
-                    </div>
-                    <div class="trust-badge">
-                        <span class="trust-icon">⚖️</span>
-                        <h3>Licensed & Fully Compliant</h3>
-                    </div>
-                     <div class="trust-badge">
-                        <span class="trust-icon">🏆</span>
-                        <h3>Real Winners Every Week</h3>
-                    </div>
-                </section>
-            </div>
-        </main>
-    `;
+    const main = createElement('main', { class: 'hero-comp-main' }, [
+        createElement('div', { class: 'container' }, [
+            createElement('section', { class: 'hero-comp-title-section' }, [
+                createElement('h1', { textContent: `Win a ${data.title}` }),
+                createElement('p', { class: 'cash-alternative-hero' }, ['Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
+                createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING' }),
+                createElement('div', { id: 'timer', class: 'hero-digital-timer' })
+            ]),
+            createElement('section', { class: 'hero-comp-progress-section' }, [
+                createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
+                createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
+            ]),
+            createElement('section', { class: 'hero-comp-entry-flow' }, [
+                createElement('div', { class: 'entry-step question-step' }, [
+                    createElement('h2', { textContent: '1. Answer The Question' }),
+                    createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
+                    createElement('div', { class: 'answer-options' }, answers)
+                ]),
+                createElement('div', { class: 'entry-step tickets-step' }, [
+                    createElement('h2', { textContent: '2. Choose Your Tickets' }),
+                    createElement('div', { class: 'ticket-options' }, ticketTiers)
+                ])
+            ]),
+            createElement('section', { class: 'hero-comp-confirm-section' }, [
+                createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [ 'Enter Now', createElement('span', { textContent: 'Secure Your Chance' }) ])
+            ]),
+            createElement('section', { class: 'hero-comp-glance-section' }, [
+                createElement('h2', { textContent: '3. Prize At a Glance' }),
+                createElement('div', { class: 'glance-content' }, [
+                    createElement('img', { src: data.imageSet.foreground, alt: 'Prize image' }),
+                    createElement('ul', {}, prizeSpecs)
+                ])
+            ]),
+            createElement('section', { class: 'hero-comp-trust-section' }, [
+                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
+                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),
+                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
+            ])
+        ])
+    ]);
+    return [header, main];
 }
+
 
 // --- INSTANT WIN MODAL LOGIC ---
 function showInstantWinModal(tokenCount) {

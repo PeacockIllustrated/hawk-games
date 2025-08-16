@@ -21,7 +21,7 @@ const dashboardViewHTML = `
 
 const createCompViewHTML = `
     <div class="content-panel">
-        <h2>Create New Main Competition</h2>
+        <h2>Create New Competition</h2>
         <form id="create-comp-form" class="admin-form">
             <fieldset><legend>Core Details</legend>
                 <div class="form-group"><label for="title">Competition Title</label><input type="text" id="title" required></div>
@@ -37,15 +37,21 @@ const createCompViewHTML = `
             </fieldset>
             <fieldset><legend>Ticket Pricing</legend><div id="ticket-tiers-container"></div><button type="button" id="add-tier-btn" class="btn btn-secondary btn-small">Add Tier</button></fieldset>
             
-            <fieldset><legend>Bonus Spin Tokens</legend>
+            <fieldset><legend>Competition Type</legend>
                 <div class="form-group-inline">
+                    <label for="isHeroComp" style="display:flex; align-items: center; gap: 10px;">
+                        Set as Hero Competition? (The single main promotional prize)
+                        <input type="checkbox" id="isHeroComp" style="width:auto; height:auto;">
+                    </label>
+                </div>
+                <div class="form-group-inline" style="margin-top: 1rem;">
                     <label for="enable-spin-tokens" style="display:flex; align-items: center; gap: 10px;">
-                        Award 1 Bonus Spin Token per ticket purchased?
+                        Make this an Instant Win Competition? (Awards 1 Spin Token per ticket)
                         <input type="checkbox" id="enable-spin-tokens" style="width:auto; height:auto;">
                     </label>
                 </div>
                  <p class="form-hint" style="font-size: 0.8rem; color: #888; margin-top: 0.5rem;">
-                    Check this to award tokens. The Spinner Game itself is configured in the "Spinner Settings" tab.
+                    Select ONE of the options above. If neither is checked, it will be a standard Main Competition. A competition cannot be both Hero and Instant Win.
                  </p>
             </fieldset>
 
@@ -178,6 +184,15 @@ function renderCompetitionRow(comp) {
     const progress = (comp.ticketsSold / comp.totalTickets) * 100;
     let buttons = '';
     
+    let titleBadge;
+    if (comp.isHeroComp) {
+        titleBadge = '<span class="title-badge title-badge-hero">⭐ Hero Comp</span>';
+    } else if (comp.instantWinsConfig?.enabled) {
+        titleBadge = '<span class="title-badge title-badge-instant">⚡️ Instant Win</span>';
+    } else {
+        titleBadge = '<span class="title-badge title-badge-main">Main Prize</span>';
+    }
+    
     if (comp.status === 'live') {
         buttons = `
             <button class="btn btn-small btn-secondary" data-action="end">End Now</button>
@@ -194,7 +209,7 @@ function renderCompetitionRow(comp) {
     return `
         <div class="competition-row" data-comp-id="${comp.id}">
             <div class="comp-info">
-                <h4>${comp.title}</h4>
+                <h4>${comp.title} ${titleBadge}</h4>
                 <div class="progress-bar"><div class="progress-bar-fill" style="width:${progress}%"></div></div>
                 <span>${comp.ticketsSold || 0} / ${comp.totalTickets}</span>
             </div>
@@ -202,6 +217,7 @@ function renderCompetitionRow(comp) {
             <div class="comp-actions">${buttons}</div>
         </div>`;
 }
+
 
 function initializeCreateFormView() {
     const form = document.getElementById('create-comp-form');
@@ -228,6 +244,16 @@ async function handleCreateFormSubmit(e) {
     submitButton.disabled = true;
     submitButton.textContent = 'Saving...';
 
+    const isHero = form.querySelector('#isHeroComp').checked;
+    const isInstant = form.querySelector('#enable-spin-tokens').checked;
+
+    if (isHero && isInstant) {
+        alert("Error: A competition cannot be both a Hero and an Instant Win competition. Please choose one.");
+        submitButton.disabled = false;
+        submitButton.textContent = 'Create Competition';
+        return;
+    }
+
     try {
         const ticketTiers = Array.from(document.querySelectorAll('.ticket-tier-row')).map(row => ({ amount: parseInt(row.querySelector('.tier-amount').value), price: parseFloat(row.querySelector('.tier-price').value) }));
         const correctAnswer = form.querySelector('#correctAnswer').value.trim();
@@ -253,8 +279,9 @@ async function handleCreateFormSubmit(e) {
             status: 'live',
             createdAt: serverTimestamp(),
             winnerId: null,
+            isHeroComp: isHero,
             instantWinsConfig: { 
-                enabled: form.querySelector('#enable-spin-tokens').checked 
+                enabled: isInstant
             }
         };
         
@@ -399,7 +426,8 @@ function initializeSpinnerCompsView() {
             console.error(error);
             alert('Error saving spinner competition.');
         } finally {
-            submitBtn.disabled = false; submitBtn.textContent = 'Save Spinner Competition';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Spinner Competition';
         }
     });
 }

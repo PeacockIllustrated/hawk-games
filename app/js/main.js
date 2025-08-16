@@ -3,13 +3,15 @@ import { app } from './auth.js';
 
 const db = getFirestore(app);
 
-// --- SECURITY: Helper for safe element creation ---
+// --- SECURITY: Corrected helper function for safe element creation ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
-            if (Array.isArray(value)) value.forEach(c => c && el.classList.add(c));
-            else if (value) el.classList.add(value);
+            const classes = Array.isArray(value) ? value : String(value).split(' ');
+            classes.forEach(c => {
+                if (c) el.classList.add(c); // Check for empty strings
+            });
         } else if (key === 'textContent') {
             el.textContent = value;
         } else if (key === 'style') {
@@ -21,6 +23,7 @@ function createElement(tag, options = {}, children = []) {
     children.forEach(child => child && el.append(child));
     return el;
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
@@ -253,9 +256,9 @@ function startAllCountdowns() {
         timerElements.forEach(timer => {
             const endDate = new Date(timer.dataset.endDate);
             const distance = endDate.getTime() - new Date().getTime();
+            timer.innerHTML = ''; // Clear previous content
 
             if (distance < 0) {
-                timer.innerHTML = '';
                 timer.append(createElement('strong', { textContent: "Competition Closed" }));
                 return;
             }
@@ -264,7 +267,6 @@ function startAllCountdowns() {
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             
-            timer.innerHTML = '';
             timer.append(
                 createElement('strong', { textContent: `${days}D ${hours}H ${minutes}M` }),
                 ' LEFT TO ENTER'

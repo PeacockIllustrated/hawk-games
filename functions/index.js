@@ -138,13 +138,13 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- enterSpinnerCompetition ---
+// --- enterSpinnerCompetition (MODIFIED) ---
 exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
-    const { compId, bundle } = request.data;
+    const { compId, bundle, paymentMethod } = request.data; // Added paymentMethod
 
-    if (!compId || !bundle || !bundle.amount || bundle.amount <= 0) {
+    if (!compId || !bundle || !bundle.amount || bundle.amount <= 0 || !bundle.price) {
         throw new HttpsError('invalid-argument', 'Invalid competition or bundle specified.');
     }
 
@@ -162,12 +162,31 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
             throw new HttpsError('not-found', 'The spinner competition is not active.');
         }
 
+        const userData = userDoc.data();
+        let amountPaid = bundle.price;
+        let entryType = 'paid';
+
+        // Handle credit payment
+        if (paymentMethod === 'credit') {
+            entryType = 'credit';
+            const userCredit = userData.creditBalance || 0;
+            if (userCredit < bundle.price) {
+                throw new HttpsError('failed-precondition', 'Insufficient credit balance.');
+            }
+            // Decrement user's credit balance
+            transaction.update(userRef, { creditBalance: FieldValue.increment(-bundle.price) });
+        } else {
+            // Here you would normally integrate a payment provider like Stripe.
+            // For now, we assume payment was handled client-side if not using credit.
+        }
+
         const entryRef = spinnerCompRef.collection('entries').doc();
         transaction.set(entryRef, {
             userId: uid,
-            userDisplayName: userDoc.data().displayName || "N/A",
+            userDisplayName: userData.displayName || "N/A",
             entriesBought: bundle.amount,
-            amountPaid: bundle.price,
+            amountPaid: amountPaid,
+            entryType: entryType,
             enteredAt: FieldValue.serverTimestamp(),
         });
 
@@ -182,6 +201,8 @@ exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
             });
         }
         transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
+        
+        return { success: true };
     });
 });
 

@@ -15,7 +15,7 @@ let userCreditBalance = 0;
 let spinnerPrizes = [];
 let isSpinning = false;
 let userProfileUnsubscribe = null;
-let activeTokenCompetition = null; // Store the found competition
+let activeTokenCompetition = null;
 
 const tokenCountElement = document.getElementById('token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
@@ -252,7 +252,6 @@ buyMoreBtn.addEventListener('click', async () => {
     purchaseModal.classList.add('show');
     
     try {
-        // Find an available token competition for the user
         const compsRef = collection(db, 'competitions');
         const q = query(compsRef, where('status', '==', 'live'), where('competitionType', '==', 'token'));
         const querySnapshot = await getDocs(q);
@@ -263,7 +262,7 @@ buyMoreBtn.addEventListener('click', async () => {
             const userEntryCount = userProfile.entryCount?.[compData.id] || 0;
             if (userEntryCount < compData.userEntryLimit) {
                 availableComp = compData;
-                break; // Found one, stop searching
+                break;
             }
         }
         
@@ -271,13 +270,13 @@ buyMoreBtn.addEventListener('click', async () => {
             modalContent.innerHTML = '';
             modalContent.append(
                 createElement('h2', { textContent: 'No Competitions Available' }),
-                createElement('p', { textContent: "You've entered all available token draws for now. More will be available next week!" }),
+                createElement('p', { textContent: "You've entered all available token draws for now. More will be available soon!" }),
                 createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
             );
             return;
         }
 
-        activeTokenCompetition = availableComp; // Store for later use
+        activeTokenCompetition = availableComp;
         
         const answers = Object.entries(activeTokenCompetition.skillQuestion.answers)
             .map(([key, value]) => createElement('button', { type: 'button', class: 'answer-btn', 'data-answer': key, textContent: value }));
@@ -307,13 +306,13 @@ buyMoreBtn.addEventListener('click', async () => {
         
         modalContent.append(
             createElement('h2', { textContent: activeTokenCompetition.title }),
-            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus spin tokens instantly!`]),
+            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `£${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus spin tokens instantly!`]),
             form
         );
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleTokenCompEntry(form, activeTokenCompetition.skillQuestion.correctAnswer, activeTokenCompetition.id, 'card');
+            handleTokenCompEntry(form, 'card');
         });
 
     } catch (error) {
@@ -327,12 +326,13 @@ buyMoreBtn.addEventListener('click', async () => {
     }
 });
 
-async function handleTokenCompEntry(form, correctAnswer, compId, paymentMethod = 'card') {
+async function handleTokenCompEntry(form, paymentMethod = 'card') {
     const selectedAnswer = form.querySelector('.answer-btn.selected');
     const selectedBundle = form.querySelector('.ticket-option.selected');
 
+    if (!activeTokenCompetition) { alert('Error: No active competition selected.'); return; }
     if (!selectedAnswer) { alert('Please answer the question.'); return; }
-    if (selectedAnswer.dataset.answer !== correctAnswer) { alert('Incorrect answer. Please try again.'); return; }
+    if (selectedAnswer.dataset.answer !== activeTokenCompetition.skillQuestion.correctAnswer) { alert('Incorrect answer. Please try again.'); return; }
     if (!selectedBundle) { alert('Please select a bundle.'); return; }
 
     const submitBtn = form.querySelector('button[type="submit"]');
@@ -345,14 +345,17 @@ async function handleTokenCompEntry(form, correctAnswer, compId, paymentMethod =
     if(targetBtn) targetBtn.textContent = 'Processing...';
 
     try {
-        // Use the main, unified entry function
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
+        
+        // --- FIX: Send the complete, correct payload to the backend ---
         await allocateTicketsAndAwardTokens({
-            compId: compId,
+            compId: activeTokenCompetition.id,
             ticketsBought: parseInt(selectedBundle.dataset.amount),
+            expectedPrice: parseFloat(selectedBundle.dataset.price),
+            paymentMethod: paymentMethod 
         });
+
         purchaseModal.classList.remove('show');
-        // The onSnapshot listener will update the UI automatically
     } catch (error) {
         console.error("Token comp entry failed:", error);
         alert(`Entry failed: ${error.message}`);
@@ -380,7 +383,7 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
         if (userCreditBalance >= price) {
             const creditButton = createElement('button', { type: 'button', id: 'pay-with-credit-btn', class: ['btn', 'btn-credit'], textContent: `Pay with £${price.toFixed(2)} Credit` });
             creditButton.onclick = () => {
-                 handleTokenCompEntry(target.closest('form'), activeTokenCompetition.skillQuestion.correctAnswer, activeTokenCompetition.id, 'credit');
+                 handleTokenCompEntry(target.closest('form'), 'credit');
             };
             creditOptionDiv.append(creditButton);
             creditOptionDiv.style.display = 'block';

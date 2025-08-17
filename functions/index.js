@@ -239,7 +239,6 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
     const userRef = db.collection('users').doc(uid);
 
     return db.runTransaction(async (transaction) => {
-        // Fetch all settings and user data first
         const settingsRef = db.collection('admin_settings').doc('plinkoPrizes');
         const [userDoc, settingsDoc] = await Promise.all([transaction.get(userRef), transaction.get(settingsRef)]);
 
@@ -248,8 +247,9 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
         
         const userData = userDoc.data();
         const settings = settingsDoc.data();
-        const PLINKO_ROWS = settings.rows || 12; // Use configured rows, default to 12
+        const PLINKO_ROWS = settings.rows || 12;
         const payouts = settings.payouts || [];
+        const mode = settings.mode || 'server';
 
         const userTokens = userData.plinkoTokens || [];
         const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
@@ -259,22 +259,26 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
         const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
         transaction.update(userRef, { plinkoTokens: updatedTokens });
 
-        // Generate the path using pure binomial distribution (p=0.5)
         let rights = 0;
         const steps = [];
         for (let i = 0; i < PLINKO_ROWS; i++) {
-            const step = Math.random() < 0.5 ? -1 : 1; // -1 for left, 1 for right
+            let step;
+            if (mode === 'weighted') {
+                // Example of a slight center bias, can be made more complex
+                step = Math.random() < 0.55 ? 1 : -1;
+            } else { // 'unbiased' and 'server' default to pure 50/50
+                step = Math.random() < 0.5 ? -1 : 1;
+            }
             steps.push(step);
             if (step === 1) rights++;
         }
         const finalSlotIndex = rights;
 
-        const prizeValue = payouts[finalSlotIndex] || 0;
-
+        const prize = payouts[finalSlotIndex] || { type: 'credit', value: 0 };
         const finalPrize = {
-            won: prizeValue > 0,
-            type: 'credit', // All Plinko prizes are site credit
-            value: prizeValue
+            won: prize.value > 0,
+            type: prize.type || 'credit',
+            value: prize.value || 0
         };
 
         if (finalPrize.won) {
@@ -287,7 +291,9 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
                 wonAt: FieldValue.serverTimestamp(),
                 tokenIdUsed: tokenId,
             });
-            transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            if (finalPrize.type === 'credit') {
+                transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            }
         }
         
         return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };

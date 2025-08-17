@@ -89,7 +89,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
       ticketsBought: z.number().int().positive(),
       expectedPrice: z.number().positive(),
       paymentMethod: z.enum(['card', 'credit']).default('card'),
-      tokenType: z.enum(['spinner', 'plinko']), // NEW: Which token to award
+      tokenType: z.enum(['spinner', 'plinko']),
     });
 
     const validation = schema.safeParse(request.data);
@@ -148,7 +148,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             entryType: entryType,
         });
         
-        let newTokens = [];
+        const newTokens = [];
         const earnedAt = new Date();
         for (let i = 0; i < ticketsBought; i++) {
             newTokens.push({
@@ -159,7 +159,6 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             });
         }
         
-        // --- FIX: Award the correct type of token ---
         const tokenFieldToUpdate = tokenType === 'plinko' ? 'plinkoTokens' : 'spinTokens';
         transaction.update(userRef, { [tokenFieldToUpdate]: FieldValue.arrayUnion(...newTokens) });
         
@@ -240,10 +239,18 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
     const userRef = db.collection('users').doc(uid);
 
     return db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
+        // Fetch all settings and user data first
+        const settingsRef = db.collection('admin_settings').doc('plinkoPrizes');
+        const [userDoc, settingsDoc] = await Promise.all([transaction.get(userRef), transaction.get(settingsRef)]);
+
         if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+        if (!settingsDoc.exists) throw new HttpsError('internal', 'Plinko prize configuration is not available.');
         
         const userData = userDoc.data();
+        const settings = settingsDoc.data();
+        const PLINKO_ROWS = settings.rows || 12; // Use configured rows, default to 12
+        const payouts = settings.payouts || [];
+
         const userTokens = userData.plinkoTokens || [];
         const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
         if (tokenIndex === -1) {
@@ -252,27 +259,21 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
         const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
         transaction.update(userRef, { plinkoTokens: updatedTokens });
 
-        const PLINKO_ROWS = 12;
+        // Generate the path using pure binomial distribution (p=0.5)
         let rights = 0;
         const steps = [];
         for (let i = 0; i < PLINKO_ROWS; i++) {
-            const step = Math.random() < 0.5 ? -1 : 1;
+            const step = Math.random() < 0.5 ? -1 : 1; // -1 for left, 1 for right
             steps.push(step);
             if (step === 1) rights++;
         }
         const finalSlotIndex = rights;
 
-        const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
-        const settingsDoc = await settingsRef.get();
-        if (!settingsDoc.exists) {
-            throw new HttpsError('internal', 'Plinko prize configuration is not available.');
-        }
-        const payouts = settingsDoc.data().payouts || [];
         const prizeValue = payouts[finalSlotIndex] || 0;
 
         const finalPrize = {
             won: prizeValue > 0,
-            type: 'credit',
+            type: 'credit', // All Plinko prizes are site credit
             value: prizeValue
         };
 

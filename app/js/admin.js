@@ -299,6 +299,8 @@ function renderCompetitionRow(comp) {
     ]);
 }
 
+
+
 // --- Event Listener Initialization ---
 
 function initializeCreateFormListeners() {
@@ -328,6 +330,86 @@ function initializeCreateFormListeners() {
     addTier();
     
     form.addEventListener('submit', handleCreateFormSubmit);
+}
+
+// Add this new function to admin.js
+
+async function handleCreateFormSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+
+    try {
+        // 1. Gather all form data
+        const title = form.querySelector('#title').value;
+        const totalTickets = parseInt(form.querySelector('#totalTickets').value);
+        const userEntryLimit = parseInt(form.querySelector('#userEntryLimit').value);
+        const cashAlternative = parseFloat(form.querySelector('#cashAlternative').value);
+        const endDate = new Date(form.querySelector('#endDate').value);
+
+        const isHeroComp = form.querySelector('#isHeroComp').checked;
+        const instantWinsEnabled = form.querySelector('#enable-spin-tokens').checked;
+        
+        // 2. Process Skill Question
+        const correctAnswerText = form.querySelector('#correctAnswer').value.trim();
+        const otherAnswersText = form.querySelector('#otherAnswers').value.split(',').map(a => a.trim());
+        const allAnswersArray = [correctAnswerText, ...otherAnswersText].sort(() => Math.random() - 0.5);
+        
+        const answersObject = {};
+        let correctKey = '';
+        ['A', 'B', 'C', 'D'].slice(0, allAnswersArray.length).forEach((key, index) => {
+            answersObject[key] = allAnswersArray[index];
+            if (allAnswersArray[index] === correctAnswerText) {
+                correctKey = key;
+            }
+        });
+
+        // 3. Process Ticket Tiers
+        const ticketTiers = Array.from(form.querySelectorAll('.ticket-tier-row')).map(row => ({
+            amount: parseInt(row.querySelector('.tier-amount').value),
+            price: parseFloat(row.querySelector('.tier-price').value)
+        }));
+        
+        // 4. Construct the Firestore document payload
+        const competitionPayload = {
+            title,
+            totalTickets,
+            userEntryLimit,
+            cashAlternative,
+            endDate: Timestamp.fromDate(endDate),
+            ticketsSold: 0,
+            status: 'live',
+            createdAt: serverTimestamp(),
+            isHeroComp,
+            instantWinsConfig: {
+                enabled: instantWinsEnabled
+            },
+            skillQuestion: {
+                text: form.querySelector('#questionText').value,
+                answers: answersObject,
+                correctAnswer: correctKey
+            },
+            ticketTiers,
+            prizeImage: form.querySelector('#prizeImage').value || null // Handle image URLs
+            // You can add the parallax image fields here if needed
+        };
+
+        // 5. Save to Firestore
+        const docRef = await addDoc(collection(db, 'competitions'), competitionPayload);
+        
+        alert(`Competition "${title}" created successfully with ID: ${docRef.id}`);
+        form.reset();
+        renderView('dashboard'); // Refresh the dashboard view to show the new competition
+
+    } catch (error) {
+        console.error("Error creating competition:", error);
+        alert(`Failed to create competition: ${error.message}`);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Competition';
+    }
 }
 
 function initializeSpinnerSettingsListeners() {

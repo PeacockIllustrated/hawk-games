@@ -881,6 +881,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 .plinko-game-panel.card .bd {
     padding: 14px 16px 16px 16px;
+    /* FIX: Center the board horizontally */
+    display: flex;
+    justify-content: center;
 }
 
 .plinko-game-panel.card::after {
@@ -900,13 +903,15 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* Plinko Board */
 .plinko-game-panel .board {
-    margin: 10px 16px 18px;
+    margin: 10px 0 18px 0; /* Removed side margin for flex centering */
     border-radius: 18px;
     overflow: hidden;
     position: relative;
     background: #0f1013;
     border: 1px solid #181920;
     box-shadow: inset 0 -30px 120px rgba(0, 0, 0, .55), inset 0 2px 0 rgba(255, 255, 255, .02);
+    max-width: 800px; /* Ensure board scales nicely */
+    width: 100%;
 }
 
 .plinko-game-panel .board::before {
@@ -944,7 +949,10 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 .plinko-game-panel .peg {
     filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .8));
-    fill: var(--primary-gold);
+    /* The fill is now a gradient defined in the JS */
+    fill: url(#goldGrad); 
+    stroke: #d09832;
+    stroke-width: .75;
 }
 
 .plinko-game-panel .pocket {
@@ -953,10 +961,13 @@ input:checked + .slider:before { transform: translateX(26px); }
     rx: 10;
 }
 
+/* FIX: Improved prize label styling */
 .plinko-game-panel .payoutLabel {
     fill: var(--primary-gold);
+    font-family: var(--font-heading); /* Oswald font */
     font-weight: 700;
-    font-size: 12px;
+    font-size: 1.2rem; /* Larger font size */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 }
 
 .plinko-game-panel .slotLabel {
@@ -1001,7 +1012,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     background: #101117;
 }
 
-/* Plinko Confetti (different from spinner) */
+/* Plinko Confetti */
 .plinko-confetti {
     position: fixed;
     width: 6px;

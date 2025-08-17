@@ -97,6 +97,7 @@ function renderView(viewName) {
         case 'hero-comp': renderHeroCompView(); break;
         case 'token-comps': renderTokenCompsView(); break;
         case 'spinner-settings': renderSpinnerSettingsView(); break;
+        case 'plinko-settings': renderPlinkoSettingsView(); break; // NEW VIEW
     }
 }
 
@@ -282,6 +283,27 @@ function renderSpinnerSettingsView() {
     initializeSpinnerSettingsListeners();
 }
 
+// --- NEW VIEW: Plinko Settings ---
+function renderPlinkoSettingsView() {
+    const payoutsContainer = createElement('div', {id: 'plinko-payouts-container', class: 'plinko-payouts-grid'});
+    const saveBtn = createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Save Plinko Payouts']);
+
+    const form = createElement('form', { id: 'plinko-settings-form', class: 'admin-form', style: { marginTop: '2rem' } }, [
+        payoutsContainer,
+        createElement('hr', { style: { borderColor: 'var(--border-color)', margin: '1.5rem 0' } }),
+        saveBtn
+    ]);
+
+    const panel = createElement('div', { class: 'content-panel' }, [
+        createElement('h2', { textContent: 'Plinko Prize Settings' }),
+        createElement('p', { style: { padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }, textContent: 'Define the site credit prize for each of the 13 landing slots (0-12) in the Plinko game. The distribution follows a binomial curve.'}),
+        form
+    ]);
+    mainContentContainer.append(panel);
+    initializePlinkoSettingsListeners();
+}
+
+
 // --- FORM CREATION & LOGIC ---
 function createCompetitionForm({ type, title }) {
     const isMain = type === 'main';
@@ -327,7 +349,6 @@ function createCompetitionForm({ type, title }) {
         createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, [ isHero ? 'Save Hero Competition' : 'Create Competition' ])
     ]);
 
-    // Initialize tiers
     const addTier = () => {
         const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
         const tierEl = createElement('div', { class: ['form-group-inline', 'ticket-tier-row'] }, [
@@ -364,9 +385,6 @@ async function handleCreateFormSubmit(e, formType) {
         const instantWinsEnabled = ['instant', 'hero', 'token'].includes(competitionType);
         
         let status = 'live';
-        if (competitionType === 'token') {
-             status = 'live'; // Token competitions are live immediately to be in the pool
-        }
         
         const title = form.querySelector('#title').value;
         const totalTickets = competitionType === 'token' ? 1000000 : parseInt(form.querySelector('#totalTickets').value);
@@ -429,7 +447,6 @@ function initializeSpinnerSettingsListeners() {
     const form = document.getElementById('spinner-settings-form');
     const prizesContainer = document.getElementById('spinner-prizes-container');
     const addPrizeBtn = document.getElementById('add-spinner-prize-btn');
-
     const addPrizeTier = (type = 'credit', value = '', odds = '') => {
         const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
         const prizeEl = createElement('div', { class: ['form-group-inline', 'spinner-prize-row'] }, [
@@ -449,8 +466,59 @@ function initializeSpinnerSettingsListeners() {
         removeBtn.addEventListener('click', () => { prizeEl.remove(); });
     };
 
-    addPrizeBtn.addEventListener('click', () => addPrizeTier());
+function initializePlinkoSettingsListeners() {
+    const form = document.getElementById('plinko-settings-form');
+    const payoutsContainer = document.getElementById('plinko-payouts-container');
+    const PLINKO_SLOTS = 13; // 0 to 12
 
+    const renderInputs = (payouts = []) => {
+        payoutsContainer.innerHTML = '';
+        for (let i = 0; i < PLINKO_SLOTS; i++) {
+            const val = payouts[i] !== undefined ? payouts[i] : 0;
+            const inputGroup = createElement('div', {class: 'form-group'}, [
+                createElement('label', {textContent: `Slot ${i} Payout (£)`}),
+                createElement('input', { type: 'number', 'data-slot': i, class: 'plinko-payout-input', value: val.toFixed(2), step: '0.01', required: true })
+            ]);
+            payoutsContainer.append(inputGroup);
+        }
+    };
+
+    const loadSettings = async () => {
+        const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists() && docSnap.data().payouts) {
+            renderInputs(docSnap.data().payouts);
+        } else {
+            // Default binomial-like distribution if nothing is set
+            renderInputs([0, 0.20, 0.50, 1, 2, 5, 10, 5, 2, 1, 0.50, 0.20, 0]);
+        }
+    };
+    loadSettings();
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        try {
+            const inputs = Array.from(payoutsContainer.querySelectorAll('.plinko-payout-input'));
+            const payouts = inputs.map(input => parseFloat(input.value) || 0);
+            await setDoc(doc(db, 'admin_settings', 'plinkoPrizes'), { payouts });
+            alert('Plinko payouts saved successfully!');
+        } catch (error) {
+            console.error('Error saving plinko payouts:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Plinko Payouts';
+        }
+    });
+}
+
+
+// --- Re-pasting unchanged functions for completeness ---
+
+    addPrizeBtn.addEventListener('click', () => addPrizeTier());
     const loadSettings = async () => { 
         const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(defaultsRef);
@@ -461,7 +529,6 @@ function initializeSpinnerSettingsListeners() {
         if (prizesContainer.children.length === 0) addPrizeTier();
     };
     loadSettings();
-
     form.addEventListener('submit', async (e) => { 
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
@@ -485,19 +552,14 @@ function initializeSpinnerSettingsListeners() {
         }
     });
 }
-
-// --- Event Handlers & Modal Logic ---
 function handleDashboardClick(e) { 
     const button = e.target.closest('button');
     if (!button) return;
-
     const action = button.dataset.action;
     const compRow = button.closest('.competition-row');
     const compId = compRow?.dataset.compId;
     if (!action || !compId) return;
-
     button.disabled = true;
-
     if (action === 'add-fer') {
         showAddFerModal(compId);
         button.disabled = false; 
@@ -507,7 +569,6 @@ function handleDashboardClick(e) {
         handleDrawWinner(compId, button);
     }
 }
-
 async function handleEndCompetition(compId, button) { 
     if (!confirm('Are you sure you want to end this competition? This cannot be undone.')) {
         button.disabled = false;
@@ -524,7 +585,6 @@ async function handleEndCompetition(compId, button) {
         button.disabled = false;
     }
 }
-
 async function handleDrawWinner(compId, button) { 
     if (!confirm('This will draw a winner and publicly announce them. Are you absolutely sure?')) {
         button.disabled = false;
@@ -534,7 +594,6 @@ async function handleDrawWinner(compId, button) {
     try {
         const drawWinner = httpsCallable(functions, 'drawWinner');
         const result = await drawWinner({ compId });
-
         if (result.data.success) {
             alert(`🎉 Winner Drawn! 🎉\n\nWinner: ${result.data.winnerDisplayName}\nTicket: #${result.data.winningTicketNumber}`);
             renderView('dashboard');
@@ -548,11 +607,9 @@ async function handleDrawWinner(compId, button) {
         button.textContent = 'Draw Winner';
     }
 }
-
 function showAddFerModal(compId) {
     const comp = allCompetitions.find(c => c.id === compId);
     if (!comp) return;
-
     const form = createElement('form', { id: 'fer-form', class: 'modal-form' }, [
         createElement('div', { class: 'form-group' }, [createElement('label', { for: 'fer-email', textContent: "User's Email" }), createElement('input', { type: 'email', id: 'fer-email', required: true, placeholder: 'user@example.com' })]),
         createElement('div', { class: 'form-group' }, [createElement('label', { for: 'fer-tickets', textContent: 'Number of Entries' }), createElement('input', { type: 'number', id: 'fer-tickets', required: true, value: '1', min: '1' })]),
@@ -561,28 +618,22 @@ function showAddFerModal(compId) {
             createElement('button', { type: 'submit', class: 'btn' }, ['Add Entry'])
         ])
     ]);
-    
     const content = createElement('div', {}, [
         createElement('h2', { textContent: 'Add Free Entry for:' }),
         createElement('h3', { textContent: comp.title }),
         form
     ]);
-
     openModal(content);
-
     form.addEventListener('submit', (e) => handleAddFerSubmit(e, compId));
     document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
 }
-
 async function handleAddFerSubmit(e, compId) { 
     e.preventDefault();
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
-
     const userEmail = form.querySelector('#fer-email').value;
     const ticketsToAdd = parseInt(form.querySelector('#fer-tickets').value);
-
     try {
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where("email", "==", userEmail), limit(1));
@@ -590,31 +641,23 @@ async function handleAddFerSubmit(e, compId) {
         if (userSnapshot.empty) throw new Error(`User with email ${userEmail} not found.`);
         const userDoc = userSnapshot.docs[0];
         const userId = userDoc.id;
-        
         await runTransaction(db, async (transaction) => {
             const competitionRef = doc(db, 'competitions', compId);
             const userRef = doc(db, 'users', userId);
             const compDoc = await transaction.get(competitionRef);
-            
             if (!compDoc.exists()) throw new Error("Competition not found.");
-            
             const compData = compDoc.data();
             const userData = userDoc.data();
-            
             if (compData.status !== 'live') throw new Error("This competition is no longer live.");
-            
             const userEntryCount = userData.entryCount?.[compId] || 0;
             const entryLimit = compData.userEntryLimit || 75;
             if (userEntryCount + ticketsToAdd > entryLimit) {
                 throw new Error(`Entry limit exceeded. User has ${entryLimit - userEntryCount} entries remaining.`);
             }
-
             const ticketsSoldBefore = compData.ticketsSold || 0;
             if (ticketsSoldBefore + ticketsToAdd > compData.totalTickets) throw new Error("Not enough tickets available.");
-
             transaction.update(competitionRef, { ticketsSold: ticketsSoldBefore + ticketsToAdd });
             transaction.update(userRef, { [`entryCount.${compId}`]: userEntryCount + ticketsToAdd });
-            
             const entryRef = doc(collection(competitionRef, 'entries'));
             transaction.set(entryRef, {
                 userId: userId, 
@@ -626,24 +669,20 @@ async function handleAddFerSubmit(e, compId) {
                 entryType: 'free_postal'
             });
         });
-
         alert('Free entry added successfully!');
         closeModal();
         renderView('dashboard');
-
     } catch (error) {
         console.error("FER Error:", error);
         alert(`Error: ${error.message}`);
         submitBtn.disabled = false;
     }
 }
-
 function setupModal() {
     modalContainer.addEventListener('click', (e) => {
         if (e.target === modalContainer) closeModal();
     });
 }
-
 function openModal(content) {
     modalBody.innerHTML = '';
     if (typeof content === 'string') {
@@ -653,7 +692,6 @@ function openModal(content) {
     }
     modalContainer.classList.add('show');
 }
-
 function closeModal() {
     modalContainer.classList.remove('show');
 }

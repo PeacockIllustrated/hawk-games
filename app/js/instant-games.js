@@ -14,6 +14,7 @@ let userPlinkoTokens = []; // Plinko tokens
 let userProfile = {};
 let userCreditBalance = 0;
 let spinnerPrizes = [];
+let plinkoConfig = {}; // NEW: To store Plinko settings
 let isSpinning = false;
 let userProfileUnsubscribe = null;
 let activeTokenCompetition = null;
@@ -23,7 +24,8 @@ const tokenCountElement = document.getElementById('token-count');
 const plinkoTokenCountElement = document.getElementById('plinko-token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
-const buyMoreBtn = document.getElementById('buy-more-tokens-btn');
+const buySpinnerBtn = document.getElementById('buy-spinner-tokens-btn');
+const buyPlinkoBtn = document.getElementById('buy-plinko-tokens-btn');
 const purchaseModal = document.getElementById('purchase-modal');
 const winCelebrationModal = document.getElementById('win-celebration-modal');
 
@@ -73,12 +75,37 @@ auth.onAuthStateChanged((user) => {
                 }
             }
         });
-        loadPrizeSettings();
-        initializePlinkoBoard();
+        loadAllGameSettings();
     } else {
         window.location.replace('login.html');
     }
 });
+
+async function loadAllGameSettings() {
+    // Load spinner prizes
+    try {
+        const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists() && docSnap.data().prizes) {
+            spinnerPrizes = docSnap.data().prizes;
+            renderPrizesTable(spinnerPrizes);
+        } else { console.error("Spinner settings not found."); }
+    } catch (error) { console.error("Error fetching spinner prizes:", error); }
+
+    // Load plinko settings
+    try {
+        const plinkoSettingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
+        const docSnap = await getDoc(plinkoSettingsRef);
+        if (docSnap.exists()) {
+            plinkoConfig = docSnap.data();
+        } else {
+            // Default config if not set in admin
+            plinkoConfig = { rows: 12, gravity: 1.0, payouts: [0, 0.2, 0.5, 1, 2, 5, 10, 5, 2, 1, 0.5, 0.2, 0] };
+        }
+        initializePlinkoBoard(); // Re-initialize with fetched/default config
+    } catch (error) { console.error("Error fetching plinko prizes:", error); }
+}
+
 
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
@@ -113,17 +140,6 @@ initializeHub();
 
 
 // --- Spinner Logic ---
-async function loadPrizeSettings() {
-    try {
-        const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
-        const docSnap = await getDoc(settingsRef);
-        if (docSnap.exists() && docSnap.data().prizes) {
-            spinnerPrizes = docSnap.data().prizes;
-            renderPrizesTable(spinnerPrizes);
-        } else { console.error("Spinner settings not found."); }
-    } catch (error) { console.error("Error fetching spinner prizes:", error); }
-}
-
 function renderPrizesTable(prizes) {
     prizesTableContainer.innerHTML = '';
     const tableRows = prizes.map(prize => {
@@ -233,9 +249,9 @@ spinButton.addEventListener('click', handleSpin);
 
 // --- Plinko Logic ---
 let plinkoPegs = [], plinkoSlots = [], plinkoOffsets = [];
-const PLINKO_ROWS = 12;
 
 function initializePlinkoBoard() {
+    const PLINKO_ROWS = plinkoConfig.rows || 12;
     while (plinkoSvg.firstChild) plinkoSvg.removeChild(plinkoSvg.firstChild);
 
     const W = 800, H = 900, margin = 60, rowGap = 58;
@@ -274,7 +290,7 @@ function initializePlinkoBoard() {
         const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 38); t2.setAttribute('text-anchor', 'middle');
         t2.setAttribute('class', 'payoutLabel');
-        t2.textContent = `...`;
+        t2.textContent = `£${(plinkoConfig.payouts?.[s] || 0).toFixed(2)}`;
         t2.setAttribute('data-slot-payout', String(s));
         plinkoSvg.appendChild(t2);
     }
@@ -285,9 +301,10 @@ async function handlePlinkoDrop() {
     plinkoActiveBalls++;
     plinkoDropBtn.disabled = true;
 
+    const tokenToSpend = userPlinkoTokens[0];
     const playPlinkoFunc = httpsCallable(functions, 'playPlinko');
     try {
-        const result = await playPlinkoFunc({ tokenId: "some-token-id" }); // TODO: Use real tokens
+        const result = await playPlinkoFunc({ tokenId: tokenToSpend.tokenId });
         const { prize, path } = result.data;
         await animatePlinkoDrop(path, prize);
     } catch (error) {
@@ -300,6 +317,8 @@ async function handlePlinkoDrop() {
 }
 
 async function animatePlinkoDrop(path, prize) {
+    const PLINKO_ROWS = plinkoConfig.rows || 12;
+    const gravity = plinkoConfig.gravity || 1.0;
     const W = 800, margin = 60, rowGap = 58;
     const usableWidth = W - margin * 2;
     const colGap = usableWidth / (PLINKO_ROWS + 1);
@@ -312,6 +331,7 @@ async function animatePlinkoDrop(path, prize) {
     plinkoSvg.appendChild(ball);
 
     const tween = (toX, toY, ms) => new Promise(resolve => {
+        ms = ms * gravity; // Apply gravity multiplier
         const x0 = x, y0 = y, dx = toX - x0, dy = toY - y0; let t0 = null;
         const step = t => {
             if (!t0) t0 = t; const p = Math.min(1, (t - t0) / ms); const ease = p < .5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
@@ -336,7 +356,7 @@ async function animatePlinkoDrop(path, prize) {
         showWinCelebrationModal(prize.type, prize.value, 'plinko');
     }
 
-    await new Promise(res => setTimeout(res, 420));
+    await new Promise(res => setTimeout(res, 420 * gravity));
     plinkoSvg.removeChild(ball);
 }
 
@@ -378,55 +398,40 @@ function renderTokenAccordion() {
     tokenAccordionContainer.append(fragment);
 }
 
-buyMoreBtn.addEventListener('click', async () => {
+async function openPurchaseModal(tokenType) {
     const modalBody = document.getElementById('purchase-modal-body');
     modalBody.innerHTML = '';
-    modalBody.append(createElement('h2', { textContent: 'Get More Spins' }), createElement('p', { class: 'placeholder', textContent: 'Finding available competitions...' }));
+    modalBody.append(createElement('h2', { textContent: `Get More ${tokenType === 'spinner' ? 'Spins' : 'Drops'}` }), createElement('p', { class: 'placeholder', textContent: 'Finding assigned competition...' }));
     purchaseModal.classList.add('show');
-    
+
     try {
-        const compsRef = collection(db, 'competitions');
-        const q = query(compsRef, where('status', '==', 'live'), where('competitionType', '==', 'token'));
-        const querySnapshot = await getDocs(q);
-
-        let availableComp = null;
-        for (const doc of querySnapshot.docs) {
-            const compData = { id: doc.id, ...doc.data() };
-            const userEntryCount = userProfile.entryCount?.[compData.id] || 0;
-            if (userEntryCount < compData.userEntryLimit) {
-                availableComp = compData;
-                break;
-            }
-        }
+        const assignmentsRef = doc(db, 'admin_settings', 'game_assignments');
+        const assignmentsSnap = await getDoc(assignmentsRef);
+        if (!assignmentsSnap.exists()) throw new Error('Game assignments not configured by admin.');
         
-        if (!availableComp) {
-            modalBody.innerHTML = '';
-            modalBody.append(
-                createElement('h2', { textContent: 'No Competitions Available' }),
-                createElement('p', { textContent: "You've entered all available token draws for now. More will be available soon!" }),
-                createElement('div', {class: 'modal-actions'}, [
-                    createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
-                ])
-            );
-            return;
+        const assignments = assignmentsSnap.data();
+        const compId = tokenType === 'spinner' ? assignments.spinnerCompId : assignments.plinkoCompId;
+        if (!compId) throw new Error(`No token competition has been assigned to the ${tokenType} game.`);
+
+        const compRef = doc(db, 'competitions', compId);
+        const compSnap = await getDoc(compRef);
+        if (!compSnap.exists() || compSnap.data().status !== 'live') {
+            throw new Error('The assigned token competition is not currently active.');
         }
 
-        activeTokenCompetition = availableComp;
+        activeTokenCompetition = { id: compSnap.id, ...compSnap.data() };
         
         const answers = Object.entries(activeTokenCompetition.skillQuestion.answers)
             .map(([key, value]) => createElement('button', { type: 'button', class: 'answer-btn', 'data-answer': key, textContent: value }));
 
-        let bundlesHTML = [createElement('p', {textContent: 'No bundles available.'})];
-        if (activeTokenCompetition.ticketTiers && activeTokenCompetition.ticketTiers.length > 0) {
-            bundlesHTML = activeTokenCompetition.ticketTiers.map(b => 
-                createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` })
-            );
-        }
+        const bundlesHTML = activeTokenCompetition.ticketTiers.map(b => 
+            createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` })
+        );
         
         modalBody.innerHTML = '';
         const form = createElement('form', { id: 'token-entry-form', class: 'modal-form' }, [
             createElement('h2', { textContent: activeTokenCompetition.title }),
-            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `£${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus spin tokens instantly!`]),
+            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `£${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus tokens instantly!`]),
             createElement('div', { class: 'skill-question-box' }, [
                 createElement('p', { class: 'question-text', textContent: activeTokenCompetition.skillQuestion.text }),
                 createElement('div', { class: 'answer-options' }, answers)
@@ -445,7 +450,7 @@ buyMoreBtn.addEventListener('click', async () => {
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleTokenCompEntry(form, 'card');
+            handleTokenCompEntry(form, tokenType, 'card');
         });
 
     } catch (error) {
@@ -459,9 +464,12 @@ buyMoreBtn.addEventListener('click', async () => {
             ])
         );
     }
-});
+}
 
-async function handleTokenCompEntry(form, paymentMethod = 'card') {
+buySpinnerBtn.addEventListener('click', () => openPurchaseModal('spinner'));
+buyPlinkoBtn.addEventListener('click', () => openPurchaseModal('plinko'));
+
+async function handleTokenCompEntry(form, tokenType, paymentMethod = 'card') {
     const selectedAnswer = form.querySelector('.answer-btn.selected');
     const selectedBundle = form.querySelector('.ticket-option.selected');
 
@@ -485,7 +493,8 @@ async function handleTokenCompEntry(form, paymentMethod = 'card') {
             compId: activeTokenCompetition.id,
             ticketsBought: parseInt(selectedBundle.dataset.amount),
             expectedPrice: parseFloat(selectedBundle.dataset.price),
-            paymentMethod: paymentMethod 
+            paymentMethod: paymentMethod,
+            tokenType: tokenType
         });
         purchaseModal.classList.remove('show');
     } catch (error) {
@@ -510,6 +519,8 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
     const form = target.closest('form');
     if (!form) return;
 
+    const currentTokenType = form.contains(document.querySelector('#buy-spinner-tokens-btn')) ? 'spinner' : 'plinko';
+
     if (target.classList.contains('answer-btn')) {
         form.querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
         target.classList.add('selected');
@@ -524,7 +535,7 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
         if (userCreditBalance >= price) {
             const creditButton = createElement('button', { type: 'button', id: 'pay-with-credit-btn', class: ['btn', 'btn-credit'], textContent: `Pay with £${price.toFixed(2)} Credit` });
             creditButton.onclick = () => {
-                 handleTokenCompEntry(target.closest('form'), 'credit');
+                 handleTokenCompEntry(target.closest('form'), currentTokenType, 'credit');
             };
             creditOptionDiv.append(creditButton);
             creditOptionDiv.style.display = 'block';
@@ -538,7 +549,7 @@ showPrizesBtn.addEventListener('click', () => prizesModal.classList.add('show'))
 
 const closeModalHandler = (e) => {
     const modal = e.target.closest('.modal-container');
-    if (modal && e.target === modal) { // Only close if clicking on the overlay itself
+    if (modal && e.target === modal) {
         modal.classList.remove('show');
     }
 };

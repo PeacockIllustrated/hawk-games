@@ -697,3 +697,280 @@ input:checked + .slider:before { transform: translateX(26px); }
         text-align: center;
     }
 }
+
+
+/* =================================================== */
+/* ==       SECTION 24: INSTANT GAMES HUB           == */
+/* =================================================== */
+
+.game-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 3rem;
+}
+
+.game-tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 4px solid transparent;
+    position: relative;
+    top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.game-tab-btn:hover {
+    color: var(--light-white);
+}
+
+.game-tab-btn.active {
+    color: var(--primary-gold);
+    border-bottom-color: var(--primary-gold);
+}
+
+.plinko-icon {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background-color: #4a69e0; /* A distinct color for Plinko */
+    border-radius: 50%;
+}
+
+.game-panel {
+    display: none;
+}
+
+.game-panel.active {
+    display: block;
+}
+
+
+/* =================================================== */
+/* ==     SECTION 25: IMPROVED PURCHASE MODAL       == */
+/* =================================================== */
+
+.purchase-modal-content {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; /* Ensure modal doesn't overflow viewport height */
+}
+
+#purchase-modal-body {
+    padding: 2rem;
+    overflow-y: auto; /* Enable scrolling for content */
+}
+
+#purchase-modal-body h2 {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    text-transform: uppercase;
+    color: var(--primary-gold);
+}
+
+#purchase-modal-body p {
+    color: #aaa;
+    margin: 0.5rem 0 2rem 0;
+}
+
+.modal-form .skill-question-box,
+.modal-form .ticket-selector-box {
+    text-align: left;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--dark-bg);
+    border-radius: 4px;
+}
+
+.modal-form .question-text {
+    font-size: 1.1rem;
+    color: var(--light-white);
+    margin-bottom: 1rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    background-color: #111;
+}
+
+/* =================================================== */
+/* ==          SECTION 26: PLINKO STYLES            == */
+/* == (Migrated from plinko-mvp.html for integration)== */
+/* =================================================== */
+
+.plinko-game-panel.card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, .0));
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+    position: relative;
+    overflow: hidden;
+}
+
+.plinko-game-panel.card .hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 0 16px;
+}
+
+.plinko-game-panel.card .bd {
+    padding: 14px 16px 16px 16px;
+}
+
+.plinko-game-panel.card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 16px;
+    background: radial-gradient(800px 200px at 50% -10%, rgba(224, 169, 74, .14), transparent 60%);
+    mix-blend-mode: screen;
+    opacity: .4;
+}
+
+.plinko-game-panel h1, .plinko-game-panel h2, .plinko-game-panel h3 {
+    margin: 8px 0;
+}
+
+/* Plinko Board */
+.plinko-game-panel .board {
+    margin: 10px 16px 18px;
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+    background: #0f1013;
+    border: 1px solid #181920;
+    box-shadow: inset 0 -30px 120px rgba(0, 0, 0, .55), inset 0 2px 0 rgba(255, 255, 255, .02);
+}
+
+.plinko-game-panel .board::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(600px 280px at 50% 0%, rgba(224, 169, 74, .12), transparent 65%), radial-gradient(300px 160px at 48% 20%, rgba(224, 169, 74, .06), transparent 60%);
+    opacity: .6;
+}
+
+.plinko-game-panel .dropzone {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 14px;
+    color: #bfbfbf;
+    font-size: 12px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .8);
+    animation: dz 2.4s ease-in-out infinite;
+    user-select: none;
+    pointer-events: none;
+}
+
+@keyframes dz {
+    0%, 100% { opacity: .85; transform: translateX(-50%) translateY(0); }
+    50% { opacity: .55; transform: translateX(-50%) translateY(1px); }
+}
+
+.plinko-game-panel svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.plinko-game-panel .peg {
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .8));
+    fill: var(--primary-gold);
+}
+
+.plinko-game-panel .pocket {
+    fill: #14151b;
+    stroke: #262832;
+    rx: 10;
+}
+
+.plinko-game-panel .payoutLabel {
+    fill: var(--primary-gold);
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.plinko-game-panel .slotLabel {
+    fill: #bfbfbf;
+    font-size: 12px;
+}
+
+/* Plinko Controls */
+.plinko-game-panel .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 4px 0 8px;
+}
+
+.plinko-game-panel .btn-primary {
+    background: linear-gradient(180deg, #f4d488, var(--primary-gold));
+    color: #1a1a1a;
+    box-shadow: 0 8px 30px rgba(224, 169, 74, .25), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+
+.plinko-game-panel .btn:active {
+    transform: translateY(1px) scale(.99);
+}
+.plinko-game-panel .btn-primary:hover {
+    filter: brightness(1.03);
+}
+
+.plinko-game-panel .chips {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.plinko-game-panel .chip {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: #bfbfbf;
+    font-size: 12px;
+    background: #101117;
+}
+
+/* Plinko Confetti (different from spinner) */
+.plinko-confetti {
+    position: fixed;
+    width: 6px;
+    height: 10px;
+    background: var(--primary-gold);
+    left: 50%;
+    top: 40%;
+    opacity: .95;
+    transform: translateX(-50%);
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(224, 169, 74, .6);
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .plinko-game-panel .dropzone, .plinko-confetti { animation: none; transition: none }
+}

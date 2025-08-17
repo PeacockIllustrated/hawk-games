@@ -697,8 +697,6 @@ input:checked + .slider:before { transform: translateX(26px); }
         text-align: center;
     }
 }
-
-
 /* =================================================== */
 /* ==       SECTION 24: INSTANT GAMES HUB           == */
 /* =================================================== */
@@ -747,12 +745,59 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 .game-panel {
     display: none;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .game-panel.active {
     display: block;
 }
 
+/* NEW: Style for Plinko Buy More Button */
+.balance-row .btn-buy-plinko-tokens {
+    font-size: 1.8rem;
+    line-height: 1;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    background-color: #222;
+    color: #888;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.balance-row .btn-buy-plinko-tokens:hover {
+    background-color: #333;
+    color: var(--light-white);
+}
+
+
+/* NEW: Styles for Admin Assignment Panels */
+.admin-assignment-panel {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--dark-bg);
+    border-radius: 5px;
+}
+
+.admin-assignment-panel h3 {
+    font-family: var(--font-heading);
+    color: var(--primary-gold);
+    margin: 0 0 1rem 0;
+}
+
+.admin-assignment-panel .form-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
 
 /* =================================================== */
 /* ==     SECTION 25: IMPROVED PURCHASE MODAL       == */

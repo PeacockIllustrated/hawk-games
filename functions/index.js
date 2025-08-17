@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, HttpsError } = require("firebase-functions/v2/onCall");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
@@ -27,6 +27,7 @@ const functionOptions = {
 };
 
 // --- allocateTicketsAndAwardTokens ---
+// This function now handles ALL competition entries, including the new 'token' type competitions.
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
     // --- SECURITY: Zod schema for strict input validation ---
     const schema = z.object({
@@ -161,75 +162,9 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- enterSpinnerCompetition ---
-exports.enterSpinnerCompetition = onCall(functionOptions, async (request) => {
-    // --- SECURITY: Zod schema for strict input validation ---
-    const schema = z.object({
-        compId: z.string().min(1),
-        bundle: z.object({
-            amount: z.number().int().positive(),
-            price: z.number().positive(),
-        }),
-        paymentMethod: z.enum(['credit', 'card']),
-    });
-
-    const validation = schema.safeParse(request.data);
-    if (!validation.success) {
-      throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
-    }
-    const { compId, bundle, paymentMethod } = validation.data;
-
-    assertIsAuthenticated(request);
-    const uid = request.auth.uid;
-    
-    const userRef = db.collection('users').doc(uid);
-    const spinnerCompRef = db.collection('spinner_competitions').doc(compId);
-
-    return db.runTransaction(async (transaction) => {
-        const userDoc = await transaction.get(userRef);
-        const spinnerCompDoc = await transaction.get(spinnerCompRef);
-
-        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
-        if (!spinnerCompDoc.exists) throw new HttpsError('not-found', 'The spinner competition is not active.');
-
-        const userData = userDoc.data();
-        let amountPaid = bundle.price;
-        let entryType = 'paid';
-
-        if (paymentMethod === 'credit') {
-            entryType = 'credit';
-            const userCredit = userData.creditBalance || 0;
-            if (userCredit < bundle.price) {
-                throw new HttpsError('failed-precondition', 'Insufficient credit balance.');
-            }
-            transaction.update(userRef, { creditBalance: FieldValue.increment(-bundle.price) });
-        }
-
-        const entryRef = spinnerCompRef.collection('entries').doc();
-        transaction.set(entryRef, {
-            userId: uid,
-            userDisplayName: userData.displayName || "N/A",
-            entriesBought: bundle.amount,
-            amountPaid: amountPaid,
-            entryType: entryType,
-            enteredAt: FieldValue.serverTimestamp(),
-        });
-
-        let newTokens = [];
-        const earnedAt = new Date();
-        for (let i = 0; i < bundle.amount; i++) {
-            newTokens.push({
-                tokenId: crypto.randomBytes(16).toString('hex'),
-                compId: 'spinner-comp-bundle',
-                compTitle: `Spinner Competition Entry`,
-                earnedAt: earnedAt
-            });
-        }
-        transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
-        
-        return { success: true };
-    });
-});
+// --- DEPRECATED: enterSpinnerCompetition ---
+// This function is no longer needed as all entries now go through allocateTicketsAndAwardTokens.
+// It is removed to simplify the backend and centralize logic.
 
 // --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {

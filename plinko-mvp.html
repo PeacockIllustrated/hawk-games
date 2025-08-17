@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>The Hawk Games — Plinko (EPIC MVP)</title>
+  <title>The Hawk Games — Plinko (EPIC + Hold)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="On-brand Plinko demo for The Hawk Games — premium UI/UX, smooth physics-like motion.">
+  <meta name="description" content="On-brand Plinko demo for The Hawk Games — premium UI/UX, snap-aligned physics-like motion, hold-to-drop controls.">
   <style>
     /* ===== Brand tokens ===== */
     :root{
@@ -18,7 +18,6 @@
       --card2:#191a1f;
       --border:#2a2a2f;
       --shadow:0 12px 40px rgba(0,0,0,.45);
-      --r:12px;
     }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
@@ -31,8 +30,6 @@
       font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
       min-height:100vh;
     }
-
-    /* Subtle moving aurora */
     body::before{
       content:"";
       position:fixed; inset:-20%;
@@ -42,10 +39,7 @@
       pointer-events:none;
       animation: aurora 14s ease-in-out infinite alternate;
     }
-    @keyframes aurora{
-      0%{transform:translate3d(-2%,0,0)}
-      100%{transform:translate3d(2%,1%,0)}
-    }
+    @keyframes aurora{0%{transform:translate3d(-2%,0,0)}100%{transform:translate3d(2%,1%,0)}}
 
     /* ===== Layout ===== */
     .header{
@@ -65,8 +59,6 @@
     .card{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0)); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
     .card .hd{display:flex; align-items:center; justify-content:space-between; padding:14px 16px 0 16px}
     .card .bd{padding:14px 16px 16px 16px}
-
-    /* Inner glow edge */
     .card::after{
       content:""; position:absolute; inset:0; pointer-events:none; border-radius:16px;
       background: radial-gradient(800px 200px at 50% -10%, rgba(224,169,74,.14), transparent 60%);
@@ -94,6 +86,7 @@
       position:absolute; left:50%; transform:translateX(-50%); top:14px; color:var(--muted); font-size:12px;
       text-shadow:0 1px 0 rgba(0,0,0,.8);
       animation: dz 2.4s ease-in-out infinite;
+      user-select:none; pointer-events:none;
     }
     @keyframes dz{0%,100%{opacity:.85; transform:translateX(-50%) translateY(0)} 50%{opacity:.55; transform:translateX(-50%) translateY(1px)}}
 
@@ -106,17 +99,24 @@
 
     /* ===== Controls ===== */
     .controls{display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 8px}
-    .btn{appearance:none; border:none; cursor:pointer; border-radius:12px; padding:12px 16px; font-weight:700; letter-spacing:.2px; transition:.18s transform, .18s box-shadow, .18s filter}
+    .btn{appearance:none; position:relative; border:none; cursor:pointer; border-radius:12px; padding:12px 16px; font-weight:700; letter-spacing:.2px; transition:.18s transform, .18s box-shadow, .18s filter; overflow:hidden}
     .btn-primary{
       background: linear-gradient(180deg, var(--gold-hi), var(--gold));
       color:#1a1a1a; box-shadow: 0 8px 30px rgba(224,169,74,.25), inset 0 1px 0 rgba(255,255,255,.5);
     }
     .btn-ghost{ background:#1a1b21; border:1px solid var(--border); color:var(--fg) }
     .btn:active{ transform: translateY(1px) scale(.99) }
-
-    /* Magnetic hover */
     .btn-primary:hover{ filter:brightness(1.03) }
     .btn-ghost:hover{ border-color:#3a3b44 }
+
+    /* hold progress */
+    .hold{
+      position:absolute; left:0; top:0; bottom:0; width:0%;
+      background:rgba(0,0,0,.15); pointer-events:none;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+      transition: width .05s linear;
+    }
+    .hold.active{ background:rgba(0,0,0,.2) }
 
     .chips{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
     .chip{padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:12px; background:#101117}
@@ -158,14 +158,14 @@
 <body>
   <header class="header">
     <a class="brand" href="#">The Hawk Games</a>
-    <span class="pill">Plinko — Epic MVP</span>
+    <span class="pill">Plinko — Epic MVP (Hold to Drop)</span>
   </header>
 
   <main class="wrap">
     <!-- Left: Game -->
     <section class="card">
       <div class="hd">
-        <h1>Plinko <span class="muted">(physics-like)</span></h1>
+        <h1>Plinko <span class="muted">(physics-like, snap-aligned)</span></h1>
         <div class="chips">
           <span class="chip" id="stakePill">Stake: £2.50</span>
           <span class="chip" id="rowsPill">Rows: 12 (Slots: 13)</span>
@@ -173,10 +173,9 @@
         </div>
       </div>
       <div class="bd">
-        <div class="board" id="board">
+        <div class="board" id="board" title="Click anywhere to drop a ball (even while others are falling)">
           <div class="dropzone">Drop Zone</div>
           <svg id="plinko" viewBox="0 0 800 900" aria-label="Plinko Board">
-            <!-- gold gradient for pegs -->
             <defs>
               <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#f4d488"/>
@@ -188,8 +187,14 @@
         </div>
 
         <div class="controls">
-          <button id="drop1" class="btn btn-primary">Drop 1</button>
-          <button id="drop3" class="btn btn-ghost">Drop 3×</button>
+          <button id="drop1" class="btn btn-primary">
+            <span>Drop 1 (hold)</span>
+            <span class="hold" id="hold1"></span>
+          </button>
+          <button id="drop3" class="btn btn-ghost">
+            <span>Drop 3× (hold)</span>
+            <span class="hold" id="hold3"></span>
+          </button>
           <button id="reset" class="btn btn-ghost">Reset</button>
         </div>
       </div>
@@ -261,18 +266,23 @@
       baseStakeGBP: 2.5,
       gravity: 1.0,           // 1.0 = normal; <1 faster, >1 slower
       mode: 'unbiased',       // 'unbiased' | 'weighted' | 'server'
-      payoutsGBP: [],         // length rows+1
+      payoutsGBP: [],
       drops: 0,
-      winnings: 0,
-      busy:false,
-      queue:0
+      winnings: 0
     };
+
+    // limits
+    const MAX_ACTIVE_BALLS = 24;            // safety cap
+    const HOLD_DURATION_MS = 1000;          // 1s hold to arm
+    const HOLD_TICK_MS = 160;               // drop cadence while held
 
     // DOM
     const svg = document.getElementById('plinko');
     const board = document.getElementById('board');
     const drop1 = document.getElementById('drop1');
     const drop3 = document.getElementById('drop3');
+    const hold1 = document.getElementById('hold1');
+    const hold3 = document.getElementById('hold3');
     const resetBtn = document.getElementById('reset');
     const payoutsEl = document.getElementById('payouts');
     const stakePill = document.getElementById('stakePill');
@@ -283,7 +293,6 @@
     const statDrops = document.getElementById('statDrops');
     const statWinnings = document.getElementById('statWinnings');
     const statSessionRTP = document.getElementById('statSessionRTP');
-    const toast = document.getElementById('toast');
     const rowsSlider = document.getElementById('rowsSlider');
     const rowsVal = document.getElementById('rowsVal');
     const stakeInput = document.getElementById('stakeInput');
@@ -295,10 +304,15 @@
       server:   document.getElementById('modeServer')
     };
     const modeNote = document.getElementById('modeNote');
+    const toast = document.getElementById('toast');
 
     // Geometry
-    let pegs = [];   // {x,y}
-    let slots = [];  // {x,width,idx}
+    let pegs = [];   // per-row x positions
+    let slots = [];  // pockets
+    let offsets = []; // offset per row (for exact alignment)
+
+    // Active balls
+    let activeBalls = 0;
 
     // Utils
     const fmtGBP = (n) => '£' + Number(n).toFixed(2);
@@ -315,42 +329,20 @@
         const p = nCr(N, k) / denom;
         exp += p * state.payoutsGBP[k];
       }
-      const perStake = exp / state.baseStakeGBP;
-      return perStake; // return per £1 stake
+      return exp / state.baseStakeGBP; // per £1
     }
 
     function showToast(text){
       toast.textContent = text;
       toast.classList.add('show');
       clearTimeout(showToast._t);
-      showToast._t = setTimeout(()=> toast.classList.remove('show'), 1600);
-    }
-
-    function confettiBurst(centerX, centerY){
-      for (let i=0;i<28;i++){
-        const el = document.createElement('div');
-        el.className='confetti';
-        const hue = 40 + (i*7)%40; // gold range
-        el.style.background = `hsl(${hue} 70% 55%)`;
-        el.style.left = centerX + 'px';
-        el.style.top = centerY + 'px';
-        const dx = (Math.random()*2-1)*180;
-        const dy = (Math.random()*-1)*220 - 60;
-        const rot = (Math.random()*2-1)*280;
-        const t = 900 + Math.random()*700;
-        el.animate([
-          { transform:`translate(0,0) rotate(0deg)`, opacity:1 },
-          { transform:`translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity:0 }
-        ], { duration:t, easing:'cubic-bezier(.17,.67,.22,1)', fill:'forwards' });
-        document.body.appendChild(el);
-        setTimeout(()=> el.remove(), t+50);
-      }
+      showToast._t = setTimeout(()=> toast.classList.remove('show'), 1500);
     }
 
     function animateNumber(el, to, prefix='£', isPercent=false){
       const parse = (s)=> Number(String(s).replace(/[^\d.-]/g,''))||0;
       const from = parse(el.textContent);
-      const dur = 500;
+      const dur = 400;
       const t0 = performance.now();
       function tick(t){
         const p = clamp((t-t0)/dur,0,1);
@@ -362,9 +354,8 @@
       requestAnimationFrame(tick);
     }
 
-    /* ===== Board build/render ===== */
+    /* ===== Board build/render (exact lattice) ===== */
     function defaultPayouts(rows){
-      // Symmetric profile: edges low, centre higher. Tuned for screenshots vibe.
       const len = rows+1;
       const mid = Math.floor(len/2);
       const arr = new Array(len).fill(0);
@@ -373,13 +364,11 @@
         const base = [0, .25, .5, 1, 2, 5, 10][clamp(6-d,0,6)];
         arr[i] = Number(base.toFixed(2));
       }
-      // Optional: flatten extreme edges to 0
       arr[0]=0; arr[len-1]=0;
       return arr;
     }
 
     function buildBoard(){
-      // reset svg
       while (svg.firstChild) svg.removeChild(svg.firstChild);
 
       const W = 800, H = 900;
@@ -387,18 +376,7 @@
       const rowGap = 58;
       const N = state.rows;
 
-      // Background plate (subtle inner gradient handled by CSS container)
-      const plate = document.createElementNS('http://www.w3.org/2000/svg','rect');
-      plate.setAttribute('x', 14);
-      plate.setAttribute('y', 14);
-      plate.setAttribute('width', W-28);
-      plate.setAttribute('height', H-28);
-      plate.setAttribute('fill', 'url(#plateGrad)');
-      plate.setAttribute('stroke', '#1a1b22');
-      plate.setAttribute('rx', '16');
-      svg.appendChild(plate);
-
-      // Plate grad
+      // plate
       const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
       const pGrad = document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
       pGrad.setAttribute('id','plateGrad');
@@ -408,24 +386,33 @@
       pGrad.appendChild(s1); pGrad.appendChild(s2); defs.appendChild(pGrad);
       svg.appendChild(defs);
 
-      pegs = []; slots = [];
+      const plate = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      plate.setAttribute('x', 14); plate.setAttribute('y', 14);
+      plate.setAttribute('width', W-28); plate.setAttribute('height', H-28);
+      plate.setAttribute('fill', 'url(#plateGrad)'); plate.setAttribute('stroke', '#1a1b22'); plate.setAttribute('rx', '16');
+      svg.appendChild(plate);
+
       const usableWidth = W - margin*2;
       const colGap = usableWidth / (N+1);
 
-      // Pegs
-      for (let row=0; row<N; row++){
-        const pegsInRow = row+1;
-        const y = margin + rowGap*(row+1);
+      pegs = []; slots = []; offsets = [];
+
+      // Precompute per-row peg offsets (so pegs are centred regardless of N)
+      for (let r=0; r<N; r++){
+        const pegsInRow = r+1;
         const offset = (usableWidth - (pegsInRow-1)*colGap)/2 + margin;
-        for (let p=0; p<pegsInRow; p++){
-          const x = offset + p*colGap;
-          pegs.push({x,y});
+        offsets[r] = offset;
+        const row = [];
+        const y = margin + rowGap*(r+1);
+        for (let k=0; k<pegsInRow; k++){
+          const x = offset + k*colGap;
+          row.push(x);
           const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
           c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 8);
-          c.setAttribute('class','peg gold');
-          c.setAttribute('opacity','0.95');
+          c.setAttribute('class','peg gold'); c.setAttribute('opacity','0.95');
           svg.appendChild(c);
         }
+        pegs[r] = row;
       }
 
       // Slots & labels
@@ -435,11 +422,11 @@
         const w = colGap*0.9;
         slots.push({x, width:w, idx:s});
 
-        const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
-        r.setAttribute('x', x - w/2); r.setAttribute('y', slotsY);
-        r.setAttribute('width', w); r.setAttribute('height', 48);
-        r.setAttribute('class','pocket');
-        svg.appendChild(r);
+        const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        rect.setAttribute('x', x - w/2); rect.setAttribute('y', slotsY);
+        rect.setAttribute('width', w); rect.setAttribute('height', 48);
+        rect.setAttribute('class','pocket');
+        svg.appendChild(rect);
 
         const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
         t1.setAttribute('x', x); t1.setAttribute('y', slotsY + 20); t1.setAttribute('text-anchor','middle');
@@ -460,7 +447,6 @@
         const card = document.createElement('div'); card.className='payout-card';
         const i = document.createElement('div'); i.className='idx'; i.textContent = `Slot ${idx}`;
         const v = document.createElement('div'); v.className='val'; v.textContent = fmtGBP(val);
-        // make editable: click to prompt quick edit
         card.addEventListener('click', ()=>{
           const nv = prompt(`Set payout for Slot ${idx} (GBP)`, String(val));
           if (nv===null) return;
@@ -478,15 +464,13 @@
       stakePill.textContent = `Stake: £${state.baseStakeGBP.toFixed(2)}`;
       rowsPill.textContent = `Rows: ${state.rows} (Slots: ${state.rows+1})`;
     }
-
     function updateRTPUI(){
-      const r = theoreticalRTP(); // per £1
-      const pct = clamp(r*100, 0, 200); // cap bar at 200%
+      const r = theoreticalRTP();
+      const pct = clamp(r*100, 0, 200);
       rtpPill.textContent = `RTP: ${(r*100).toFixed(1)}%`;
       rtpText.textContent = (r*100).toFixed(1) + '%';
       rtpFill.style.width = pct + '%';
     }
-
     function updateStatsUI(){
       statDrops.textContent = state.drops;
       animateNumber(statWinnings, state.winnings, '£');
@@ -496,8 +480,9 @@
     }
 
     function highlightSlot(idx){
+      const N = state.rows, margin = 60, rowGap = 58;
       const s = slots[idx]; if (!s) return;
-      const slotsY = 60 + 58*(state.rows+1) + 10;
+      const slotsY = margin + rowGap*(N+1) + 10;
       const g = document.createElementNS('http://www.w3.org/2000/svg','rect');
       g.setAttribute('x', s.x - s.width/2);
       g.setAttribute('y', slotsY);
@@ -510,10 +495,11 @@
       g.setAttribute('opacity','0.0');
       svg.appendChild(g);
       let t0=null; const dur=620/state.gravity;
-      function anim(t){ if(!t0) t0=t; const p=Math.min(1,(t-t0)/dur); g.setAttribute('opacity', String(0.9*(1-p))); if(p<1) requestAnimationFrame(anim); else svg.removeChild(g); }
+      function anim(t){ if(!t0)t0=t; const p=Math.min(1,(t-t0)/dur); g.setAttribute('opacity', String(0.9*(1-p))); if(p<1) requestAnimationFrame(anim); else svg.removeChild(g); }
       requestAnimationFrame(anim);
     }
 
+    /* ===== Exact path simulation + animation ===== */
     function simulatePath(){
       const N = state.rows;
       let rights = 0;
@@ -521,11 +507,9 @@
       for (let r=0;r<N;r++){
         let right;
         if (state.mode==='weighted'){
-          // slight centre bias example (p tilts towards centre)
-          const centreBias = 0.55; // tweakable
+          const centreBias = 0.55;
           right = (Math.random() < centreBias) ? 1 : -1;
         } else {
-          // unbiased
           right = (crypto.getRandomValues(new Uint8Array(1))[0] & 1) ? 1 : -1;
         }
         if (right===1) rights++;
@@ -535,23 +519,28 @@
     }
 
     async function animateDrop(path){
+      if (activeBalls >= MAX_ACTIVE_BALLS) return;
+      activeBalls++;
+
       const N = state.rows;
-      const W = 800;
-      const margin = 60;
+      const W = 800, margin = 60, rowGap = 58;
       const usableWidth = W - margin*2;
       const colGap = usableWidth / (N+1);
-      const rowGap = 58;
 
-      let x = W/2, y = margin + 8;
+      // Start slightly above top peg, centred over it
+      let k = 0; // rights so far
+      let x = offsets[0] + 0*colGap; // top peg index 0
+      let y = margin + 8;
+
       const ball = document.createElementNS('http://www.w3.org/2000/svg','circle');
       ball.setAttribute('cx', x); ball.setAttribute('cy', y); ball.setAttribute('r', 10);
       ball.setAttribute('fill','var(--gold)'); ball.setAttribute('opacity','0.98');
       ball.style.filter='drop-shadow(0 4px 10px rgba(224,169,74,.35))';
       svg.appendChild(ball);
 
-      function trail(x,y){
+      function trail(tx,ty){
         const t = document.createElementNS('http://www.w3.org/2000/svg','circle');
-        t.setAttribute('cx', x); t.setAttribute('cy', y); t.setAttribute('r', 7);
+        t.setAttribute('cx', tx); t.setAttribute('cy', ty); t.setAttribute('r', 7);
         t.setAttribute('fill','var(--gold)'); t.setAttribute('opacity','0.28');
         svg.appendChild(t);
         const d = 360/state.gravity;
@@ -580,32 +569,35 @@
         });
       }
 
-      let rights = 0;
+      // For each row: move to the precise peg, then to the precise gap center for next row
       for (let r=0; r<N; r++){
+        const pegX = offsets[r] + k*colGap;
         const pegY = margin + rowGap*(r+1);
-        const decisionRight = path.steps[r] === 1;
-        if (decisionRight) rights++;
-        // drift toward next column
-        const targetX = (margin + (rights+0.5)*colGap);
-        await tween(targetX, pegY, 140, true);
-        // small settle drop
-        await tween(targetX, pegY + rowGap*0.42, 110, false);
+        await tween(pegX, pegY, 140, true);
+
+        const stepRight = path.steps[r] === 1;
+        // gap center between row r and r+1 depends on step: k-0.5 (left) or k+0.5 (right)
+        const gapX = (offsets[r+1] ?? (margin + (usableWidth - (r+1)*colGap)/2 + margin)) + (k + (stepRight? 0.5 : -0.5))*colGap;
+        const gapY = pegY + rowGap*0.45;
+        await tween(gapX, gapY, 110, false);
+
+        if (stepRight) k++;
       }
 
-      // Final pocket fall
-      const slot = slots[path.slotIndex];
+      // Fall into slot k
+      const slot = slots[k];
       const slotsY = margin + rowGap*(N+1) + 34;
       await tween(slot.x, slotsY, 240, true);
 
-      const prize = state.payoutsGBP[path.slotIndex] || 0;
+      const prize = state.payoutsGBP[k] || 0;
       state.drops += 1;
       state.winnings += prize;
-
       updateStatsUI();
-      highlightSlot(path.slotIndex);
+      highlightSlot(k);
+
       const bounds = board.getBoundingClientRect();
       if (prize >= 10) confettiBurst(bounds.left + slot.x*(bounds.width/800), bounds.top + slotsY*(bounds.height/900));
-      showToast(prize>0 ? `Win: ${fmtGBP(prize)} (Slot ${path.slotIndex})` : `No prize (Slot ${path.slotIndex})`);
+      showToast(prize>0 ? `Win: ${fmtGBP(prize)} (Slot ${k})` : `No prize (Slot ${k})`);
 
       // Fade the ball out
       await new Promise(res=>{
@@ -613,26 +605,86 @@
         requestAnimationFrame(f);
       });
       svg.removeChild(ball);
+      activeBalls--;
     }
 
-    async function drop(){
-      if (state.busy){ state.queue++; return; }
-      state.busy = true;
-      try{
-        const path = (state.mode==='server')
-          ? await serverOutcomeStub()
-          : simulatePath();
-        await animateDrop(path);
-      } finally {
-        state.busy = false;
-        if (state.queue>0){ state.queue--; drop(); }
+    function confettiBurst(centerX, centerY){
+      for (let i=0;i<28;i++){
+        const el = document.createElement('div');
+        el.className='confetti';
+        const hue = 40 + (i*7)%40;
+        el.style.background = `hsl(${hue} 70% 55%)`;
+        el.style.left = centerX + 'px';
+        el.style.top = centerY + 'px';
+        const dx = (Math.random()*2-1)*180;
+        const dy = (Math.random()*-1)*220 - 60;
+        const rot = (Math.random()*2-1)*280;
+        const t = 900 + Math.random()*700;
+        el.animate([{ transform:`translate(0,0) rotate(0deg)`, opacity:1 },{ transform:`translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity:0 }], { duration:t, easing:'cubic-bezier(.17,.67,.22,1)', fill:'forwards' });
+        document.body.appendChild(el);
+        setTimeout(()=> el.remove(), t+50);
       }
     }
 
-    // Placeholder server outcome demo hook
-    async function serverOutcomeStub(){
-      // For now mimic unbiased; here you would call Functions and return a secure slotIndex
-      return simulatePath();
+    /* ===== Interaction: hold-to-drop buttons ===== */
+    function setupHold(button, barEl, makeBurstFn){
+      let raf = null, start = 0, armed = false, intervalId = null;
+
+      function resetBar(){ barEl.style.width = '0%'; barEl.classList.remove('active'); }
+
+      function onDown(){
+        if (intervalId) return; // already streaming
+        start = performance.now();
+        armed = false;
+        barEl.classList.add('active');
+        const step = (t)=>{
+          const p = Math.min(1, (t - start)/HOLD_DURATION_MS);
+          barEl.style.width = (p*100) + '%';
+          if (p >= 1 && !armed){
+            armed = true;
+            // start streaming bursts
+            intervalId = setInterval(()=>{
+              makeBurstFn();
+            }, HOLD_TICK_MS);
+          }
+          if (!armed) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+      }
+
+      function onUpCancel(){
+        barEl.classList.remove('active');
+        cancelAnimationFrame(raf);
+        if (intervalId){
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        // If user released before arming, do nothing (no drop).
+        // If armed, we already streamed while holding; just reset bar.
+        setTimeout(resetBar, 120);
+      }
+
+      button.addEventListener('pointerdown', (e)=>{ e.preventDefault(); onDown(); });
+      window.addEventListener('pointerup', onUpCancel);
+      window.addEventListener('pointercancel', onUpCancel);
+      // Keyboard accessibility
+      button.addEventListener('keydown', (e)=>{ if (e.code==='Space' || e.code==='Enter'){ onDown(); }});
+      button.addEventListener('keyup', onUpCancel);
+    }
+
+    function burst1(){
+      if (activeBalls >= MAX_ACTIVE_BALLS) return;
+      const path = (state.mode==='server') ? simulatePath() : simulatePath();
+      animateDrop(path);
+    }
+    function burst3(){
+      if (activeBalls >= MAX_ACTIVE_BALLS-2){ burst1(); return; }
+      const p1 = (state.mode==='server') ? simulatePath() : simulatePath();
+      const p2 = (state.mode==='server') ? simulatePath() : simulatePath();
+      const p3 = (state.mode==='server') ? simulatePath() : simulatePath();
+      animateDrop(p1);
+      setTimeout(()=> animateDrop(p2), 70);
+      setTimeout(()=> animateDrop(p3), 140);
     }
 
     /* ===== Wire UI ===== */
@@ -644,7 +696,6 @@
         next==='weighted' ? 'Weighted: slight centre bias (demo only).' :
         'Server: production — outcomes decided by backend.';
     }
-
     modeButtons.unbiased.onclick = ()=> setMode('unbiased');
     modeButtons.weighted.onclick = ()=> setMode('weighted');
     modeButtons.server.onclick   = ()=> setMode('server');
@@ -656,39 +707,32 @@
       state.payoutsGBP = defaultPayouts(state.rows);
       buildBoard(); renderPayoutCards(); updatePills(); updateRTPUI();
     });
-
     stakeInput.addEventListener('change', ()=>{
       const v = Math.max(.1, Number(stakeInput.value)||state.baseStakeGBP);
       state.baseStakeGBP = v;
       stakeInput.value = v.toFixed(2);
       updatePills(); updateRTPUI(); updateStatsUI();
     });
-
     gravSlider.addEventListener('input', ()=>{
       const v = Number(gravSlider.value);
       state.gravity = v;
       gravVal.textContent = v.toFixed(2)+'×';
     });
 
-    drop1.addEventListener('click', ()=> drop());
-    drop3.addEventListener('click', ()=> { drop(); drop(); drop(); });
+    // Board click = instant drop (even if others are running)
+    board.addEventListener('click', ()=>{
+      burst1();
+    });
+
+    // Hold buttons
+    setupHold(drop1, hold1, burst1);
+    setupHold(drop3, hold3, burst3);
+
     resetBtn.addEventListener('click', ()=>{
       state.drops = 0; state.winnings = 0;
       updateStatsUI();
       buildBoard();
     });
-
-    // Magnetic hover for primary button
-    (function magnet(){
-      const btn = drop1;
-      btn.addEventListener('mousemove', (e)=>{
-        const r = btn.getBoundingClientRect();
-        const x = (e.clientX - r.left - r.width/2)/r.width;
-        const y = (e.clientY - r.top - r.height/2)/r.height;
-        btn.style.transform = `translateY(-1px) perspective(300px) rotateX(${y*-4}deg) rotateY(${x*6}deg)`;
-      });
-      btn.addEventListener('mouseleave', ()=> btn.style.transform='');
-    })();
 
     /* ===== Init ===== */
     (function init(){
@@ -698,10 +742,10 @@
     })();
 
     /* ===== Integration Notes =====
-      - Replace simulatePath()/serverOutcomeStub() with a callable (e.g., startPlinkoDrop)
-        that returns an array of slot indices (or exact step sequences) for 1× / 3× drops.
-      - Load payouts from Firestore (admin_settings/plinkoSettings) and keep this UI read-only in production.
-      - Enforce stake/rows limits server-side; treat client values as hints only.
+      - Outcomes should be server-determined in production. Replace simulatePath()
+        with a callable (e.g., startPlinkoDrop) returning slotIndex or step arrays.
+      - This UI allows concurrent animations; keep server limits on concurrent plays.
+      - Hold-to-drop uses a 1s arm time and streams bursts every 160ms while held.
     */
   </script>
 </body>

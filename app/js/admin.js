@@ -95,7 +95,6 @@ function renderView(viewName) {
         case 'dashboard': renderDashboardView(); break;
         case 'create': renderCreateCompView(); break;
         case 'spinner-settings': renderSpinnerSettingsView(); break;
-        case 'spinner-comps': renderSpinnerCompsView(); break;
     }
 }
 
@@ -148,9 +147,12 @@ function renderCreateCompView() {
         createElement('fieldset', {}, [createElement('legend', { textContent: 'Ticket Pricing' }), tiersContainer, addTierBtn]),
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Competition Type' }),
-            createElement('div', { class: 'form-group-inline' }, [createElement('label', { for: 'isHeroComp', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, ['Set as Hero Competition?', createElement('input', { type: 'checkbox', id: 'isHeroComp', style: { width: 'auto', height: 'auto' } })])]),
-            createElement('div', { class: 'form-group-inline', style: { marginTop: '1rem' } }, [createElement('label', { for: 'enable-spin-tokens', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, ['Make this an Instant Win Competition?', createElement('input', { type: 'checkbox', id: 'enable-spin-tokens', style: { width: 'auto', height: 'auto' } })])]),
-            createElement('p', { class: 'form-hint', style: { fontSize: '0.8rem', color: '#888', marginTop: '0.5rem' }, textContent: 'A Hero competition can also award Instant Win spins. If neither box is checked, it will be a standard Main Competition.'})
+            createElement('div', { class: 'admin-radio-group' }, [
+                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'main', checked: true }), 'Main Prize Competition' ]),
+                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'instant' }), 'Main Prize + Instant Win Tokens' ]),
+                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'hero' }), 'Hero Competition (+ Instant Win Tokens)' ]),
+                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'token' }), 'Token Competition (for getting spins)' ])
+            ])
         ]),
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Skill Question' }),
@@ -196,43 +198,6 @@ function renderSpinnerSettingsView() {
     initializeSpinnerSettingsListeners();
 }
 
-function renderSpinnerCompsView() {
-    const bundlesContainer = createElement('div', { id: 'spinner-bundles-container' });
-    const addBundleBtn = createElement('button', { type: 'button', id: 'add-spinner-bundle-btn', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Bundle']);
-
-    const form = createElement('form', { id: 'spinner-comp-form', class: 'admin-form', style: { marginTop: '2rem' } }, [
-        createElement('input', { type: 'hidden', id: 'spinner-comp-id', value: 'active' }),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Competition Details' }),
-            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-title', textContent: 'Title' }), createElement('input', { type: 'text', id: 'spinner-title', required: true, value: 'Weekly £50 Spinner Draw' })]),
-            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-prize', textContent: 'Prize Description' }), createElement('input', { type: 'text', id: 'spinner-prize', required: true, value: '£50 Cash' })])
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Ticket Bundles' }),
-            bundlesContainer,
-            addBundleBtn
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Skill Question' }),
-            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-questionText', textContent: 'Question' }), createElement('input', { type: 'text', id: 'spinner-questionText', required: true })]),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-correctAnswer', textContent: 'Correct Answer' }), createElement('input', { type: 'text', id: 'spinner-correctAnswer', required: true })]),
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'spinner-otherAnswers', textContent: 'Incorrect Answers (comma separated)' }), createElement('input', { type: 'text', id: 'spinner-otherAnswers', required: true })])
-            ])
-        ]),
-        createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Save Spinner Competition'])
-    ]);
-
-    const panel = createElement('div', { class: 'content-panel' }, [
-        createElement('h2', { textContent: 'Manage Spinner Competition' }),
-        createElement('p', { style: { padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }, textContent: 'This is the always-on, low-stakes competition that users enter to receive bonus spin tokens. You only need one active at a time.' }),
-        form
-    ]);
-
-    mainContentContainer.append(panel);
-    initializeSpinnerCompsListeners();
-}
-
 // --- Data Fetching & Rendering Logic ---
 
 async function loadAndRenderCompetitions(listDiv) {
@@ -258,9 +223,21 @@ function renderCompetitionRow(comp) {
     const progress = (comp.ticketsSold / comp.totalTickets) * 100;
 
     let titleBadges = [];
-    if (comp.isHeroComp) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
-    if (comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
-    if (!comp.isHeroComp && !comp.instantWinsConfig?.enabled) titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
+    const type = comp.competitionType || 'main'; // Default to 'main' for legacy comps
+    switch(type) {
+        case 'hero':
+            titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
+            break;
+        case 'instant':
+            titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
+            break;
+        case 'token':
+            titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-token'], textContent: '🎟️ Token Comp' }));
+            break;
+        case 'main':
+        default:
+             titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
+    }
     
     let statusContent;
     if (comp.status === 'live') {
@@ -299,8 +276,6 @@ function renderCompetitionRow(comp) {
     ]);
 }
 
-
-
 // --- Event Listener Initialization ---
 
 function initializeCreateFormListeners() {
@@ -332,8 +307,6 @@ function initializeCreateFormListeners() {
     form.addEventListener('submit', handleCreateFormSubmit);
 }
 
-// Add this new function to admin.js
-
 async function handleCreateFormSubmit(e) {
     e.preventDefault();
     const form = e.target;
@@ -348,9 +321,10 @@ async function handleCreateFormSubmit(e) {
         const userEntryLimit = parseInt(form.querySelector('#userEntryLimit').value);
         const cashAlternative = parseFloat(form.querySelector('#cashAlternative').value);
         const endDate = new Date(form.querySelector('#endDate').value);
+        const competitionType = form.querySelector('input[name="competitionType"]:checked').value;
 
-        const isHeroComp = form.querySelector('#isHeroComp').checked;
-        const instantWinsEnabled = form.querySelector('#enable-spin-tokens').checked;
+        const isHeroComp = competitionType === 'hero';
+        const instantWinsEnabled = ['instant', 'hero', 'token'].includes(competitionType);
         
         // 2. Process Skill Question
         const correctAnswerText = form.querySelector('#correctAnswer').value.trim();
@@ -382,7 +356,8 @@ async function handleCreateFormSubmit(e) {
             ticketsSold: 0,
             status: 'live',
             createdAt: serverTimestamp(),
-            isHeroComp,
+            competitionType,
+            isHeroComp, // Keep for potential hero-specific display logic
             instantWinsConfig: {
                 enabled: instantWinsEnabled
             },
@@ -392,8 +367,7 @@ async function handleCreateFormSubmit(e) {
                 correctAnswer: correctKey
             },
             ticketTiers,
-            prizeImage: form.querySelector('#prizeImage').value || null // Handle image URLs
-            // You can add the parallax image fields here if needed
+            prizeImage: form.querySelector('#prizeImage').value || null
         };
 
         // 5. Save to Firestore
@@ -411,6 +385,7 @@ async function handleCreateFormSubmit(e) {
         submitBtn.textContent = 'Create Competition';
     }
 }
+
 
 function initializeSpinnerSettingsListeners() {
     const form = document.getElementById('spinner-settings-form');
@@ -482,97 +457,6 @@ function initializeSpinnerSettingsListeners() {
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Spinner Settings';
-        }
-    });
-}
-
-function initializeSpinnerCompsListeners() { 
-    const form = document.getElementById('spinner-comp-form');
-    const compId = form.querySelector('#spinner-comp-id').value;
-    const bundlesContainer = document.getElementById('spinner-bundles-container');
-    const addBundleBtn = document.getElementById('add-spinner-bundle-btn');
-
-    const addBundleRow = (amount = '', price = '') => {
-        const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
-        const bundleEl = createElement('div', { class: ['form-group-inline', 'spinner-bundle-row'] }, [
-            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Entries' }), createElement('input', { type: 'number', class: 'bundle-amount', value: amount, required: true })]),
-            createElement('div', { class: 'form-group' }, [createElement('label', { textContent: 'Price (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'bundle-price', value: price, required: true })]),
-            removeBtn
-        ]);
-        bundlesContainer.appendChild(bundleEl);
-        removeBtn.addEventListener('click', () => bundleEl.remove());
-    };
-    
-    addBundleBtn.addEventListener('click', () => addBundleRow());
-
-    const loadData = async () => {
-        const compRef = doc(db, 'spinner_competitions', compId);
-        const docSnap = await getDoc(compRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            form.querySelector('#spinner-title').value = data.title || '';
-            form.querySelector('#spinner-prize').value = data.prize || '';
-            
-            bundlesContainer.innerHTML = '';
-            if (data.ticketBundles && data.ticketBundles.length > 0) {
-                data.ticketBundles.forEach(bundle => addBundleRow(bundle.amount, bundle.price));
-            } else {
-                addBundleRow(5, 4.50);
-            }
-
-            if (data.skillQuestion) {
-                form.querySelector('#spinner-questionText').value = data.skillQuestion.text || '';
-                const answers = data.skillQuestion.answers;
-                const correct = data.skillQuestion.correctAnswer;
-                form.querySelector('#spinner-correctAnswer').value = answers[correct];
-                form.querySelector('#spinner-otherAnswers').value = Object.keys(answers).filter(k => k !== correct).map(k => answers[k]).join(', ');
-            }
-        } else {
-             addBundleRow(5, 4.50);
-        }
-    };
-    loadData();
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
-        
-        try {
-            const correctAnswer = form.querySelector('#spinner-correctAnswer').value.trim();
-            const otherAnswers = form.querySelector('#spinner-otherAnswers').value.split(',').map(a => a.trim());
-            const allAnswers = [correctAnswer, ...otherAnswers].sort(() => Math.random() - 0.5);
-            const answers = {};
-            let correctKey = '';
-            ['A', 'B', 'C', 'D'].slice(0, allAnswers.length).forEach((key, i) => {
-                 answers[key] = allAnswers[i];
-                 if (allAnswers[i] === correctAnswer) correctKey = key;
-            });
-            
-            const ticketBundles = Array.from(document.querySelectorAll('.spinner-bundle-row')).map(row => ({
-                amount: parseInt(row.querySelector('.bundle-amount').value),
-                price: parseFloat(row.querySelector('.bundle-price').value)
-            }));
-
-            const compData = {
-                title: form.querySelector('#spinner-title').value,
-                prize: form.querySelector('#spinner-prize').value,
-                ticketBundles: ticketBundles,
-                skillQuestion: {
-                    text: form.querySelector('#spinner-questionText').value,
-                    answers,
-                    correctAnswer: correctKey
-                },
-                isActive: true,
-            };
-            await setDoc(doc(db, 'spinner_competitions', compId), compData);
-            alert('Spinner competition saved!');
-        } catch (error) {
-            console.error(error);
-            alert('Error saving spinner competition.');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Spinner Competition';
         }
     });
 }

@@ -75,7 +75,7 @@ const loadAllCompetitions = async () => {
     const spinnerGrid = document.getElementById('spinner-competition-grid');
 
     try {
-        const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("endDate", "asc"));
+        const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
@@ -96,15 +96,23 @@ const loadAllCompetitions = async () => {
 
         querySnapshot.forEach((doc) => {
             const compData = { id: doc.id, ...doc.data() };
-            // Prioritize hero comp classification
-            if (compData.competitionType === 'hero') {
-                 heroComp = compData;
-            } else if (compData.competitionType === 'instant') {
-                instantWinComps.push(compData);
-            } else if (compData.competitionType === 'token') {
-                tokenComps.push(compData);
-            } else { // 'main' or undefined legacy comps
-                mainComps.push(compData);
+            
+            // CORRECTED LOGIC: Prioritize the isHeroComp flag to correctly categorize.
+            if (compData.isHeroComp === true) {
+                heroComp = compData; // If it's a hero, it only goes here.
+            } else {
+                switch (compData.competitionType) {
+                    case 'instant':
+                        instantWinComps.push(compData);
+                        break;
+                    case 'token':
+                        tokenComps.push(compData);
+                        break;
+                    case 'main':
+                    default: // Catches legacy comps without a type
+                        mainComps.push(compData);
+                        break;
+                }
             }
         });
         
@@ -213,10 +221,10 @@ function createCompetitionCard(compData, isTokenComp = false) {
 
     const timerElement = endDate
         ? createElement('div', { class: 'hawk-card__timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' })
-        : createElement('div', { class: 'hawk-card__timer', textContent: 'Draws Weekly' }); // Display for token comps
+        : createElement('div', { class: 'hawk-card__timer', textContent: 'Draws Weekly' });
 
     const buttonText = isTokenComp ? 'Get Spins' : 'Enter Now';
-    const linkHref = isTokenComp ? `competition.html?id=${compData.id}` : `competition.html?id=${compData.id}`; // Can be different later
+    const linkHref = `competition.html?id=${compData.id}`;
 
     return createElement('a', { href: linkHref, class: 'hawk-card' }, [
         instantWinBadge,

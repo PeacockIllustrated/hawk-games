@@ -57,8 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ... (The rest of the file's logic remains exactly the same as the complete version I provided previously)
-// The key fix was the helper function above. I will include the rest of the file for absolute certainty.
 
 async function loadCompetitionDetails(id) {
     const pageContent = document.getElementById('competition-page-content');
@@ -77,7 +75,11 @@ async function loadCompetitionDetails(id) {
                 pageContent.append(createStandardPageElement(currentCompetitionData));
             }
             
-            setupCountdown(currentCompetitionData.endDate.toDate());
+            // --- FIX: Conditionally set up the countdown ---
+            if (currentCompetitionData.endDate) {
+                setupCountdown(currentCompetitionData.endDate.toDate());
+            }
+
             setupEntryLogic(currentCompetitionData.skillQuestion.correctAnswer);
         } else {
             pageContent.innerHTML = '';
@@ -245,6 +247,11 @@ function createStandardPageElement(data) {
     const ticketTiers = data.ticketTiers.map(tier => createElement('button', { class: 'ticket-option', 'data-amount': tier.amount, 'data-price': tier.price, textContent: `${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}` }));
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
     
+    // --- FIX: Conditionally create timer or static text ---
+    const timerElement = data.endDate 
+        ? createElement('div', { id: 'timer', class: 'detail-timer' })
+        : createElement('div', { class: 'detail-timer', textContent: 'Draws Weekly' });
+    
     return createElement('main', {}, [
         createElement('div', { id: 'competition-container', class: 'container' }, [
             createElement('div', { class: 'competition-detail-view' }, [
@@ -252,7 +259,7 @@ function createStandardPageElement(data) {
                 createElement('div', { class: 'entry-details-panel' }, [
                     createElement('h1', { textContent: data.title }),
                     createElement('p', { class: 'cash-alternative' }, ['Or ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
-                    createElement('div', { id: 'timer', class: 'detail-timer' }),
+                    timerElement, // Use the conditional element
                     createElement('div', { class: 'detail-progress' }, [
                         createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })]),
                         createElement('p', { textContent: `${data.ticketsSold || 0} / ${data.totalTickets} sold` })

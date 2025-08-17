@@ -9,7 +9,8 @@ import { app } from './auth.js';
 const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app);
-let userTokens = [];
+let userTokens = []; // Spinner tokens
+let userPlinkoTokens = []; // Plinko tokens
 let userProfile = {};
 let userCreditBalance = 0;
 let spinnerPrizes = [];
@@ -17,19 +18,31 @@ let isSpinning = false;
 let userProfileUnsubscribe = null;
 let activeTokenCompetition = null;
 
+// --- DOM Elements ---
 const tokenCountElement = document.getElementById('token-count');
+const plinkoTokenCountElement = document.getElementById('plinko-token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
+const buyMoreBtn = document.getElementById('buy-more-tokens-btn');
+const purchaseModal = document.getElementById('purchase-modal');
+const winCelebrationModal = document.getElementById('win-celebration-modal');
+
+// Spinner Elements
 const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
 const spinResultContainer = document.getElementById('spin-result');
-const buyMoreBtn = document.getElementById('buy-more-tokens-btn');
-const purchaseModal = document.getElementById('purchase-modal');
-const prizesModal = document.getElementById('prizes-modal');
-const winCelebrationModal = document.getElementById('win-celebration-modal');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
+const prizesModal = document.getElementById('prizes-modal');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
+// Plinko Elements
+const plinkoSvg = document.getElementById('plinko-svg');
+const plinkoBoard = document.getElementById('plinko-board');
+const plinkoDropBtn = document.getElementById('plinko-drop-btn');
+let plinkoActiveBalls = 0;
+const MAX_PLINKO_BALLS = 12;
+
+// --- Utility Functions ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
@@ -44,6 +57,7 @@ function createElement(tag, options = {}, children = []) {
     return el;
 }
 
+// --- Initialization ---
 auth.onAuthStateChanged((user) => {
     if (user) {
         if (userProfileUnsubscribe) userProfileUnsubscribe();
@@ -53,12 +67,14 @@ auth.onAuthStateChanged((user) => {
                 userProfile = docSnap.data();
                 userCreditBalance = userProfile.creditBalance || 0;
                 userTokens = (userProfile.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
+                userPlinkoTokens = (userProfile.plinkoTokens || []);
                 if (!isSpinning) {
                     updateUI();
                 }
             }
         });
         loadPrizeSettings();
+        initializePlinkoBoard();
     } else {
         window.location.replace('login.html');
     }
@@ -66,11 +82,37 @@ auth.onAuthStateChanged((user) => {
 
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
+    plinkoTokenCountElement.textContent = userPlinkoTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
     spinButton.disabled = userTokens.length === 0 || isSpinning;
+    plinkoDropBtn.disabled = userPlinkoTokens.length === 0 || plinkoActiveBalls >= MAX_PLINKO_BALLS;
     renderTokenAccordion();
 }
 
+function initializeHub() {
+    const tabButtons = document.querySelectorAll('.game-tab-btn');
+    const gamePanels = document.querySelectorAll('.game-panel');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.dataset.gametab;
+
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+
+            gamePanels.forEach(panel => {
+                if (panel.id === `${targetTab}-game-container`) {
+                    panel.classList.add('active');
+                } else {
+                    panel.classList.remove('active');
+                }
+            });
+        });
+    });
+}
+initializeHub();
+
+
+// --- Spinner Logic ---
 async function loadPrizeSettings() {
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
@@ -78,40 +120,8 @@ async function loadPrizeSettings() {
         if (docSnap.exists() && docSnap.data().prizes) {
             spinnerPrizes = docSnap.data().prizes;
             renderPrizesTable(spinnerPrizes);
-        } else {
-            console.error("Spinner settings not found in Firestore.");
-        }
-    } catch (error) {
-        console.error("Error fetching spinner prizes:", error);
-    }
-}
-
-function renderTokenAccordion() {
-    tokenAccordionContainer.innerHTML = '';
-    if (userTokens.length === 0) {
-        tokenAccordionContainer.append(createElement('div', { class: 'placeholder', textContent: 'You have no Spin Tokens. Enter a competition to earn them!' }));
-        return;
-    }
-    const groupedTokens = userTokens.reduce((acc, token) => {
-        const groupTitle = token.compTitle || "Purchased Tokens";
-        (acc[groupTitle] = acc[groupTitle] || []).push(token);
-        return acc;
-    }, {});
-    const fragment = document.createDocumentFragment();
-    for (const groupTitle in groupedTokens) {
-        const tokens = groupedTokens[groupTitle];
-        const date = new Date(tokens[0].earnedAt.seconds * 1000).toLocaleDateString();
-        const content = createElement('div', { class: 'accordion-content' }, [
-            createElement('ul', {}, tokens.map(t => createElement('li', { textContent: `Token ID: ...${t.tokenId.slice(-8)}` })))
-        ]);
-        const header = createElement('button', { class: 'accordion-header' }, [
-            createElement('span', { textContent: groupTitle }),
-            createElement('span', { class: 'accordion-meta', textContent: `${tokens.length} Token(s) - Earned ${date}` }),
-            createElement('span', { class: 'accordion-arrow' })
-        ]);
-        fragment.append(createElement('div', { class: 'accordion-item' }, [header, content]));
-    }
-    tokenAccordionContainer.append(fragment);
+        } else { console.error("Spinner settings not found."); }
+    } catch (error) { console.error("Error fetching spinner prizes:", error); }
 }
 
 function renderPrizesTable(prizes) {
@@ -130,27 +140,25 @@ function renderPrizesTable(prizes) {
     prizesTableContainer.append(table);
 }
 
-function showWinCelebrationModal(prizeType, value) {
-    if (!winCelebrationModal) return;
-
+function showWinCelebrationModal(prizeType, value, game = 'spinner') {
     const prizeValueText = `£${value.toFixed(2)}`;
     const prizeTypeText = prizeType === 'credit' ? "SITE CREDIT" : "CASH";
-    const remainingTokens = userTokens.length;
+    const remainingTokens = game === 'spinner' ? userTokens.length : userPlinkoTokens.length;
 
-    const spinAgainBtn = createElement('button', { class: 'btn', textContent: 'Spin Again' });
+    const playAgainBtn = createElement('button', { class: 'btn', textContent: `Play ${game === 'spinner' ? 'Spinner' : 'Plinko'} Again` });
     const tokenInfo = createElement('p', { class: 'win-modal-token-info' });
 
     if (remainingTokens > 0) {
-        tokenInfo.textContent = `You have ${remainingTokens} spin${remainingTokens > 1 ? 's' : ''} left.`;
-        spinAgainBtn.disabled = false;
+        tokenInfo.textContent = `You have ${remainingTokens} token${remainingTokens > 1 ? 's' : ''} left.`;
+        playAgainBtn.disabled = false;
     } else {
-        tokenInfo.textContent = 'No spins remaining.';
-        spinAgainBtn.disabled = true;
+        tokenInfo.textContent = 'No tokens remaining.';
+        playAgainBtn.disabled = true;
     }
     
-    spinAgainBtn.addEventListener('click', () => {
+    playAgainBtn.addEventListener('click', () => {
         closeWinCelebrationModal();
-        setTimeout(handleSpin, 400);
+        setTimeout(game === 'spinner' ? handleSpin : handlePlinkoDrop, 400);
     }, { once: true });
 
     const closeBtn = createElement('button', { class: 'btn btn-secondary', textContent: 'Close' });
@@ -161,20 +169,12 @@ function showWinCelebrationModal(prizeType, value) {
         createElement('p', { class: 'win-modal-heading', textContent: 'YOU WON!' }),
         createElement('h2', { class: 'win-modal-prize-value', textContent: prizeValueText }),
         createElement('p', { class: 'win-modal-prize-type', textContent: prizeTypeText }),
-        createElement('div', { class: 'win-modal-actions' }, [
-            spinAgainBtn,
-            tokenInfo,
-            closeBtn
-        ])
+        createElement('div', { class: 'win-modal-actions' }, [playAgainBtn, tokenInfo, closeBtn])
     ]);
     
     const confettiContainer = createElement('div', { class: 'confetti-container' });
     for (let i = 0; i < 100; i++) {
-        const confetti = createElement('div', { 
-            class: 'confetti',
-            style: { left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 4}s`, animationDuration: `${2 + Math.random() * 2}s` }
-        });
-        confettiContainer.appendChild(confetti);
+        confettiContainer.appendChild(createElement('div', { class: 'confetti', style: { left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 4}s`, animationDuration: `${2 + Math.random() * 2}s` } }));
     }
     modalContent.prepend(confettiContainer);
 
@@ -184,7 +184,6 @@ function showWinCelebrationModal(prizeType, value) {
 }
 
 function closeWinCelebrationModal() {
-    if (!winCelebrationModal) return;
     winCelebrationModal.classList.add('closing');
     setTimeout(() => {
         winCelebrationModal.classList.remove('show', 'closing');
@@ -194,61 +193,195 @@ function closeWinCelebrationModal() {
 
 async function handleSpin() {
     if (userTokens.length === 0 || isSpinning) return;
-
     isSpinning = true;
     spinButton.disabled = true;
     spinButton.textContent = '...';
     spinResultContainer.innerHTML = '';
-    
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
-    void wheel.offsetWidth; 
-
+    void wheel.offsetWidth;
     const tokenToSpend = userTokens[0];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
-
     try {
         const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
-        
-        userTokens.shift(); 
-        updateUI(); 
-        
         const { won, prizeType, value } = result.data;
-        
-        const baseSpins = 360 * 3; 
+        const baseSpins = 360 * 3;
         const randomAdditionalRotation = Math.random() * 360;
         const finalAngle = baseSpins + randomAdditionalRotation;
-        
         wheel.style.transition = 'transform 3s cubic-bezier(0.25, 0.1, 0.25, 1)';
         wheel.style.transform = `rotate(${finalAngle}deg)`;
-
         setTimeout(() => {
             if (won) {
-                showWinCelebrationModal(prizeType, value);
+                showWinCelebrationModal(prizeType, value, 'spinner');
             } else {
                 spinResultContainer.append(createElement('p', { textContent: 'Better luck next time!' }));
             }
             isSpinning = false;
             spinButton.textContent = 'SPIN';
-            updateUI(); 
+            updateUI();
         }, 3500);
-
     } catch (error) {
         console.error("Error spending token:", error);
-        spinResultContainer.innerHTML = '';
-        spinResultContainer.append(createElement('p', { class: 'spin-error', textContent: `Error: ${error.message}` }));
+        spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
         isSpinning = false;
         spinButton.textContent = 'SPIN';
         updateUI();
     }
 }
-
 spinButton.addEventListener('click', handleSpin);
 
+
+// --- Plinko Logic ---
+let plinkoPegs = [], plinkoSlots = [], plinkoOffsets = [];
+const PLINKO_ROWS = 12;
+
+function initializePlinkoBoard() {
+    while (plinkoSvg.firstChild) plinkoSvg.removeChild(plinkoSvg.firstChild);
+
+    const W = 800, H = 900, margin = 60, rowGap = 58;
+    const usableWidth = W - margin * 2;
+    const colGap = usableWidth / (PLINKO_ROWS + 1);
+
+    plinkoPegs = []; plinkoSlots = []; plinkoOffsets = [];
+
+    for (let r = 0; r < PLINKO_ROWS; r++) {
+        const pegsInRow = r + 1;
+        const offset = (usableWidth - (pegsInRow - 1) * colGap) / 2 + margin;
+        plinkoOffsets[r] = offset;
+        const row = [];
+        const y = margin + rowGap * (r + 1);
+        for (let k = 0; k < pegsInRow; k++) {
+            const x = offset + k * colGap;
+            row.push(x);
+            const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 8);
+            c.setAttribute('class', 'peg');
+            plinkoSvg.appendChild(c);
+        }
+        plinkoPegs[r] = row;
+    }
+
+    const slotsY = margin + rowGap * (PLINKO_ROWS + 1) + 10;
+    for (let s = 0; s <= PLINKO_ROWS; s++) {
+        const x = margin + (s + 0.5) * colGap;
+        const w = colGap * 0.9;
+        plinkoSlots.push({ x, width: w, idx: s });
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x - w / 2); rect.setAttribute('y', slotsY);
+        rect.setAttribute('width', w); rect.setAttribute('height', 48);
+        rect.setAttribute('class', 'pocket');
+        plinkoSvg.appendChild(rect);
+        const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 38); t2.setAttribute('text-anchor', 'middle');
+        t2.setAttribute('class', 'payoutLabel');
+        t2.textContent = `...`;
+        t2.setAttribute('data-slot-payout', String(s));
+        plinkoSvg.appendChild(t2);
+    }
+}
+
+async function handlePlinkoDrop() {
+    if (userPlinkoTokens.length === 0 || plinkoActiveBalls >= MAX_PLINKO_BALLS) return;
+    plinkoActiveBalls++;
+    plinkoDropBtn.disabled = true;
+
+    const playPlinkoFunc = httpsCallable(functions, 'playPlinko');
+    try {
+        const result = await playPlinkoFunc({ tokenId: "some-token-id" }); // TODO: Use real tokens
+        const { prize, path } = result.data;
+        await animatePlinkoDrop(path, prize);
+    } catch (error) {
+        console.error("Error playing Plinko:", error);
+        alert(`Plinko Error: ${error.message}`);
+    } finally {
+        plinkoActiveBalls--;
+        updateUI();
+    }
+}
+
+async function animatePlinkoDrop(path, prize) {
+    const W = 800, margin = 60, rowGap = 58;
+    const usableWidth = W - margin * 2;
+    const colGap = usableWidth / (PLINKO_ROWS + 1);
+
+    let k = 0, x = plinkoOffsets[0], y = margin + 8;
+    const ball = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ball.setAttribute('cx', x); ball.setAttribute('cy', y); ball.setAttribute('r', 10);
+    ball.setAttribute('fill', 'var(--primary-gold)');
+    ball.style.filter = 'drop-shadow(0 4px 10px rgba(224,169,74,.35))';
+    plinkoSvg.appendChild(ball);
+
+    const tween = (toX, toY, ms) => new Promise(resolve => {
+        const x0 = x, y0 = y, dx = toX - x0, dy = toY - y0; let t0 = null;
+        const step = t => {
+            if (!t0) t0 = t; const p = Math.min(1, (t - t0) / ms); const ease = p < .5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+            ball.setAttribute('cx', x0 + dx * ease); ball.setAttribute('cy', y0 + dy * ease);
+            if (p < 1) requestAnimationFrame(step); else { x = toX; y = toY; resolve(); }
+        };
+        requestAnimationFrame(step);
+    });
+
+    for (let r = 0; r < PLINKO_ROWS; r++) {
+        await tween(plinkoOffsets[r] + k * colGap, margin + rowGap * (r + 1), 140);
+        const stepRight = path.steps[r] === 1;
+        const nextOffset = plinkoOffsets[r + 1] || (margin + (usableWidth - (r + 1) * colGap) / 2 + margin);
+        await tween(nextOffset + (k + (stepRight ? 0.5 : -0.5)) * colGap, margin + rowGap * (r + 1) + rowGap * 0.45, 110);
+        if (stepRight) k++;
+    }
+
+    const slot = plinkoSlots[k];
+    await tween(slot.x, margin + rowGap * (PLINKO_ROWS + 1) + 34, 240);
+    
+    if (prize.value > 0) {
+        showWinCelebrationModal(prize.type, prize.value, 'plinko');
+    }
+
+    await new Promise(res => setTimeout(res, 420));
+    plinkoSvg.removeChild(ball);
+}
+
+plinkoDropBtn.addEventListener('click', handlePlinkoDrop);
+plinkoBoard.addEventListener('click', handlePlinkoDrop);
+
+
+// --- Shared Modal & Accordion Logic ---
+function renderTokenAccordion() {
+    tokenAccordionContainer.innerHTML = '';
+    const allTokens = [
+        ...userTokens.map(t => ({...t, type: 'Spinner'})),
+        ...userPlinkoTokens.map(t => ({...t, type: 'Plinko'}))
+    ].sort((a,b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
+    
+    if (allTokens.length === 0) {
+        tokenAccordionContainer.append(createElement('div', { class: 'placeholder', textContent: 'You have no game tokens. Enter a competition to earn them!' }));
+        return;
+    }
+    const groupedTokens = allTokens.reduce((acc, token) => {
+        const groupTitle = token.compTitle || "Purchased Tokens";
+        (acc[groupTitle] = acc[groupTitle] || []).push(token);
+        return acc;
+    }, {});
+    const fragment = document.createDocumentFragment();
+    for (const groupTitle in groupedTokens) {
+        const tokens = groupedTokens[groupTitle];
+        const date = new Date(tokens[0].earnedAt.seconds * 1000).toLocaleDateString();
+        const content = createElement('div', { class: 'accordion-content' }, [
+            createElement('ul', {}, tokens.map(t => createElement('li', { textContent: `${t.type} Token ID: ...${t.tokenId.slice(-8)}` })))
+        ]);
+        const header = createElement('button', { class: 'accordion-header' }, [
+            createElement('span', { textContent: groupTitle }),
+            createElement('span', { class: 'accordion-meta', textContent: `${tokens.length} Token(s) - Earned ${date}` }),
+            createElement('span', { class: 'accordion-arrow' })
+        ]);
+        fragment.append(createElement('div', { class: 'accordion-item' }, [header, content]));
+    }
+    tokenAccordionContainer.append(fragment);
+}
+
 buyMoreBtn.addEventListener('click', async () => {
-    const modalContent = document.getElementById('purchase-modal-content');
-    modalContent.innerHTML = '';
-    modalContent.append(createElement('h2', { textContent: 'Get More Spins' }), createElement('p', { class: 'placeholder', textContent: 'Finding available competitions...' }));
+    const modalBody = document.getElementById('purchase-modal-body');
+    modalBody.innerHTML = '';
+    modalBody.append(createElement('h2', { textContent: 'Get More Spins' }), createElement('p', { class: 'placeholder', textContent: 'Finding available competitions...' }));
     purchaseModal.classList.add('show');
     
     try {
@@ -267,11 +400,13 @@ buyMoreBtn.addEventListener('click', async () => {
         }
         
         if (!availableComp) {
-            modalContent.innerHTML = '';
-            modalContent.append(
+            modalBody.innerHTML = '';
+            modalBody.append(
                 createElement('h2', { textContent: 'No Competitions Available' }),
                 createElement('p', { textContent: "You've entered all available token draws for now. More will be available soon!" }),
-                createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
+                createElement('div', {class: 'modal-actions'}, [
+                    createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
+                ])
             );
             return;
         }
@@ -288,13 +423,15 @@ buyMoreBtn.addEventListener('click', async () => {
             );
         }
         
-        modalContent.innerHTML = '';
+        modalBody.innerHTML = '';
         const form = createElement('form', { id: 'token-entry-form', class: 'modal-form' }, [
-            createElement('div', { class: 'skill-question-box', style: { padding: '1rem 0' } }, [
+            createElement('h2', { textContent: activeTokenCompetition.title }),
+            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `£${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus spin tokens instantly!`]),
+            createElement('div', { class: 'skill-question-box' }, [
                 createElement('p', { class: 'question-text', textContent: activeTokenCompetition.skillQuestion.text }),
                 createElement('div', { class: 'answer-options' }, answers)
             ]),
-            createElement('div', { class: 'ticket-selector-box', style: { padding: '1rem 0' } }, [
+            createElement('div', { class: 'ticket-selector-box' }, [
                  createElement('div', { class: 'ticket-options' }, bundlesHTML)
             ]),
             createElement('div', { id: 'credit-payment-option', style: { display: 'none', marginTop: '1rem' } }),
@@ -304,11 +441,7 @@ buyMoreBtn.addEventListener('click', async () => {
             ])
         ]);
         
-        modalContent.append(
-            createElement('h2', { textContent: activeTokenCompetition.title }),
-            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `£${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus spin tokens instantly!`]),
-            form
-        );
+        modalBody.append(form);
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -317,11 +450,13 @@ buyMoreBtn.addEventListener('click', async () => {
 
     } catch (error) {
         console.error(error);
-        modalContent.innerHTML = '';
-        modalContent.append(
+        modalBody.innerHTML = '';
+        modalBody.append(
             createElement('h2', { textContent: 'Error' }),
             createElement('p', { textContent: error.message }),
-            createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
+             createElement('div', {class: 'modal-actions'}, [
+                createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
+            ])
         );
     }
 });
@@ -346,15 +481,12 @@ async function handleTokenCompEntry(form, paymentMethod = 'card') {
 
     try {
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
-        
-        // --- FIX: Send the complete, correct payload to the backend ---
         await allocateTicketsAndAwardTokens({
             compId: activeTokenCompetition.id,
             ticketsBought: parseInt(selectedBundle.dataset.amount),
             expectedPrice: parseFloat(selectedBundle.dataset.price),
             paymentMethod: paymentMethod 
         });
-
         purchaseModal.classList.remove('show');
     } catch (error) {
         console.error("Token comp entry failed:", error);
@@ -367,18 +499,27 @@ async function handleTokenCompEntry(form, paymentMethod = 'card') {
 }
 
 document.getElementById('purchase-modal').addEventListener('click', (e) => {
-    const target = e.target;
-    if (target.closest('.answer-btn')) {
-        target.closest('.answer-options').querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
-        target.closest('.answer-btn').classList.add('selected');
-    }
-    if (target.closest('.ticket-option')) {
-        const bundle = target.closest('.ticket-option');
-        const price = parseFloat(bundle.dataset.price);
-        target.closest('.ticket-options').querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
-        bundle.classList.add('selected');
+    const target = e.target.closest('button');
+    if (!target) return;
 
-        const creditOptionDiv = document.getElementById('credit-payment-option');
+    if (target.matches('[data-close-modal]')) {
+        target.closest('.modal-container').classList.remove('show');
+        return;
+    }
+
+    const form = target.closest('form');
+    if (!form) return;
+
+    if (target.classList.contains('answer-btn')) {
+        form.querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
+        target.classList.add('selected');
+    }
+    if (target.classList.contains('ticket-option')) {
+        const price = parseFloat(target.dataset.price);
+        form.querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
+        target.classList.add('selected');
+
+        const creditOptionDiv = form.querySelector('#credit-payment-option');
         creditOptionDiv.innerHTML = '';
         if (userCreditBalance >= price) {
             const creditButton = createElement('button', { type: 'button', id: 'pay-with-credit-btn', class: ['btn', 'btn-credit'], textContent: `Pay with £${price.toFixed(2)} Credit` });
@@ -397,7 +538,7 @@ showPrizesBtn.addEventListener('click', () => prizesModal.classList.add('show'))
 
 const closeModalHandler = (e) => {
     const modal = e.target.closest('.modal-container');
-    if (modal && (e.target === modal || e.target.closest('[data-close-modal]'))) {
+    if (modal && e.target === modal) { // Only close if clicking on the overlay itself
         modal.classList.remove('show');
     }
 };

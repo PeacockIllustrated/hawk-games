@@ -14,7 +14,7 @@ let userPlinkoTokens = []; // Plinko tokens
 let userProfile = {};
 let userCreditBalance = 0;
 let spinnerPrizes = [];
-let plinkoConfig = {}; // NEW: To store Plinko settings
+let plinkoConfig = {};
 let isSpinning = false;
 let userProfileUnsubscribe = null;
 let activeTokenCompetition = null;
@@ -26,6 +26,7 @@ const creditBalanceElement = document.getElementById('credit-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
 const buySpinnerBtn = document.getElementById('buy-spinner-tokens-btn');
 const buyPlinkoBtn = document.getElementById('buy-plinko-tokens-btn');
+const buyPlinkoBtn2 = document.getElementById('buy-plinko-tokens-btn-2');
 const purchaseModal = document.getElementById('purchase-modal');
 const winCelebrationModal = document.getElementById('win-celebration-modal');
 
@@ -40,7 +41,9 @@ const prizesTableContainer = document.getElementById('prizes-table-container');
 // Plinko Elements
 const plinkoSvg = document.getElementById('plinko-svg');
 const plinkoBoard = document.getElementById('plinko-board');
-const plinkoDropBtn = document.getElementById('plinko-drop-btn');
+const plinkoDrop1Btn = document.getElementById('plinko-drop-1');
+const plinkoDrop3Btn = document.getElementById('plinko-drop-3');
+const plinkoBalanceDisplay = document.getElementById('plinko-balance-display');
 let plinkoActiveBalls = 0;
 const MAX_PLINKO_BALLS = 12;
 
@@ -113,15 +116,23 @@ async function loadAllGameSettings() {
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
     plinkoTokenCountElement.textContent = userPlinkoTokens.length;
+    plinkoBalanceDisplay.textContent = userPlinkoTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
+    
+    const canPlayPlinko = userPlinkoTokens.length > 0 && plinkoActiveBalls < MAX_PLINKO_BALLS;
+    plinkoDrop1Btn.disabled = !canPlayPlinko;
+    plinkoDrop3Btn.disabled = !(canPlayPlinko && userPlinkoTokens.length >= 3);
+    
     spinButton.disabled = userTokens.length === 0 || isSpinning;
-    plinkoDropBtn.disabled = userPlinkoTokens.length === 0 || plinkoActiveBalls >= MAX_PLINKO_BALLS;
     renderTokenAccordion();
 }
 
 function initializeHub() {
     const tabButtons = document.querySelectorAll('.game-tab-btn');
     const gamePanels = document.querySelectorAll('.game-panel');
+    const controlsPanels = document.querySelectorAll('.game-controls-panel');
+    const layoutContainer = document.getElementById('game-hub-layout');
+
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const targetTab = button.dataset.gametab;
@@ -130,12 +141,14 @@ function initializeHub() {
             button.classList.add('active');
 
             gamePanels.forEach(panel => {
-                if (panel.id === `${targetTab}-game-container`) {
-                    panel.classList.add('active');
-                } else {
-                    panel.classList.remove('active');
-                }
+                panel.classList.toggle('active', panel.id === `${targetTab}-game-container`);
             });
+            
+            controlsPanels.forEach(panel => {
+                panel.classList.toggle('active', panel.id === `${targetTab}-controls`);
+            });
+            
+            layoutContainer.className = `instant-win-layout ${targetTab}-active`;
         });
     });
 }
@@ -257,7 +270,6 @@ function initializePlinkoBoard() {
     const PLINKO_ROWS = plinkoConfig.rows || 12;
     while (plinkoSvg.firstChild) plinkoSvg.removeChild(plinkoSvg.firstChild);
 
-    // --- FIX: Add SVG definitions for the gold gradient ---
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
         <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
@@ -302,7 +314,7 @@ function initializePlinkoBoard() {
         rect.setAttribute('class', 'pocket');
         plinkoSvg.appendChild(rect);
         const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 32); // Adjusted Y for better centering
+        t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 32);
         t2.setAttribute('text-anchor', 'middle');
         t2.setAttribute('class', 'payoutLabel');
         const prize = plinkoConfig.payouts?.[s] || {value: 0};
@@ -312,25 +324,40 @@ function initializePlinkoBoard() {
     }
 }
 
-async function handlePlinkoDrop() {
-    if (userPlinkoTokens.length === 0 || plinkoActiveBalls >= MAX_PLINKO_BALLS) return;
-    plinkoActiveBalls++;
-    plinkoDropBtn.disabled = true;
+async function handlePlinkoDrop(numDrops = 1) {
+    if (userPlinkoTokens.length < numDrops || plinkoActiveBalls >= MAX_PLINKO_BALLS) return;
+    
+    plinkoActiveBalls += numDrops;
+    updateUI();
 
-    const tokenToSpend = userPlinkoTokens[0];
     const playPlinkoFunc = httpsCallable(functions, 'playPlinko');
-    try {
-        const result = await playPlinkoFunc({ tokenId: tokenToSpend.tokenId });
-        const { prize, path } = result.data;
-        await animatePlinkoDrop(path, prize);
-    } catch (error) {
-        console.error("Error playing Plinko:", error);
-        alert(`Plinko Error: ${error.message}`);
-    } finally {
-        plinkoActiveBalls--;
-        updateUI();
+
+    for (let i = 0; i < numDrops; i++) {
+        if (userPlinkoTokens.length === 0) break;
+        const tokenToSpend = userPlinkoTokens.shift();
+
+        try {
+            // Stagger the drops for a better visual effect
+            if (i > 0) await new Promise(res => setTimeout(res, 150));
+            
+            const result = await playPlinkoFunc({ tokenId: tokenToSpend.tokenId });
+            const { prize, path } = result.data;
+            animatePlinkoDrop(path, prize); // Don't await this so drops can overlap
+        } catch (error) {
+            console.error("Error playing Plinko:", error);
+            alert(`Plinko Error: ${error.message}`);
+            userPlinkoTokens.unshift(tokenToSpend); // Return token on error
+        } finally {
+            if (i === numDrops - 1) { // Only update UI after the final call
+                 setTimeout(() => {
+                    plinkoActiveBalls -= numDrops;
+                    updateUI();
+                }, (plinkoConfig.gravity || 1.0) * 2000); // Wait for animation to settle
+            }
+        }
     }
 }
+
 
 async function animatePlinkoDrop(path, prize) {
     const PLINKO_ROWS = plinkoConfig.rows || 12;
@@ -376,8 +403,9 @@ async function animatePlinkoDrop(path, prize) {
     plinkoSvg.removeChild(ball);
 }
 
-plinkoDropBtn.addEventListener('click', handlePlinkoDrop);
-plinkoBoard.addEventListener('click', handlePlinkoDrop);
+plinkoDrop1Btn.addEventListener('click', () => handlePlinkoDrop(1));
+plinkoDrop3Btn.addEventListener('click', () => handlePlinkoDrop(3));
+plinkoBoard.addEventListener('click', () => handlePlinkoDrop(1));
 
 
 // --- Shared Modal & Accordion Logic ---
@@ -484,6 +512,7 @@ async function openPurchaseModal(tokenType) {
 
 buySpinnerBtn.addEventListener('click', () => openPurchaseModal('spinner'));
 buyPlinkoBtn.addEventListener('click', () => openPurchaseModal('plinko'));
+buyPlinkoBtn2.addEventListener('click', () => openPurchaseModal('plinko'));
 
 async function handleTokenCompEntry(form, tokenType, paymentMethod = 'card') {
     const selectedAnswer = form.querySelector('.answer-btn.selected');
@@ -535,8 +564,6 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
     const form = target.closest('form');
     if (!form) return;
     
-    // Determine token type based on which button was originally clicked to open the modal
-    // This is a bit of a simplification; a more robust way would be to store this in a state variable.
     const currentTokenType = activeTokenCompetition.title.toLowerCase().includes('plinko') ? 'plinko' : 'spinner';
 
     if (target.classList.contains('answer-btn')) {

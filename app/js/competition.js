@@ -75,7 +75,6 @@ async function loadCompetitionDetails(id) {
                 pageContent.append(createStandardPageElement(currentCompetitionData));
             }
             
-            // --- FIX: Conditionally set up the countdown ---
             if (currentCompetitionData.endDate) {
                 setupCountdown(currentCompetitionData.endDate.toDate());
             }
@@ -140,26 +139,37 @@ function showConfirmationModal() {
         return;
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
-    const price = parseFloat(selectedTicket.dataset.price).toFixed(2);
+    const price = parseFloat(selectedTicket.dataset.price);
     
     const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn' }, ['Confirm & Pay']);
     const content = createElement('div', {}, [
         createElement('h2', { textContent: 'Confirm Your Entry' }),
-        createElement('p', {}, [`You are about to purchase `, createElement('strong', { textContent: `${tickets}` }), ` entries for `, createElement('strong', { textContent: `£${price}` }), `.`]),
+        createElement('p', {}, [`You are about to purchase `, createElement('strong', { textContent: `${tickets}` }), ` entries for `, createElement('strong', { textContent: `£${price.toFixed(2)}` }), `.`]),
         createElement('div', { class: 'modal-actions' }, [
             createElement('button', { 'data-close-modal': true, class: ['btn', 'btn-secondary'] }, ['Cancel']),
             confirmBtn
         ])
     ]);
     openModal(content);
-    confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
+    // --- FIX: Pass both tickets and price to the handler ---
+    confirmBtn.addEventListener('click', () => handleEntry(tickets, price), { once: true });
 }
 
-async function handleEntry(ticketsBought) {
+// --- FIX: Update function signature and payload ---
+async function handleEntry(ticketsBought, price) {
     openModal(createElement('div', {}, [createElement('h2', { textContent: 'Processing Entry...' }), createElement('div', { class: 'loader' }), createElement('p', { textContent: 'Please wait, do not close this window.' })]));
     try {
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
-        const result = await allocateTicketsAndAwardTokens({ compId: competitionId, ticketsBought });
+        
+        // --- FIX: Construct the full, valid payload ---
+        const payload = {
+            compId: competitionId,
+            ticketsBought: ticketsBought,
+            expectedPrice: price,
+            paymentMethod: 'card' // Default to 'card' for entries from this page
+        };
+        
+        const result = await allocateTicketsAndAwardTokens(payload);
         const data = result.data;
         
         if (data.awardedTokens && data.awardedTokens.length > 0) {
@@ -247,7 +257,6 @@ function createStandardPageElement(data) {
     const ticketTiers = data.ticketTiers.map(tier => createElement('button', { class: 'ticket-option', 'data-amount': tier.amount, 'data-price': tier.price, textContent: `${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}` }));
     const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
     
-    // --- FIX: Conditionally create timer or static text ---
     const timerElement = data.endDate 
         ? createElement('div', { id: 'timer', class: 'detail-timer' })
         : createElement('div', { class: 'detail-timer', textContent: 'Draws Weekly' });
@@ -259,7 +268,7 @@ function createStandardPageElement(data) {
                 createElement('div', { class: 'entry-details-panel' }, [
                     createElement('h1', { textContent: data.title }),
                     createElement('p', { class: 'cash-alternative' }, ['Or ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
-                    timerElement, // Use the conditional element
+                    timerElement,
                     createElement('div', { class: 'detail-progress' }, [
                         createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })]),
                         createElement('p', { textContent: `${data.ticketsSold || 0} / ${data.totalTickets} sold` })
@@ -352,8 +361,6 @@ function createHeroPageElements(data) {
     return [header, main];
 }
 
-
-
 // --- INSTANT WIN MODAL LOGIC ---
 function showInstantWinModal(tokenCount) {
     const modal = document.getElementById('instant-win-modal');
@@ -367,9 +374,9 @@ function showInstantWinModal(tokenCount) {
     
     spinButton.disabled = false;
     spinButton.textContent = "SPIN THE WHEEL";
-    spinButton.onclick = handleSpinButtonClick; // Re-assign the click handler
+    spinButton.onclick = handleSpinButtonClick;
     spinResultContainer.innerHTML = '';
-    wheel.style.transition = 'none'; // Reset any previous spin
+    wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
 
     modal.classList.add('show');

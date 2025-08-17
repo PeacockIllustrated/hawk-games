@@ -15,7 +15,6 @@
     <header class="main-header"></header>
 
     <main class="container">
-        <!-- NEW: Tab Navigation for the Game Hub -->
         <nav class="game-tabs">
             <button class="game-tab-btn active" data-gametab="spinner">
                 <span class="token-icon"></span> Spinner Game
@@ -26,9 +25,7 @@
         </nav>
 
         <div class="instant-win-layout">
-            <!-- Game Column -->
             <div class="game-content-container">
-                <!-- SPINNER GAME PANEL (Now inside a container) -->
                 <section id="spinner-game-container" class="game-panel active">
                     <div class="spin-game-panel">
                         <div class="spin-panel-header">
@@ -49,7 +46,6 @@
                     </div>
                 </section>
 
-                <!-- PLINKO GAME PANEL (NEW) -->
                 <section id="plinko-game-container" class="game-panel">
                     <div class="plinko-game-panel card">
                         <div class="hd">
@@ -72,7 +68,6 @@
                 </section>
             </div>
 
-            <!-- Inventory Column -->
             <aside class="inventory-panel">
                 <div class="inventory-card">
                     <h3>Your Balance</h3>
@@ -86,7 +81,6 @@
                         </div>
                         <button id="buy-spinner-tokens-btn" class="btn-buy-tokens">+</button>
                     </div>
-                    <!-- NEW: Plinko Token Balance -->
                     <div class="balance-row">
                         <div class="balance-item">
                             <span class="plinko-icon"></span>
@@ -118,15 +112,15 @@
         </div>
     </main>
     
+    <!-- FIX: Correct the ID on the main container -->
     <div id="purchase-modal" class="modal-container">
-        <!-- Content is now styled via CSS and is scrollable -->
         <div class="purchase-modal-content">
             <div id="purchase-modal-body"></div>
         </div>
     </div>
     
     <div id="prizes-modal" class="modal-container">
-        <div id="prizes-modal-content" class="modal-content">
+        <div class="modal-content">
             <h2>Prizes & Odds</h2>
             <div id="prizes-table-container"></div>
             <button class="btn btn-secondary" style="margin-top: 1.5rem;" data-close-modal>Close</button>

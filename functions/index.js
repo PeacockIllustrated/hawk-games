@@ -1,5 +1,5 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/onCall");
-const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onCall, HttpsError } = require("firebase-functions/v2/https"); // CORRECTED IMPORT
+const { onSchedule } = require("firebase-functions/v2/scheduler"); // CORRECTED IMPORT
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
@@ -288,17 +288,17 @@ exports.weeklyTokenCompDraw = onSchedule({
 
 function getNextMondayNoon() {
     const now = new Date();
-    const londonOffset = 0; // UTC during winter, +1 during BST. JS handles this.
-    const nowUTC = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
+    // Use a robust method to get the current date in London time
+    const londonTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
 
-    const dayOfWeek = nowUTC.getDay(); // Sunday = 0, Monday = 1...
+    const dayOfWeek = londonTime.getDay(); // Sunday = 0, Monday = 1...
     let daysUntilMonday = 1 - dayOfWeek;
     if (daysUntilMonday <= 0) {
         daysUntilMonday += 7;
     }
 
-    const nextMonday = new Date(nowUTC);
-    nextMonday.setDate(nowUTC.getDate() + daysUntilMonday);
+    const nextMonday = new Date(londonTime);
+    nextMonday.setDate(londonTime.getDate() + daysUntilMonday);
     nextMonday.setHours(12, 0, 0, 0);
 
     return nextMonday;

@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>The Hawk Games — Plinko (MVP)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Plinko MVP on-brand demo for The Hawk Games.">
+  <style>
+    :root{
+      --bg:#121212;--fg:#f5f5f5;--muted:#bfbfbf;--gold:#e0a94a;--card:#1b1b1b;--border:#2a2a2a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:#0e0e0e}
+    .brand{color:var(--gold);text-decoration:none;font-weight:700}
+    .container{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 320px;gap:20px}
+    .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+    h1,h2,h3{margin:8px 0}
+    .muted{color:var(--muted)}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+    .btn{background:#222;color:var(--fg);padding:10px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer}
+    .btn:hover{border-color:var(--gold)}
+    .btn-primary{background:var(--gold);color:#1a1a1a;border:none}
+    .btn-primary:hover{filter:brightness(1.05)}
+    .pill{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px}
+    .board-wrap{position:relative;min-height:640px;display:flex;align-items:center;justify-content:center}
+    svg{width:100%;height:auto;max-height:820px;display:block}
+    .legend{display:grid;grid-template-columns:1fr auto;row-gap:8px;column-gap:12px;margin-top:10px}
+    .legend .slot{display:flex;align-items:center;gap:8px}
+    .legend .chip{width:12px;height:12px;border-radius:50%;background:var(--gold)}
+    .stat{display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px dashed var(--border);border-radius:10px;margin-top:8px}
+    .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1b1b;border:1px solid var(--border);color:var(--fg);padding:10px 14px;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+    .payout-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+    .payout-card{background:#161616;border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center}
+    .payout-card .idx{font-size:12px;color:var(--muted)}
+    .payout-card .val{font-weight:700;color:var(--gold)}
+    .hr{height:1px;background:linear-gradient(90deg,transparent, var(--border), transparent);margin:12px 0}
+    @media (max-width:900px){
+      .container{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <a class="brand" href="#">The Hawk Games</a>
+    <div class="pill">Plinko — MVP demo</div>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <h1>Plinko (on-brand)</h1>
+      <p class="muted">Visual demo. Outcomes here are client-simulated; in production, the server decides and the client renders.</p>
+      <div class="board-wrap">
+        <!-- SVG board injected by JS -->
+        <svg id="plinko" viewBox="0 0 800 900" aria-label="Plinko Board"></svg>
+      </div>
+      <div class="controls">
+        <button id="drop1" class="btn btn-primary">Drop 1</button>
+        <button id="drop3" class="btn">Drop 3×</button>
+        <button id="reset" class="btn">Reset Board</button>
+        <span class="pill" id="stakePill"></span>
+        <span class="pill" id="rowsPill"></span>
+        <span class="pill" id="rtpPill" title="Expected return per £1 based on binomial probabilities">RTP: …</span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <h2>Payouts</h2>
+      <div id="payoutGrid" class="payout-grid"></div>
+      <div class="hr"></div>
+      <div class="stat"><span>Total Drops</span><strong id="statDrops">0</strong></div>
+      <div class="stat"><span>Total Winnings</span><strong id="statWinnings">£0.00</strong></div>
+      <div class="stat"><span>Session RTP</span><strong id="statSessionRTP">0%</strong></div>
+      <p class="muted" style="margin-top:8px">Tip: centre slots are easier to hit. Tune payouts to hit your target RTP.</p>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // --- Config (MVP) ---
+    const CONFIG = {
+      rows: 12,                   // N rows -> N+1 slots
+      baseStakeGBP: 1,            // conceptual stake per drop (for RTP display)
+      // Payouts for slots [0..N], symmetrical-ish; adjust to meet target RTP
+      payoutsGBP: [0, 0.25, 0.5, 1, 2, 5, 25, 5, 2, 1, 0.5, 0.25, 0],
+      // Visual
+      pegRadius: 8,
+      ballRadius: 10,
+      boardMargin: 60,
+      rowGap: 58
+    };
+
+    // Sanity: payouts length must be rows+1
+    if (CONFIG.payoutsGBP.length !== CONFIG.rows + 1) {
+      throw new Error('payoutsGBP must have length rows+1');
+    }
+
+    // Elements
+    const svg = document.getElementById('plinko');
+    const drop1 = document.getElementById('drop1');
+    const drop3 = document.getElementById('drop3');
+    const resetBtn = document.getElementById('reset');
+    const payoutGrid = document.getElementById('payoutGrid');
+    const stakePill = document.getElementById('stakePill');
+    const rowsPill = document.getElementById('rowsPill');
+    const rtpPill = document.getElementById('rtpPill');
+    const toast = document.getElementById('toast');
+    const statDrops = document.getElementById('statDrops');
+    const statWinnings = document.getElementById('statWinnings');
+    const statSessionRTP = document.getElementById('statSessionRTP');
+
+    // State
+    let pegs = [];         // [{x,y}]
+    let slots = [];        // [{x,width,idx}]
+    let busy = false;
+    let queue = 0;
+    let session = { drops: 0, winnings: 0 };
+
+    // Utils
+    const fmtGBP = (n) => '£' + Number(n).toFixed(2);
+
+    function showToast(text){
+      toast.textContent = text;
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(()=> toast.classList.remove('show'), 1800);
+    }
+
+    // Binomial choose
+    function nCr(n, r){
+      if (r<0 || r>n) return 0;
+      if (r===0 || r===n) return 1;
+      let res = 1;
+      for (let i=1;i<=r;i++){
+        res = res * (n - r + i) / i;
+      }
+      return res;
+    }
+
+    function theoreticalRTP(){
+      const N = CONFIG.rows;
+      const payouts = CONFIG.payoutsGBP;
+      const denom = Math.pow(2, N);
+      let exp = 0;
+      for (let k=0;k<=N;k++){
+        const p = nCr(N, k) / denom;       // symmetric unbiased
+        exp += p * payouts[k];
+      }
+      // return per £1 stake
+      return exp / CONFIG.baseStakeGBP;
+    }
+
+    function updateStatsUI(){
+      statDrops.textContent = session.drops;
+      statWinnings.textContent = fmtGBP(session.winnings);
+      const spent = session.drops * CONFIG.baseStakeGBP;
+      const rtp = spent > 0 ? (session.winnings / spent)*100 : 0;
+      statSessionRTP.textContent = (rtp).toFixed(1) + '%';
+    }
+
+    // Build board geometry and SVG
+    function buildBoard(){
+      // Clear
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      const W = 800;
+      const H = 900;
+      const margin = CONFIG.boardMargin;
+      const N = CONFIG.rows;
+      const rowGap = CONFIG.rowGap;
+
+      // Compute horizontal bounds per row
+      // We create an isosceles triangle layout; top row has 1 peg, next has 2, etc.
+      // Horizontal spacing chosen to fill nicely.
+      const maxCols = N+1; // number of slots
+      const usableWidth = W - margin*2;
+      const colGap = usableWidth / maxCols;
+
+      pegs = [];
+      slots = [];
+
+      // Background panel
+      const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      bg.setAttribute('x', margin/2);
+      bg.setAttribute('y', margin/2);
+      bg.setAttribute('width', W - margin);
+      bg.setAttribute('height', H - margin);
+      bg.setAttribute('fill', '#0e0e0e');
+      bg.setAttribute('stroke', 'var(--border)');
+      svg.appendChild(bg);
+
+      // Pegs
+      for (let row=0; row<N; row++){
+        const pegsInRow = row+1;
+        const y = margin + rowGap*(row+1);
+        // centring: row has (pegsInRow) positions between columns
+        const offset = (usableWidth - (pegsInRow-1)*colGap)/2 + margin;
+        for (let p=0; p<pegsInRow; p++){
+          const x = offset + p*colGap;
+          pegs.push({x,y});
+          const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          c.setAttribute('cx', x);
+          c.setAttribute('cy', y);
+          c.setAttribute('r', CONFIG.pegRadius);
+          c.setAttribute('fill', 'var(--gold)');
+          c.setAttribute('opacity', '0.9');
+          svg.appendChild(c);
+        }
+      }
+
+      // Slots (N+1)
+      const slotsY = margin + rowGap*(N+1) + 10;
+      for (let s=0; s<=N; s++){
+        const x = margin + (s+0.5)*colGap; // centre over gap between pegs below last row
+        const w = colGap*0.9;
+        slots.push({x, width: w, idx: s});
+        // Draw pocket
+        const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        r.setAttribute('x', x - w/2);
+        r.setAttribute('y', slotsY);
+        r.setAttribute('width', w);
+        r.setAttribute('height', 48);
+        r.setAttribute('fill', '#161616');
+        r.setAttribute('stroke', '#2a2a2a');
+        r.setAttribute('rx', '10');
+        svg.appendChild(r);
+
+        // Label
+        const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t1.setAttribute('x', x);
+        t1.setAttribute('y', slotsY + 20);
+        t1.setAttribute('text-anchor','middle');
+        t1.setAttribute('fill','var(--muted)');
+        t1.setAttribute('font-size','12');
+        t1.textContent = `Slot ${s}`;
+        svg.appendChild(t1);
+
+        const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t2.setAttribute('x', x);
+        t2.setAttribute('y', slotsY + 38);
+        t2.setAttribute('text-anchor','middle');
+        t2.setAttribute('fill','var(--gold)');
+        t2.setAttribute('font-size','12');
+        t2.textContent = fmtGBP(CONFIG.payoutsGBP[s]);
+        svg.appendChild(t2);
+      }
+
+      // Top chute guide line
+      const topText = document.createElementNS('http://www.w3.org/2000/svg','text');
+      topText.setAttribute('x', W/2);
+      topText.setAttribute('y', margin + 12);
+      topText.setAttribute('text-anchor','middle');
+      topText.setAttribute('fill','var(--muted)');
+      topText.setAttribute('font-size','12');
+      topText.textContent = 'Drop Zone';
+      svg.appendChild(topText);
+    }
+
+    function renderPayoutGrid(){
+      payoutGrid.innerHTML = '';
+      CONFIG.payoutsGBP.forEach((val, idx)=>{
+        const card = document.createElement('div');
+        card.className = 'payout-card';
+        const i = document.createElement('div');
+        i.className = 'idx';
+        i.textContent = `Slot ${idx}`;
+        const v = document.createElement('div');
+        v.className = 'val';
+        v.textContent = fmtGBP(val);
+        card.appendChild(i); card.appendChild(v);
+        payoutGrid.appendChild(card);
+      });
+    }
+
+    function updatePills(){
+      stakePill.textContent = `Stake: £${CONFIG.baseStakeGBP.toFixed(2)}`;
+      rowsPill.textContent = `Rows: ${CONFIG.rows} (Slots: ${CONFIG.rows+1})`;
+      const r = theoreticalRTP(); // in £ return per £1 stake
+      rtpPill.textContent = `RTP: ${(r*100).toFixed(1)}%`;
+    }
+
+    function highlightSlot(idx, duration=600){
+      // simple pulse highlight of that slot rect
+      // Find rect: every slot adds 2 texts first; rects are first N+1 rects after bg
+      // Easier: compute x; overlay a glow rect temporarily
+      const s = slots[idx];
+      if (!s) return;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      const slotsY = CONFIG.boardMargin + CONFIG.rowGap*(CONFIG.rows+1) + 10;
+      g.setAttribute('x', s.x - s.width/2);
+      g.setAttribute('y', slotsY);
+      g.setAttribute('width', s.width);
+      g.setAttribute('height', 48);
+      g.setAttribute('rx','10');
+      g.setAttribute('fill','none');
+      g.setAttribute('stroke','var(--gold)');
+      g.setAttribute('stroke-width','2.5');
+      g.setAttribute('opacity','0.0');
+      svg.appendChild(g);
+      let t0 = null;
+      function anim(t){
+        if (!t0) t0 = t;
+        const p = Math.min(1,(t - t0)/duration);
+        g.setAttribute('opacity', String(0.9*(1-p)));
+        if (p<1) requestAnimationFrame(anim);
+        else svg.removeChild(g);
+      }
+      requestAnimationFrame(anim);
+    }
+
+    // Simulate a single drop path: N rows, each step left(-1) or right(+1)
+    function simulatePath(){
+      const N = CONFIG.rows;
+      let pos = 0; // offset from centre; map to slot index later
+      const steps = [];
+      for (let r=0; r<N; r++){
+        const step = (crypto.getRandomValues(new Uint8Array(1))[0] & 1) ? 1 : -1; // unbiased
+        pos += step;
+        steps.push(step);
+      }
+      // Convert to slot index: k = number of rights (map from steps)
+      const rights = (steps.filter(s=>s===1)).length;
+      return { steps, slotIndex: rights };
+    }
+
+    // Animate the ball along the path
+    async function animateDrop(path){
+      const N = CONFIG.rows;
+      const W = 800;
+      const margin = CONFIG.boardMargin;
+      const usableWidth = W - margin*2;
+      const colGap = usableWidth / (N+1);
+      const rowGap = CONFIG.rowGap;
+
+      // Start at top centre
+      let x = W/2, y = margin + 10;
+      const ball = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ball.setAttribute('cx', x); ball.setAttribute('cy', y); ball.setAttribute('r', CONFIG.ballRadius);
+      ball.setAttribute('fill','var(--gold)'); ball.setAttribute('opacity','0.95');
+      ball.setAttribute('filter','drop-shadow(0 2px 4px rgba(0,0,0,.6))');
+      svg.appendChild(ball);
+
+      // Helper: tween
+      function tween(toX, toY, ms){
+        return new Promise(resolve=>{
+          const x0 = x, y0 = y;
+          const dx = toX - x0, dy = toY - y0;
+          let t0 = null;
+          function step(t){
+            if (!t0) t0 = t;
+            const p = Math.min(1, (t - t0)/ms);
+            const ease = p<.5 ? 2*p*p : -1+(4-2*p)*p; // quad in-out
+            const nx = x0 + dx*ease, ny = y0 + dy*ease;
+            ball.setAttribute('cx', nx); ball.setAttribute('cy', ny);
+            if (p<1) requestAnimationFrame(step); else { x = toX; y = toY; resolve(); }
+          }
+          requestAnimationFrame(step);
+        });
+      }
+
+      // Move down through rows; at each row, drift left/right by half a slot
+      let rights = 0;
+      for (let r=0; r<N; r++){
+        const pegY = margin + rowGap*(r+1);
+        // horizontal offset: centre align pegs; pegs per row = r+1
+        const pegsInRow = r+1;
+        const offset = (usableWidth - (pegsInRow-1)*colGap)/2 + margin;
+        const decisionRight = path.steps[r] === 1;
+        if (decisionRight) rights++;
+        // Move to the peg directly below with slight pre-offset for visual realism
+        const pegIndex = decisionRight ? rights : rights; // simplified pathing
+        const nextX = offset + (pegIndex-1)*colGap; // approximate
+        await tween(nextX, pegY, 180);
+        // small bounce down between rows
+        const settleY = pegY + (rowGap*0.4);
+        await tween(nextX + (decisionRight? colGap*0.5 : -colGap*0.5), settleY, 120);
+        y = settleY;
+      }
+
+      // Final fall into slot
+      const slot = slots[path.slotIndex];
+      const slotsY = margin + rowGap*(N+1) + 34;
+      await tween(slot.x, slotsY, 260);
+
+      // Prize
+      const prize = CONFIG.payoutsGBP[path.slotIndex] || 0;
+      session.drops += 1;
+      session.winnings += prize;
+      updateStatsUI();
+      highlightSlot(path.slotIndex);
+      showToast(prize>0 ? `Win: ${fmtGBP(prize)} (Slot ${path.slotIndex})` : `No prize (Slot ${path.slotIndex})`);
+
+      // Fade ball
+      await new Promise(res=>{
+        let t0=null; function f(t){ if(!t0)t0=t; const p=Math.min(1,(t-t0)/500); ball.setAttribute('opacity', String(0.95*(1-p))); if(p<1) requestAnimationFrame(f); else res(); }
+        requestAnimationFrame(f);
+      });
+      svg.removeChild(ball);
+    }
+
+    async function drop(){
+      if (busy){ queue++; return; }
+      busy = true;
+      try{
+        const path = simulatePath();            // MVP: client RNG
+        await animateDrop(path);
+      } finally {
+        busy = false;
+        if (queue>0){ queue--; drop(); }
+      }
+    }
+
+    // Wire UI
+    drop1.addEventListener('click', ()=> drop());
+    drop3.addEventListener('click', ()=> { drop(); drop(); drop(); });
+    resetBtn.addEventListener('click', ()=>{
+      session = { drops: 0, winnings: 0 };
+      updateStatsUI();
+      buildBoard();
+    });
+
+    // Init
+    (function init(){
+      buildBoard();
+      renderPayoutGrid();
+      updatePills();
+      updateStatsUI();
+    })();
+
+    // --- Integration notes (prod) ---
+    // - Replace simulatePath() with a call to a callable CF (e.g., startPlinkoDrop)
+    //   that returns secure outcomes (slots or explicit steps to render).
+    // - Load payouts/rows from Firestore (admin_settings/plinkoSettings).
+    // - Keep only animation/rendering in the client; never trust client RNG for money.
+  </script>
+</body>
+</html>

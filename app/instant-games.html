@@ -24,8 +24,11 @@
             </button>
         </nav>
 
-        <div class="instant-win-layout">
+        <!-- MASTER LAYOUT CONTAINER: Class will be toggled by JS -->
+        <div id="game-hub-layout" class="instant-win-layout spinner-active">
+            <!-- Game Content Area (Column 1) -->
             <div class="game-content-container">
+                <!-- SPINNER GAME PANEL -->
                 <section id="spinner-game-container" class="game-panel active">
                     <div class="spin-game-panel">
                         <div class="spin-panel-header">
@@ -46,73 +49,91 @@
                     </div>
                 </section>
 
+                <!-- PLINKO GAME PANEL -->
                 <section id="plinko-game-container" class="game-panel">
                     <div class="plinko-game-panel card">
-                        <div class="hd">
-                            <h1>Plinko</h1>
-                            <div class="chips">
-                                <span class="chip">Rows: 12</span>
-                                <span class="chip">Tokens: 1 per drop</span>
-                            </div>
-                        </div>
+                         <div class="hd"><h1>Plinko Game</h1></div>
                         <div class="bd">
                             <div class="board" id="plinko-board" title="Click anywhere to drop a ball">
                                 <div class="dropzone">Drop Zone</div>
                                 <svg id="plinko-svg" viewBox="0 0 800 900" aria-label="Plinko Board"></svg>
-                            </div>
-                            <div class="controls">
-                                <button id="plinko-drop-btn" class="btn btn-primary">Drop Ball</button>
                             </div>
                         </div>
                     </div>
                 </section>
             </div>
 
-            <aside class="inventory-panel">
-                <div class="inventory-card">
-                    <h3>Your Balance</h3>
-                    <div class="balance-row">
-                        <div class="balance-item">
-                            <span class="token-icon"></span>
-                            <div class="balance-details">
-                                <span id="token-count" class="balance-value">0</span>
-                                <span>Spin Tokens</span>
+            <!-- Inventory & Controls Area (Column 2 or Full-Width Row) -->
+            <aside class="inventory-and-controls-panel">
+                <!-- SPINNER CONTROLS (Will be hidden when Plinko is active) -->
+                <div id="spinner-controls" class="game-controls-panel active">
+                    <div class="inventory-card">
+                         <h3>Your Balance</h3>
+                        <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="token-icon"></span>
+                                <div class="balance-details">
+                                    <span id="token-count" class="balance-value">0</span>
+                                    <span>Spin Tokens</span>
+                                </div>
+                            </div>
+                            <button id="buy-spinner-tokens-btn" class="btn-buy-tokens">+</button>
+                        </div>
+                        <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="plinko-icon"></span>
+                                <div class="balance-details">
+                                    <span id="plinko-token-count" class="balance-value">0</span>
+                                    <span>Plinko Tokens</span>
+                                </div>
+                            </div>
+                            <button id="buy-plinko-tokens-btn" class="btn-buy-plinko-tokens">+</button>
+                        </div>
+                        <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="credit-icon">£</span>
+                                <div class="balance-details">
+                                    <span id="credit-balance-display" class="balance-value">£0.00</span>
+                                    <span>Site Credit</span>
+                                </div>
                             </div>
                         </div>
-                        <button id="buy-spinner-tokens-btn" class="btn-buy-tokens">+</button>
                     </div>
-                    <div class="balance-row">
-                        <div class="balance-item">
-                            <span class="plinko-icon"></span>
-                            <div class="balance-details">
-                                <span id="plinko-token-count" class="balance-value">0</span>
-                                <span>Plinko Tokens</span>
-                            </div>
+                    <div class="token-inventory">
+                        <h3>Token Inventory</h3>
+                        <div id="token-accordion-container">
+                            <div class="placeholder">Loading your tokens...</div>
                         </div>
-                         <button id="buy-plinko-tokens-btn" class="btn-buy-plinko-tokens">+</button>
                     </div>
-                    <div class="balance-row">
-                        <div class="balance-item">
-                             <span class="credit-icon">£</span>
-                            <div class="balance-details">
-                                <span id="credit-balance-display" class="balance-value">£0.00</span>
-                                <span>Site Credit</span>
+                </div>
+                
+                <!-- PLINKO CONTROLS (Will be shown when Plinko is active) -->
+                <div id="plinko-controls" class="game-controls-panel">
+                    <div class="plinko-controls-panel content-panel">
+                        <div class="plinko-actions">
+                            <button id="plinko-drop-1" class="btn btn-primary">Drop 1 Ball</button>
+                            <button id="plinko-drop-3" class="btn btn-ghost">Drop 3 Balls</button>
+                        </div>
+                        <div class="plinko-balance">
+                             <h3>Your Balance</h3>
+                             <div class="balance-row">
+                                <div class="balance-item">
+                                    <span class="plinko-icon"></span>
+                                    <div class="balance-details">
+                                        <span id="plinko-balance-display" class="balance-value">0</span>
+                                        <span>Plinko Tokens</span>
+                                    </div>
+                                </div>
+                                <button id="buy-plinko-tokens-btn-2" class="btn-buy-plinko-tokens">+</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="token-inventory">
-                    <h3>Token Inventory</h3>
-                    <div id="token-accordion-container">
-                        <div class="placeholder">Loading your tokens...</div>
-                    </div>
-                </div>
             </aside>
         </div>
     </main>
     
-    <!-- FIX: Correct the ID on the main container -->
     <div id="purchase-modal" class="modal-container">
         <div class="purchase-modal-content">
             <div id="purchase-modal-body"></div>

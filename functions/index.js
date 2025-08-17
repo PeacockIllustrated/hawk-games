@@ -79,21 +79,24 @@ const assertIsAuthenticated = (context) => {
 const functionOptions = {
     region: "us-central1",
     enforceAppCheck: true,
-    cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://12-7.0.0.1:5000" ]
+    cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
 };
 
-// --- allocateTicketsAndAwardTokens (Handles all entry types) ---
+// --- allocateTicketsAndAwardTokens ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
+    // --- FIX: Updated Zod schema to include payment method and expected price ---
     const schema = z.object({
       compId: z.string().min(1),
       ticketsBought: z.number().int().positive(),
+      expectedPrice: z.number().positive(),
+      paymentMethod: z.enum(['card', 'credit']).default('card'),
     });
 
     const validation = schema.safeParse(request.data);
     if (!validation.success) {
       throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
     }
-    const { compId, ticketsBought } = validation.data;
+    const { compId, ticketsBought, expectedPrice, paymentMethod } = validation.data;
 
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -107,6 +110,27 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
         const compData = compDoc.data();
         const userData = userDoc.data();
+
+        // --- FIX: Server-side price validation ---
+        const tier = compData.ticketTiers.find(t => t.amount === ticketsBought);
+        if (!tier) {
+            throw new HttpsError('invalid-argument', 'Selected ticket bundle is not valid for this competition.');
+        }
+        if (tier.price !== expectedPrice) {
+            throw new HttpsError('invalid-argument', 'Price mismatch. Please refresh and try again.');
+        }
+        
+        let entryType = 'paid';
+        // --- FIX: Handle credit payment logic ---
+        if (paymentMethod === 'credit') {
+            entryType = 'credit';
+            const userCredit = userData.creditBalance || 0;
+            if (userCredit < expectedPrice) {
+                throw new HttpsError('failed-precondition', 'Insufficient credit balance.');
+            }
+            transaction.update(userRef, { creditBalance: FieldValue.increment(-expectedPrice) });
+        }
+
         if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
         const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
         const limit = compData.userEntryLimit || 75;
@@ -122,7 +146,8 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         transaction.set(entryRef, {
             userId: uid, userDisplayName: userData.displayName || "N/A",
             ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
-            enteredAt: FieldValue.serverTimestamp(), entryType: 'paid',
+            enteredAt: FieldValue.serverTimestamp(), 
+            entryType: entryType, // Use the determined entry type
         });
         
         let newTokens = [];
@@ -228,7 +253,7 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     }
 });
 
-// --- REVISED SCHEDULED FUNCTION ---
+// --- weeklyTokenCompMaintenance ---
 exports.weeklyTokenCompMaintenance = onSchedule({
     schedule: "every monday 12:00",
     timeZone: "Europe/London",
@@ -238,7 +263,6 @@ exports.weeklyTokenCompMaintenance = onSchedule({
     const compsRef = db.collection('competitions');
     const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // Find all LIVE token competitions created more than a week ago
     const oldCompsQuery = query(compsRef, 
         where('competitionType', '==', 'token'), 
         where('status', '==', 'live'),
@@ -258,20 +282,15 @@ exports.weeklyTokenCompMaintenance = onSchedule({
         const compId = doc.id;
         logger.log(`Processing competition ${compId}...`);
         try {
-            // 1. End the competition
             await doc.ref.update({ status: 'ended' });
             logger.log(`Competition ${compId} status set to 'ended'.`);
-
-            // 2. Perform the draw
             const drawResult = await performDraw(compId);
             logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
         } catch (error) {
             logger.error(`Failed to process and draw winner for ${compId}`, error);
-            // We continue to the next one even if one fails
         }
     }
 
-    // Optional: Add logic to check if the pool of available token comps is low
     const liveTokenQuery = query(compsRef, where('competitionType', '==', 'token'), where('status', '==', 'live'));
     const liveTokenSnapshot = await liveTokenQuery.get();
     if (liveTokenSnapshot.size < 3) {

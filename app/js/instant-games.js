@@ -1,7 +1,7 @@
 'use strict';
 
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, getDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
 
@@ -10,11 +10,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app);
 let userTokens = [];
+let userProfile = {};
 let userCreditBalance = 0;
 let spinnerPrizes = [];
 let isSpinning = false;
 let userProfileUnsubscribe = null;
-let currentCompetitionData = null;
+let activeTokenCompetition = null; // Store the found competition
 
 const tokenCountElement = document.getElementById('token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
@@ -49,9 +50,9 @@ auth.onAuthStateChanged((user) => {
         const userDocRef = doc(db, 'users', user.uid);
         userProfileUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
             if (docSnap.exists()) {
-                const data = docSnap.data();
-                userCreditBalance = data.creditBalance || 0;
-                userTokens = (data.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
+                userProfile = docSnap.data();
+                userCreditBalance = userProfile.creditBalance || 0;
+                userTokens = (userProfile.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
                 if (!isSpinning) {
                     updateUI();
                 }
@@ -127,29 +128,6 @@ function renderPrizesTable(prizes) {
         createElement('tbody', {}, tableRows)
     ]);
     prizesTableContainer.append(table);
-}
-
-function triggerConfetti() {
-    const container = document.querySelector('.spin-game-panel');
-    let confettiContainer = container.querySelector('.confetti-container');
-    if (confettiContainer) {
-        confettiContainer.remove();
-    }
-    confettiContainer = createElement('div', { class: 'confetti-container' });
-    container.style.position = 'relative';
-    container.appendChild(confettiContainer);
-    
-    for (let i = 0; i < 100; i++) {
-        const confetti = createElement('div', { 
-            class: 'confetti',
-            style: {
-                left: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 4}s`,
-                animationDuration: `${2 + Math.random() * 2}s`
-            }
-        });
-        confettiContainer.appendChild(confetti);
-    }
 }
 
 function showWinCelebrationModal(prizeType, value) {
@@ -270,29 +248,51 @@ spinButton.addEventListener('click', handleSpin);
 buyMoreBtn.addEventListener('click', async () => {
     const modalContent = document.getElementById('purchase-modal-content');
     modalContent.innerHTML = '';
-    modalContent.append(createElement('h2', { textContent: 'Get More Spins' }), createElement('p', { class: 'placeholder', textContent: 'Loading competition...' }));
+    modalContent.append(createElement('h2', { textContent: 'Get More Spins' }), createElement('p', { class: 'placeholder', textContent: 'Finding available competitions...' }));
     purchaseModal.classList.add('show');
     
     try {
-        const compRef = doc(db, 'spinner_competitions', 'active');
-        const docSnap = await getDoc(compRef);
-        if (!docSnap.exists()) throw new Error('No active spinner competition found.');
+        // Find an available token competition for the user
+        const compsRef = collection(db, 'competitions');
+        const q = query(compsRef, where('status', '==', 'live'), where('competitionType', '==', 'token'));
+        const querySnapshot = await getDocs(q);
+
+        let availableComp = null;
+        for (const doc of querySnapshot.docs) {
+            const compData = { id: doc.id, ...doc.data() };
+            const userEntryCount = userProfile.entryCount?.[compData.id] || 0;
+            if (userEntryCount < compData.userEntryLimit) {
+                availableComp = compData;
+                break; // Found one, stop searching
+            }
+        }
         
-        currentCompetitionData = docSnap.data();
-        const answers = Object.entries(currentCompetitionData.skillQuestion.answers)
+        if (!availableComp) {
+            modalContent.innerHTML = '';
+            modalContent.append(
+                createElement('h2', { textContent: 'No Competitions Available' }),
+                createElement('p', { textContent: "You've entered all available token draws for now. More will be available next week!" }),
+                createElement('button', { class: 'btn', 'data-close-modal': true }, ['Close'])
+            );
+            return;
+        }
+
+        activeTokenCompetition = availableComp; // Store for later use
+        
+        const answers = Object.entries(activeTokenCompetition.skillQuestion.answers)
             .map(([key, value]) => createElement('button', { type: 'button', class: 'answer-btn', 'data-answer': key, textContent: value }));
 
         let bundlesHTML = [createElement('p', {textContent: 'No bundles available.'})];
-        if (currentCompetitionData.ticketBundles && currentCompetitionData.ticketBundles.length > 0) {
-            bundlesHTML = currentCompetitionData.ticketBundles.map(b => 
+        if (activeTokenCompetition.ticketTiers && activeTokenCompetition.ticketTiers.length > 0) {
+            bundlesHTML = activeTokenCompetition.ticketTiers.map(b => 
                 createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` })
             );
         }
         
         modalContent.innerHTML = '';
-        const form = createElement('form', { id: 'spinner-entry-form', class: 'modal-form' }, [
+        const form = createElement('form', { id: 'token-entry-form', class: 'modal-form' }, [
             createElement('div', { class: 'skill-question-box', style: { padding: '1rem 0' } }, [
-                createElement('p', { class: 'question-text', textContent: currentCompetitionData.skillQuestion.text }),
+                createElement('p', { class: 'question-text', textContent: activeTokenCompetition.skillQuestion.text }),
                 createElement('div', { class: 'answer-options' }, answers)
             ]),
             createElement('div', { class: 'ticket-selector-box', style: { padding: '1rem 0' } }, [
@@ -306,14 +306,14 @@ buyMoreBtn.addEventListener('click', async () => {
         ]);
         
         modalContent.append(
-            createElement('h2', { textContent: currentCompetitionData.title }),
-            createElement('p', {}, ['Enter our weekly draw for a chance to win ', createElement('strong', { textContent: currentCompetitionData.prize }), ' and get bonus spin tokens instantly!']),
+            createElement('h2', { textContent: activeTokenCompetition.title }),
+            createElement('p', {}, [`Enter our weekly draw for a chance to win `, createElement('strong', { textContent: `${activeTokenCompetition.cashAlternative} Cash` }), ` and get bonus spin tokens instantly!`]),
             form
         );
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleSpinnerCompEntry(form, currentCompetitionData.skillQuestion.correctAnswer, 'card');
+            handleTokenCompEntry(form, activeTokenCompetition.skillQuestion.correctAnswer, activeTokenCompetition.id, 'card');
         });
 
     } catch (error) {
@@ -327,7 +327,7 @@ buyMoreBtn.addEventListener('click', async () => {
     }
 });
 
-async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card') {
+async function handleTokenCompEntry(form, correctAnswer, compId, paymentMethod = 'card') {
     const selectedAnswer = form.querySelector('.answer-btn.selected');
     const selectedBundle = form.querySelector('.ticket-option.selected');
 
@@ -345,18 +345,16 @@ async function handleSpinnerCompEntry(form, correctAnswer, paymentMethod = 'card
     if(targetBtn) targetBtn.textContent = 'Processing...';
 
     try {
-        const enterSpinnerCompetition = httpsCallable(functions, 'enterSpinnerCompetition');
-        await enterSpinnerCompetition({
-            compId: 'active',
-            bundle: {
-                amount: parseInt(selectedBundle.dataset.amount),
-                price: parseFloat(selectedBundle.dataset.price)
-            },
-            paymentMethod: paymentMethod
+        // Use the main, unified entry function
+        const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
+        await allocateTicketsAndAwardTokens({
+            compId: compId,
+            ticketsBought: parseInt(selectedBundle.dataset.amount),
         });
         purchaseModal.classList.remove('show');
+        // The onSnapshot listener will update the UI automatically
     } catch (error) {
-        console.error("Spinner comp entry failed:", error);
+        console.error("Token comp entry failed:", error);
         alert(`Entry failed: ${error.message}`);
     } finally {
         if(submitBtn) submitBtn.disabled = false;
@@ -382,7 +380,7 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
         if (userCreditBalance >= price) {
             const creditButton = createElement('button', { type: 'button', id: 'pay-with-credit-btn', class: ['btn', 'btn-credit'], textContent: `Pay with £${price.toFixed(2)} Credit` });
             creditButton.onclick = () => {
-                 handleSpinnerCompEntry(target.closest('form'), currentCompetitionData.skillQuestion.correctAnswer, 'credit');
+                 handleTokenCompEntry(target.closest('form'), activeTokenCompetition.skillQuestion.correctAnswer, activeTokenCompetition.id, 'credit');
             };
             creditOptionDiv.append(creditButton);
             creditOptionDiv.style.display = 'block';

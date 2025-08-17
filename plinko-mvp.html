@@ -2,482 +2,707 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>The Hawk Games — Plinko (Physics MVP)</title>
+  <title>The Hawk Games — Plinko (EPIC MVP)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="On-brand Plinko with physics-like drops, weighted bias, and live RTP.">
+  <meta name="description" content="On-brand Plinko demo for The Hawk Games — premium UI/UX, smooth physics-like motion.">
   <style>
-    :root{--bg:#121212;--fg:#f5f5f5;--muted:#bfbfbf;--gold:#e0a94a;--card:#1b1b1b;--border:#2a2a2a;}
+    /* ===== Brand tokens ===== */
+    :root{
+      --bg:#0c0c0f;
+      --bg2:#121214;
+      --fg:#f5f5f5;
+      --muted:#bfbfbf;
+      --gold:#e0a94a;
+      --gold-hi:#f4d488;
+      --card:#141418;
+      --card2:#191a1f;
+      --border:#2a2a2f;
+      --shadow:0 12px 40px rgba(0,0,0,.45);
+      --r:12px;
+    }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
-    body{background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:#0e0e0e}
-    .brand{color:var(--gold);text-decoration:none;font-weight:700}
-    .container{max-width:1180px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 360px;gap:20px}
-    .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+    body{
+      color:var(--fg);
+      background:
+        radial-gradient(1200px 800px at 20% -10%, #1a1b22 0%, transparent 60%),
+        radial-gradient(1200px 800px at 120% 30%, #101217 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      min-height:100vh;
+    }
+
+    /* Subtle moving aurora */
+    body::before{
+      content:"";
+      position:fixed; inset:-20%;
+      background:
+        radial-gradient(800px 600px at 65% 10%, rgba(224,169,74,.08), transparent 60%),
+        radial-gradient(900px 700px at 20% 80%, rgba(224,169,74,.05), transparent 60%);
+      pointer-events:none;
+      animation: aurora 14s ease-in-out infinite alternate;
+    }
+    @keyframes aurora{
+      0%{transform:translate3d(-2%,0,0)}
+      100%{transform:translate3d(2%,1%,0)}
+    }
+
+    /* ===== Layout ===== */
+    .header{
+      position:sticky; top:0; z-index:5;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 18px;
+      background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15) 90%, transparent);
+      backdrop-filter: blur(6px);
+      border-bottom:1px solid #131318;
+    }
+    .brand{color:var(--gold); text-decoration:none; font-weight:800; letter-spacing:.2px}
+    .pill{display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:12px; background:#0e0f13}
+
+    .wrap{max-width:1200px; margin:26px auto; padding:0 16px; display:grid; grid-template-columns:1.4fr .9fr; gap:22px}
+    @media (max-width:1000px){ .wrap{grid-template-columns:1fr} }
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0)); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+    .card .hd{display:flex; align-items:center; justify-content:space-between; padding:14px 16px 0 16px}
+    .card .bd{padding:14px 16px 16px 16px}
+
+    /* Inner glow edge */
+    .card::after{
+      content:""; position:absolute; inset:0; pointer-events:none; border-radius:16px;
+      background: radial-gradient(800px 200px at 50% -10%, rgba(224,169,74,.14), transparent 60%);
+      mix-blend-mode:screen; opacity:.4;
+    }
+
     h1,h2,h3{margin:8px 0}
     .muted{color:var(--muted)}
-    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-    .btn{background:#222;color:var(--fg);padding:10px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer}
-    .btn:hover{border-color:var(--gold)}
-    .btn-primary{background:var(--gold);color:#1a1a1a;border:none}
-    .btn-primary:hover{filter:brightness(1.05)}
-    .pill{display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:12px}
-    .board-wrap{position:relative;min-height:660px;display:flex;align-items:center;justify-content:center}
-    svg{width:100%;height:auto;max-height:880px;display:block}
-    .stat{display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px dashed var(--border);border-radius:10px;margin-top:8px}
-    .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1b1b;border:1px solid var(--border);color:var(--fg);padding:10px 14px;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s}
-    .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
-    .grid{display:grid;gap:8px}
-    .grid.cols-2{grid-template-columns:1fr 1fr}
-    .payout-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
-    .payout-card{background:#161616;border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center}
-    .payout-card .idx{font-size:12px;color:var(--muted)}
-    .payout-card .val{font-weight:700;color:var(--gold)}
-    .hr{height:1px;background:linear-gradient(90deg,transparent, var(--border), transparent);margin:12px 0}
-    .form-row{display:flex;gap:6px;align-items:center}
-    .form-row label{font-size:12px;color:var(--muted);width:94px}
-    input[type="number"], input[type="range"], select{
-      width:100%;background:#101010;border:1px solid var(--border);color:var(--fg);border-radius:8px;padding:8px
+
+    /* ===== Board ===== */
+    .board{
+      margin:10px 16px 18px; border-radius:18px; overflow:hidden; position:relative;
+      background:#0f1013;
+      border:1px solid #181920;
+      box-shadow:inset 0 -30px 120px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,255,255,.02);
     }
-    input[type="range"]{height:34px}
-    .mode-note{font-size:12px;color:var(--muted);margin-top:-6px}
-    @media (max-width:1000px){ .container{grid-template-columns:1fr} }
+    .board::before{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:
+        radial-gradient(600px 280px at 50% 0%, rgba(224,169,74,.12), transparent 65%),
+        radial-gradient(300px 160px at 48% 20%, rgba(224,169,74,.06), transparent 60%);
+      opacity:.6;
+    }
+    .dropzone{
+      position:absolute; left:50%; transform:translateX(-50%); top:14px; color:var(--muted); font-size:12px;
+      text-shadow:0 1px 0 rgba(0,0,0,.8);
+      animation: dz 2.4s ease-in-out infinite;
+    }
+    @keyframes dz{0%,100%{opacity:.85; transform:translateX(-50%) translateY(0)} 50%{opacity:.55; transform:translateX(-50%) translateY(1px)}}
+
+    svg{width:100%; height:auto; display:block}
+    .peg{filter: drop-shadow(0 2px 0 rgba(0,0,0,.8));}
+    .peg.gold{ fill:url(#goldGrad); stroke:#d09832; stroke-width:.75; }
+    .pocket{ fill:#14151b; stroke:#262832; rx:10 }
+    .payoutLabel{ fill:var(--gold); font-weight:700; font-size:12px}
+    .slotLabel{ fill:var(--muted); font-size:12px}
+
+    /* ===== Controls ===== */
+    .controls{display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 8px}
+    .btn{appearance:none; border:none; cursor:pointer; border-radius:12px; padding:12px 16px; font-weight:700; letter-spacing:.2px; transition:.18s transform, .18s box-shadow, .18s filter}
+    .btn-primary{
+      background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+      color:#1a1a1a; box-shadow: 0 8px 30px rgba(224,169,74,.25), inset 0 1px 0 rgba(255,255,255,.5);
+    }
+    .btn-ghost{ background:#1a1b21; border:1px solid var(--border); color:var(--fg) }
+    .btn:active{ transform: translateY(1px) scale(.99) }
+
+    /* Magnetic hover */
+    .btn-primary:hover{ filter:brightness(1.03) }
+    .btn-ghost:hover{ border-color:#3a3b44 }
+
+    .chips{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .chip{padding:6px 10px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:12px; background:#101117}
+
+    /* ===== Right panel ===== */
+    .side .bd{padding:12px 16px 16px}
+    .group{background:linear-gradient(180deg, #12131a, #0f1015); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px}
+    .group h3{margin:0 0 8px}
+    .row{display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; margin:8px 0}
+    .seg{display:inline-grid; grid-auto-flow:column; background:#0f1015; border:1px solid var(--border); border-radius:10px; overflow:hidden}
+    .seg button{border:0; background:transparent; color:var(--muted); padding:8px 10px; cursor:pointer}
+    .seg button[aria-pressed="true"]{ background:#171922; color:var(--gold); box-shadow: inset 0 0 0 1px #2a2b34 }
+
+    .slider{display:flex; align-items:center; gap:10px}
+    input[type="range"]{ width: 160px }
+    .input{display:flex; align-items:center; gap:6px}
+    .input input{ width:90px; padding:8px 10px; border-radius:10px; border:1px solid var(--border); background:#11121a; color:var(--fg) }
+
+    .payouts{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+    .payout-card{ background:#121319; border:1px solid var(--border); border-radius:10px; padding:8px; text-align:center; box-shadow: inset 0 1px 0 rgba(255,255,255,.04) }
+    .payout-card .idx{font-size:11px; color:var(--muted)}
+    .payout-card .val{font-weight:800; color:var(--gold)}
+
+    .stat{display:flex; align-items:center; justify-content:space-between; background:#101118; border:1px dashed var(--border); border-radius:10px; padding:8px; margin-top:8px}
+    .rtpBar{height:10px; background:#0e0f14; border:1px solid #1e2029; border-radius:999px; position:relative; overflow:hidden}
+    .rtpBar > .fill{ position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg, #7b5b17, var(--gold)); box-shadow:inset 0 0 6px rgba(0,0,0,.6) }
+    .rtpBar::after{ content:""; position:absolute; left:50%; top:-2px; bottom:-2px; width:2px; background:#2a2b35 } /* 100% marker */
+
+    /* Toast & confetti */
+    .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(8px); background:#171822; border:1px solid var(--border); border-radius:12px; padding:10px 14px; box-shadow:var(--shadow); opacity:0; transition:.25s; pointer-events:none; z-index:10}
+    .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+    .confetti{ position:fixed; width:6px; height:10px; background:var(--gold); left:50%; top:40%; opacity:.95; transform:translateX(-50%); border-radius:2px; box-shadow:0 0 10px rgba(224,169,74,.6); pointer-events:none }
+
+    @media (prefers-reduced-motion: reduce){
+      .btn, .toast, .confetti, .dropzone, body::before{ animation:none; transition:none }
+    }
   </style>
 </head>
 <body>
   <header class="header">
     <a class="brand" href="#">The Hawk Games</a>
-    <div class="pill">Plinko — Physics/Weighted</div>
+    <span class="pill">Plinko — Epic MVP</span>
   </header>
 
-  <main class="container">
-    <section class="panel">
-      <h1>Plinko (on-brand, physics-like)</h1>
-      <p class="muted">Client shows physics; **server should decide outcomes** in production. Modes: unbiased, weighted, or server-guided.</p>
-      <div class="board-wrap">
-        <svg id="plinko" viewBox="0 0 900 980" aria-label="Plinko Board"></svg>
+  <main class="wrap">
+    <!-- Left: Game -->
+    <section class="card">
+      <div class="hd">
+        <h1>Plinko <span class="muted">(physics-like)</span></h1>
+        <div class="chips">
+          <span class="chip" id="stakePill">Stake: £2.50</span>
+          <span class="chip" id="rowsPill">Rows: 12 (Slots: 13)</span>
+          <span class="chip" id="rtpPill" title="Expected return per £1 based on binomial distribution">RTP: …</span>
+        </div>
       </div>
-      <div class="controls">
-        <button id="drop1" class="btn btn-primary">Drop 1</button>
-        <button id="drop3" class="btn">Drop 3×</button>
-        <button id="reset" class="btn">Reset</button>
-        <span class="pill" id="rowsPill"></span>
-        <span class="pill" id="rtpPill"></span>
+      <div class="bd">
+        <div class="board" id="board">
+          <div class="dropzone">Drop Zone</div>
+          <svg id="plinko" viewBox="0 0 800 900" aria-label="Plinko Board">
+            <!-- gold gradient for pegs -->
+            <defs>
+              <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#f4d488"/>
+                <stop offset="45%" stop-color="#e0a94a"/>
+                <stop offset="100%" stop-color="#b38a37"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="controls">
+          <button id="drop1" class="btn btn-primary">Drop 1</button>
+          <button id="drop3" class="btn btn-ghost">Drop 3×</button>
+          <button id="reset" class="btn btn-ghost">Reset</button>
+        </div>
       </div>
     </section>
 
-    <aside class="panel">
-      <h2>Physics & Odds</h2>
-      <div class="grid cols-2">
-        <div class="form-row"><label>Mode</label>
-          <select id="mode">
-            <option value="unbiased">Unbiased (p=0.5)</option>
-            <option value="weighted">Weighted (choose p)</option>
-            <option value="guided">Server-guided (target slot)</option>
-          </select>
-        </div>
-        <div class="form-row"><label>Rows</label>
-          <input id="rows" type="number" min="6" max="16" step="1" value="12">
-        </div>
-
-        <div class="form-row" id="pRow"><label>p (Right)</label>
-          <input id="p" type="range" min="0" max="1" step="0.01" value="0.50">
-        </div>
-        <div class="form-row" id="targetRow" style="display:none;"><label>Target slot</label>
-          <input id="target" type="number" min="0" step="1" value="6">
+    <!-- Right: Controls / Odds -->
+    <aside class="card side">
+      <div class="hd"><h2>Physics & Odds</h2></div>
+      <div class="bd">
+        <div class="group">
+          <div class="row">
+            <h3 style="margin:0">Mode</h3>
+            <div class="seg" role="tablist" aria-label="Mode">
+              <button id="modeUnbiased" aria-pressed="true">Unbiased</button>
+              <button id="modeWeighted" aria-pressed="false">Weighted</button>
+              <button id="modeServer" aria-pressed="false" title="Production: server decides">Server</button>
+            </div>
+          </div>
+          <p class="muted" id="modeNote" style="margin:6px 0 0">Unbiased: p=0.5; pure binomial.</p>
         </div>
 
-        <div class="form-row"><label>Stake (£)</label>
-          <input id="stake" type="number" min="0" step="0.01" value="1.00">
+        <div class="group">
+          <div class="row">
+            <div class="slider">
+              <strong>Rows</strong>
+              <input type="range" id="rowsSlider" min="6" max="14" step="1" value="12" />
+              <span id="rowsVal">12</span>
+            </div>
+            <div class="input">
+              <strong>Stake (£)</strong>
+              <input type="number" id="stakeInput" value="2.50" min="0.1" step="0.1">
+            </div>
+          </div>
+          <div class="row">
+            <div class="slider">
+              <strong>Gravity</strong>
+              <input type="range" id="gravSlider" min="0.6" max="1.6" step="0.05" value="1.0"/>
+              <span id="gravVal">1.00×</span>
+            </div>
+          </div>
         </div>
-        <div class="form-row"><label>Gravity</label>
-          <input id="grav" type="range" min="800" max="5000" step="50" value="2600">
+
+        <div class="group">
+          <h3>Payouts</h3>
+          <div id="payouts" class="payouts"></div>
+        </div>
+
+        <div class="group">
+          <div class="stat"><span>Total Drops</span><strong id="statDrops">0</strong></div>
+          <div class="stat"><span>Total Winnings</span><strong id="statWinnings">£0.00</strong></div>
+          <div class="stat"><span>Session RTP</span><strong id="statSessionRTP">0%</strong></div>
+          <div class="stat" style="display:block">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+              <span>Expected RTP</span><strong id="rtpText">—</strong>
+            </div>
+            <div class="rtpBar"><div class="fill" id="rtpFill"></div></div>
+          </div>
         </div>
       </div>
-      <p class="mode-note" id="modeNote"></p>
-
-      <div class="hr"></div>
-      <h3>Payouts</h3>
-      <div id="payoutGrid" class="payout-grid"></div>
-      <div id="prizeForm" class="grid cols-2" style="margin-top:8px;"></div>
-
-      <div class="hr"></div>
-      <div class="stat"><span>Total Drops</span><strong id="statDrops">0</strong></div>
-      <div class="stat"><span>Total Winnings</span><strong id="statWinnings">£0.00</strong></div>
-      <div class="stat"><span>Session RTP</span><strong id="statSessionRTP">0%</strong></div>
     </aside>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
-    // ------- Config / State -------
-    const STATE = {
+    /* ===== Config / State ===== */
+    const state = {
       rows: 12,
-      stake: 1,
-      payouts: [],      // length rows+1
-      mode: 'unbiased', // 'unbiased' | 'weighted' | 'guided'
-      p: 0.5,           // weighted probability of RIGHT
-      targetSlot: 6,    // guided mode
-      g: 2600,          // px/s^2 gravity
-      pegR: 7.5,
-      ballR: 10,
-      margin: 70,
-      rowGap: 62
+      baseStakeGBP: 2.5,
+      gravity: 1.0,           // 1.0 = normal; <1 faster, >1 slower
+      mode: 'unbiased',       // 'unbiased' | 'weighted' | 'server'
+      payoutsGBP: [],         // length rows+1
+      drops: 0,
+      winnings: 0,
+      busy:false,
+      queue:0
     };
 
-    // init payouts symmetric-ish with a juicy centre
-    function defaultPayouts(rows){
-      const mid = Math.floor(rows/2);
-      const arr = Array(rows+1).fill(0);
-      for (let k=0; k<=rows; k++){
-        const d = Math.abs(k - mid);
-        arr[k] = d===0 ? 25 : d===1 ? 5 : d===2 ? 2 : d===3 ? 1 : d===4 ? 0.5 : d===5 ? 0.25 : 0;
-      }
-      return arr;
-    }
-    STATE.payouts = defaultPayouts(STATE.rows);
-
-    // ------- DOM -------
+    // DOM
     const svg = document.getElementById('plinko');
-    const rowsPill = document.getElementById('rowsPill');
-    const rtpPill = document.getElementById('rtpPill');
+    const board = document.getElementById('board');
     const drop1 = document.getElementById('drop1');
     const drop3 = document.getElementById('drop3');
     const resetBtn = document.getElementById('reset');
-    const payoutGrid = document.getElementById('payoutGrid');
-    const prizeForm = document.getElementById('prizeForm');
+    const payoutsEl = document.getElementById('payouts');
+    const stakePill = document.getElementById('stakePill');
+    const rowsPill = document.getElementById('rowsPill');
+    const rtpPill = document.getElementById('rtpPill');
+    const rtpFill = document.getElementById('rtpFill');
+    const rtpText = document.getElementById('rtpText');
     const statDrops = document.getElementById('statDrops');
     const statWinnings = document.getElementById('statWinnings');
     const statSessionRTP = document.getElementById('statSessionRTP');
     const toast = document.getElementById('toast');
-
-    const modeSel = document.getElementById('mode');
-    const rowsInp = document.getElementById('rows');
-    const pRow = document.getElementById('pRow');
-    const targetRow = document.getElementById('targetRow');
-    const pInp = document.getElementById('p');
-    const targetInp = document.getElementById('target');
-    const stakeInp = document.getElementById('stake');
-    const gravInp = document.getElementById('grav');
+    const rowsSlider = document.getElementById('rowsSlider');
+    const rowsVal = document.getElementById('rowsVal');
+    const stakeInput = document.getElementById('stakeInput');
+    const gravSlider = document.getElementById('gravSlider');
+    const gravVal = document.getElementById('gravVal');
+    const modeButtons = {
+      unbiased: document.getElementById('modeUnbiased'),
+      weighted: document.getElementById('modeWeighted'),
+      server:   document.getElementById('modeServer')
+    };
     const modeNote = document.getElementById('modeNote');
 
-    // ------- Geometry -------
-    let GEO = null;
-    function computeGeo(){
-      const W=900,H=980,N=STATE.rows,m=STATE.margin;
-      const usable=W-2*m;
-      const colGap=usable/(N+1);
-      const xSlot=(s)=> m + 0.5*colGap + s*colGap;
-      const yRow=(r)=> m + STATE.rowGap*(r+1);
-      const xPeg=(r,j)=> m + 0.5*colGap*(N - r + 1) + j*colGap;
-      return {W,H,N,m,colGap,xSlot,yRow,xPeg, slotsY: m + STATE.rowGap*(N+1) + 12};
+    // Geometry
+    let pegs = [];   // {x,y}
+    let slots = [];  // {x,width,idx}
+
+    // Utils
+    const fmtGBP = (n) => '£' + Number(n).toFixed(2);
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+    // Binomial combinatorics
+    function nCr(n, r){ if (r<0 || r>n) return 0; if (r===0||r===n) return 1; let res=1; for(let i=1;i<=r;i++) res = res*(n-r+i)/i; return res; }
+
+    function theoreticalRTP(){
+      const N = state.rows;
+      const denom = Math.pow(2, N);
+      let exp = 0;
+      for (let k=0;k<=N;k++){
+        const p = nCr(N, k) / denom;
+        exp += p * state.payoutsGBP[k];
+      }
+      const perStake = exp / state.baseStakeGBP;
+      return perStake; // return per £1 stake
+    }
+
+    function showToast(text){
+      toast.textContent = text;
+      toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(()=> toast.classList.remove('show'), 1600);
+    }
+
+    function confettiBurst(centerX, centerY){
+      for (let i=0;i<28;i++){
+        const el = document.createElement('div');
+        el.className='confetti';
+        const hue = 40 + (i*7)%40; // gold range
+        el.style.background = `hsl(${hue} 70% 55%)`;
+        el.style.left = centerX + 'px';
+        el.style.top = centerY + 'px';
+        const dx = (Math.random()*2-1)*180;
+        const dy = (Math.random()*-1)*220 - 60;
+        const rot = (Math.random()*2-1)*280;
+        const t = 900 + Math.random()*700;
+        el.animate([
+          { transform:`translate(0,0) rotate(0deg)`, opacity:1 },
+          { transform:`translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity:0 }
+        ], { duration:t, easing:'cubic-bezier(.17,.67,.22,1)', fill:'forwards' });
+        document.body.appendChild(el);
+        setTimeout(()=> el.remove(), t+50);
+      }
+    }
+
+    function animateNumber(el, to, prefix='£', isPercent=false){
+      const parse = (s)=> Number(String(s).replace(/[^\d.-]/g,''))||0;
+      const from = parse(el.textContent);
+      const dur = 500;
+      const t0 = performance.now();
+      function tick(t){
+        const p = clamp((t-t0)/dur,0,1);
+        const ease = p<.5 ? 2*p*p : -1+(4-2*p)*p;
+        const v = from + (to-from)*ease;
+        el.textContent = isPercent ? (v.toFixed(1)+'%') : (prefix ? prefix+v.toFixed(2) : v.toFixed(0));
+        if (p<1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    /* ===== Board build/render ===== */
+    function defaultPayouts(rows){
+      // Symmetric profile: edges low, centre higher. Tuned for screenshots vibe.
+      const len = rows+1;
+      const mid = Math.floor(len/2);
+      const arr = new Array(len).fill(0);
+      for (let i=0;i<len;i++){
+        const d = Math.abs(i - mid);
+        const base = [0, .25, .5, 1, 2, 5, 10][clamp(6-d,0,6)];
+        arr[i] = Number(base.toFixed(2));
+      }
+      // Optional: flatten extreme edges to 0
+      arr[0]=0; arr[len-1]=0;
+      return arr;
     }
 
     function buildBoard(){
-      GEO = computeGeo();
-      while(svg.firstChild) svg.removeChild(svg.firstChild);
+      // reset svg
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-      const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
-      bg.setAttribute('x', GEO.m/2);
-      bg.setAttribute('y', GEO.m/2);
-      bg.setAttribute('width', GEO.W - GEO.m);
-      bg.setAttribute('height', GEO.H - GEO.m);
-      bg.setAttribute('fill', '#0e0e0e');
-      bg.setAttribute('stroke', 'var(--border)');
-      svg.appendChild(bg);
+      const W = 800, H = 900;
+      const margin = 60;
+      const rowGap = 58;
+      const N = state.rows;
 
-      for (let r=0;r<GEO.N;r++){
-        for (let j=0;j<=r;j++){
+      // Background plate (subtle inner gradient handled by CSS container)
+      const plate = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      plate.setAttribute('x', 14);
+      plate.setAttribute('y', 14);
+      plate.setAttribute('width', W-28);
+      plate.setAttribute('height', H-28);
+      plate.setAttribute('fill', 'url(#plateGrad)');
+      plate.setAttribute('stroke', '#1a1b22');
+      plate.setAttribute('rx', '16');
+      svg.appendChild(plate);
+
+      // Plate grad
+      const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+      const pGrad = document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
+      pGrad.setAttribute('id','plateGrad');
+      pGrad.setAttribute('cx','50%'); pGrad.setAttribute('cy','0%'); pGrad.setAttribute('r','90%');
+      const s1 = document.createElementNS('http://www.w3.org/2000/svg','stop'); s1.setAttribute('offset','0%'); s1.setAttribute('stop-color','#0f1116');
+      const s2 = document.createElementNS('http://www.w3.org/2000/svg','stop'); s2.setAttribute('offset','100%'); s2.setAttribute('stop-color','#0b0c10');
+      pGrad.appendChild(s1); pGrad.appendChild(s2); defs.appendChild(pGrad);
+      svg.appendChild(defs);
+
+      pegs = []; slots = [];
+      const usableWidth = W - margin*2;
+      const colGap = usableWidth / (N+1);
+
+      // Pegs
+      for (let row=0; row<N; row++){
+        const pegsInRow = row+1;
+        const y = margin + rowGap*(row+1);
+        const offset = (usableWidth - (pegsInRow-1)*colGap)/2 + margin;
+        for (let p=0; p<pegsInRow; p++){
+          const x = offset + p*colGap;
+          pegs.push({x,y});
           const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
-          c.setAttribute('cx', GEO.xPeg(r,j));
-          c.setAttribute('cy', GEO.yRow(r));
-          c.setAttribute('r', STATE.pegR);
-          c.setAttribute('fill','var(--gold)');
-          c.setAttribute('opacity','0.9');
+          c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 8);
+          c.setAttribute('class','peg gold');
+          c.setAttribute('opacity','0.95');
           svg.appendChild(c);
         }
       }
 
-      for (let s=0;s<=GEO.N;s++){
-        const x=GEO.xSlot(s), w=GEO.colGap*0.92;
-        const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
-        rect.setAttribute('x', x - w/2);
-        rect.setAttribute('y', GEO.slotsY);
-        rect.setAttribute('width', w); rect.setAttribute('height', 50);
-        rect.setAttribute('rx','10');
-        rect.setAttribute('fill','#161616'); rect.setAttribute('stroke','#2a2a2a');
-        svg.appendChild(rect);
+      // Slots & labels
+      const slotsY = margin + rowGap*(N+1) + 10;
+      for (let s=0; s<=N; s++){
+        const x = margin + (s+0.5)*colGap;
+        const w = colGap*0.9;
+        slots.push({x, width:w, idx:s});
 
-        const t1=document.createElementNS('http://www.w3.org/2000/svg','text');
-        t1.setAttribute('x',x); t1.setAttribute('y', GEO.slotsY+20);
-        t1.setAttribute('text-anchor','middle'); t1.setAttribute('fill','var(--muted)'); t1.setAttribute('font-size','12');
-        t1.textContent=`Slot ${s}`; svg.appendChild(t1);
+        const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        r.setAttribute('x', x - w/2); r.setAttribute('y', slotsY);
+        r.setAttribute('width', w); r.setAttribute('height', 48);
+        r.setAttribute('class','pocket');
+        svg.appendChild(r);
 
-        const t2=document.createElementNS('http://www.w3.org/2000/svg','text');
-        t2.setAttribute('x',x); t2.setAttribute('y', GEO.slotsY+38);
-        t2.setAttribute('text-anchor','middle'); t2.setAttribute('fill','var(--gold)'); t2.setAttribute('font-size','12');
-        t2.textContent=fmtGBP(STATE.payouts[s]||0); svg.appendChild(t2);
+        const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t1.setAttribute('x', x); t1.setAttribute('y', slotsY + 20); t1.setAttribute('text-anchor','middle');
+        t1.setAttribute('class','slotLabel'); t1.textContent = `Slot ${s}`;
+        svg.appendChild(t1);
+
+        const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 38); t2.setAttribute('text-anchor','middle');
+        t2.setAttribute('class','payoutLabel'); t2.textContent = fmtGBP(state.payoutsGBP[s] || 0);
+        t2.setAttribute('data-slot-payout', String(s));
+        svg.appendChild(t2);
       }
-
-      const top=document.createElementNS('http://www.w3.org/2000/svg','text');
-      top.setAttribute('x', GEO.W/2); top.setAttribute('y', GEO.m+12);
-      top.setAttribute('text-anchor','middle'); top.setAttribute('fill','var(--muted)'); top.setAttribute('font-size','12');
-      top.textContent='Drop Zone'; svg.appendChild(top);
     }
 
-    function updateSlotLabels(){
-      const children=[...svg.childNodes];
-      children.forEach(el=>{
-        if(el.nodeName==='text'){
-          const y=+el.getAttribute('y');
-          if(Math.abs(y-(GEO.slotsY+38))<0.6){
-            const x=+el.getAttribute('x');
-            let best=0,dist=Infinity;
-            for(let s=0;s<=GEO.N;s++){
-              const d=Math.abs(x-GEO.xSlot(s));
-              if(d<dist){dist=d;best=s;}
-            }
-            el.textContent=fmtGBP(STATE.payouts[best]||0);
-          }
-        }
-      });
-    }
-
-    // ------- UI helpers -------
-    const fmtGBP = (n)=> '£'+Number(n).toFixed(2);
-    function showToast(text){
-      toast.textContent=text; toast.classList.add('show');
-      clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.classList.remove('show'),1700);
-    }
-    function nCr(n,r){ if(r<0||r>n)return 0; if(r===0||r===n)return 1; let res=1; for(let i=1;i<=r;i++) res=res*(n-r+i)/i; return res; }
-    function rtp(p){
-      const N=STATE.rows; const denom=Math.pow(2, N)*Math.pow(p/(1-p),0); // not used directly
-      let exp=0;
-      for(let k=0;k<=N;k++){
-        const prob = ( (nCr(N,k)) * Math.pow(p,k) * Math.pow(1-p,N-k) );
-        exp += prob * (STATE.payouts[k]||0);
-      }
-      return exp / Math.max(STATE.stake, 0.0001);
-    }
-
-    function renderPayoutGrid(){
-      payoutGrid.innerHTML='';
-      STATE.payouts.forEach((v,i)=>{
-        const card=document.createElement('div'); card.className='payout-card';
-        const a=document.createElement('div'); a.className='idx'; a.textContent=`Slot ${i}`;
-        const b=document.createElement('div'); b.className='val'; b.textContent=fmtGBP(v);
-        card.appendChild(a); card.appendChild(b); payoutGrid.appendChild(card);
-      });
-    }
-    function renderPrizeForm(){
-      prizeForm.innerHTML='';
-      for(let s=0;s<=STATE.rows;s++){
-        const row=document.createElement('div'); row.className='form-row';
-        const lab=document.createElement('label'); lab.textContent=`Slot ${s}`;
-        const inp=document.createElement('input'); inp.type='number'; inp.step='0.01'; inp.min='0'; inp.value=Number(STATE.payouts[s]||0).toFixed(2);
-        inp.addEventListener('input',()=>{
-          const v=parseFloat(inp.value||'0')||0; STATE.payouts[s]=v; updateSlotLabels(); renderPayoutGrid(); updateMeta();
+    function renderPayoutCards(){
+      payoutsEl.innerHTML = '';
+      state.payoutsGBP.forEach((val, idx)=>{
+        const card = document.createElement('div'); card.className='payout-card';
+        const i = document.createElement('div'); i.className='idx'; i.textContent = `Slot ${idx}`;
+        const v = document.createElement('div'); v.className='val'; v.textContent = fmtGBP(val);
+        // make editable: click to prompt quick edit
+        card.addEventListener('click', ()=>{
+          const nv = prompt(`Set payout for Slot ${idx} (GBP)`, String(val));
+          if (nv===null) return;
+          const num = Math.max(0, Number(nv)||0);
+          state.payoutsGBP[idx] = Number(num.toFixed(2));
+          document.querySelector(`text[data-slot-payout="${idx}"]`).textContent = fmtGBP(num);
+          updateRTPUI();
         });
-        row.appendChild(lab); row.appendChild(inp); prizeForm.appendChild(row);
-      }
-    }
-    function updateMeta(){
-      rowsPill.textContent=`Rows: ${STATE.rows} (slots ${STATE.rows+1})`;
-      const p = STATE.mode==='weighted' ? STATE.p : 0.5;
-      rtpPill.textContent=`RTP: ${(rtp(p)*100).toFixed(1)}%`;
+        card.appendChild(i); card.appendChild(v);
+        payoutsEl.appendChild(card);
+      });
     }
 
-    // ------- Physics drop (weighted/guided) -------
-    let dropping=false, queue=0, session={drops:0,winnings:0};
-
-    function updateStats(){
-      statDrops.textContent=session.drops;
-      statWinnings.textContent=fmtGBP(session.winnings);
-      const spent=session.drops*STATE.stake;
-      statSessionRTP.textContent = spent>0 ? ((session.winnings/spent)*100).toFixed(1)+'%' : '0%';
+    function updatePills(){
+      stakePill.textContent = `Stake: £${state.baseStakeGBP.toFixed(2)}`;
+      rowsPill.textContent = `Rows: ${state.rows} (Slots: ${state.rows+1})`;
     }
 
-    function decideStep(rightsSoFar, rowsRemaining){
-      if(STATE.mode==='guided'){
-        const needRights = Math.max(0, STATE.targetSlot - rightsSoFar);
-        // If we must still get more rights than rows left allow, force right, else probabilistic nudge
-        if(needRights > rowsRemaining) return -1; // force left to stay feasible (edge)
-        if(needRights === rowsRemaining) return 1; // must take right all the way
-        // bias toward achieving the target smoothly
-        const bias = 0.58; // subtle
-        return Math.random() < bias ? 1 : -1;
-      }
-      if(STATE.mode==='weighted'){
-        return Math.random() < STATE.p ? 1 : -1;
-      }
-      // unbiased
-      return (crypto.getRandomValues(new Uint8Array(1))[0] & 1) ? 1 : -1;
+    function updateRTPUI(){
+      const r = theoreticalRTP(); // per £1
+      const pct = clamp(r*100, 0, 200); // cap bar at 200%
+      rtpPill.textContent = `RTP: ${(r*100).toFixed(1)}%`;
+      rtpText.textContent = (r*100).toFixed(1) + '%';
+      rtpFill.style.width = pct + '%';
     }
 
-    async function drop(){
-      if(dropping){ queue++; return; }
-      dropping=true;
-      try{
-        // Ball state
-        let x = GEO.xSlot(Math.floor(GEO.N/2));
-        let y = STATE.margin + 10;
-        let vx = 0, vy = 0;
-        let nextRow = 0;
-        let rights = 0;
-
-        // If guided, clamp target inside [0,N]
-        STATE.targetSlot = Math.max(0, Math.min(GEO.N, Math.round(STATE.targetSlot)));
-
-        const ball=document.createElementNS('http://www.w3.org/2000/svg','circle');
-        ball.setAttribute('cx', x); ball.setAttribute('cy', y); ball.setAttribute('r', STATE.ballR);
-        ball.setAttribute('fill','var(--gold)'); ball.setAttribute('opacity','0.97');
-        svg.appendChild(ball);
-
-        let lastTs=null; const airDrag=0.0008; const wallPadding=STATE.margin*0.5;
-        const leftBound = STATE.margin + STATE.ballR + wallPadding*0.2;
-        const rightBound = GEO.W - STATE.margin - STATE.ballR - wallPadding*0.2;
-
-        // Precompute desired lateral speed to drift ~ half-slot between rows
-        const tRow = Math.max(0.14, Math.sqrt((2*STATE.rowGap)/STATE.g)); // ~time to fall one row
-        const vHalfSlot = (GEO.colGap*0.5) / tRow;                         // px/s
-
-        function frame(ts){
-          if(!lastTs) lastTs=ts;
-          const dt = Math.min(32, ts - lastTs) / 1000; // clamp to keep stable
-          lastTs = ts;
-
-          // Gravity
-          vy += STATE.g * dt;
-
-          // Integrate
-          x += vx * dt;
-          y += vy * dt;
-
-          // Air drag (very subtle)
-          vx *= (1 - airDrag);
-          vy *= (1 - airDrag*0.5);
-
-          // Walls
-          if(x < leftBound){ x=leftBound; vx = Math.abs(vx)*0.6; }
-          if(x > rightBound){ x=rightBound; vx = -Math.abs(vx)*0.6; }
-
-          // Peg interaction per row (at row threshold)
-          if(nextRow < GEO.N && y >= GEO.yRow(nextRow) - STATE.pegR*1.2){
-            // compute step decision
-            const rowsRemaining = GEO.N - nextRow;
-            const step = decideStep(rights, rowsRemaining);
-            if(step===1) rights++;
-
-            // snap slightly toward real peg centre for visual contact
-            const pegX = GEO.xPeg(nextRow, Math.min(rights, nextRow));
-            x += (pegX - x) * 0.45;
-
-            // bounce effect (reduce vy, add small pop)
-            vy = Math.max(120, vy * 0.35);
-            // lateral impulse toward chosen side + light randomness
-            const jitter = (Math.random()-0.5) * (GEO.colGap*0.12);
-            vx = step * vHalfSlot + jitter;
-
-            nextRow++;
-          }
-
-          // Render
-          ball.setAttribute('cx', x); ball.setAttribute('cy', y);
-
-          // Landing
-          if(y >= GEO.slotsY + 34){
-            // Choose nearest slot
-            let best=0,dist=Infinity;
-            for(let s=0;s<=GEO.N;s++){
-              const d=Math.abs(x - GEO.xSlot(s));
-              if(d<dist){dist=d;best=s;}
-            }
-            // If guided, subtly snap outcome to target (visual consistency)
-            const slotIndex = STATE.mode==='guided' ? STATE.targetSlot : best;
-
-            // Animate settle
-            ball.setAttribute('cx', GEO.xSlot(slotIndex)); ball.setAttribute('cy', GEO.slotsY + 34);
-
-            const prize = Number(STATE.payouts[slotIndex]||0);
-            session.drops++; session.winnings += prize;
-            updateStats();
-            highlightSlot(slotIndex);
-            showToast(prize>0 ? `Win: ${fmtGBP(prize)} (Slot ${slotIndex})` : `No prize (Slot ${slotIndex})`);
-
-            // fade
-            let t0=null; function fade(t){ if(!t0)t0=t; const p=Math.min(1,(t-t0)/550); ball.setAttribute('opacity', String(0.97*(1-p))); if(p<1) requestAnimationFrame(fade); else svg.removeChild(ball); }
-            requestAnimationFrame(fade);
-            return; // stop loop
-          }
-
-          requestAnimationFrame(frame);
-        }
-        requestAnimationFrame(frame);
-      } finally {
-        // allow queue
-        setTimeout(()=>{ dropping=false; if(queue>0){ queue--; drop(); } }, 60);
-      }
+    function updateStatsUI(){
+      statDrops.textContent = state.drops;
+      animateNumber(statWinnings, state.winnings, '£');
+      const spent = state.drops * state.baseStakeGBP;
+      const rtp = spent>0 ? (state.winnings/spent)*100 : 0;
+      animateNumber(statSessionRTP, rtp, '', true);
     }
 
-    function highlightSlot(idx, duration=640){
-      const x=GEO.xSlot(idx), w=GEO.colGap*0.92;
-      const g=document.createElementNS('http://www.w3.org/2000/svg','rect');
-      g.setAttribute('x', x - w/2); g.setAttribute('y', GEO.slotsY);
-      g.setAttribute('width', w); g.setAttribute('height', 50); g.setAttribute('rx','10');
-      g.setAttribute('fill','none'); g.setAttribute('stroke','var(--gold)'); g.setAttribute('stroke-width','2.5'); g.setAttribute('opacity','0');
+    function highlightSlot(idx){
+      const s = slots[idx]; if (!s) return;
+      const slotsY = 60 + 58*(state.rows+1) + 10;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      g.setAttribute('x', s.x - s.width/2);
+      g.setAttribute('y', slotsY);
+      g.setAttribute('width', s.width);
+      g.setAttribute('height', 48);
+      g.setAttribute('rx','10');
+      g.setAttribute('fill','none');
+      g.setAttribute('stroke','var(--gold)');
+      g.setAttribute('stroke-width','2.5');
+      g.setAttribute('opacity','0.0');
       svg.appendChild(g);
-      let t0=null; function anim(t){ if(!t0)t0=t; const p=Math.min(1,(t-t0)/duration); g.setAttribute('opacity', String(0.9*(1-p))); if(p<1) requestAnimationFrame(anim); else svg.removeChild(g); }
+      let t0=null; const dur=620/state.gravity;
+      function anim(t){ if(!t0) t0=t; const p=Math.min(1,(t-t0)/dur); g.setAttribute('opacity', String(0.9*(1-p))); if(p<1) requestAnimationFrame(anim); else svg.removeChild(g); }
       requestAnimationFrame(anim);
     }
 
-    // ------- Wire UI -------
+    function simulatePath(){
+      const N = state.rows;
+      let rights = 0;
+      const steps=[];
+      for (let r=0;r<N;r++){
+        let right;
+        if (state.mode==='weighted'){
+          // slight centre bias example (p tilts towards centre)
+          const centreBias = 0.55; // tweakable
+          right = (Math.random() < centreBias) ? 1 : -1;
+        } else {
+          // unbiased
+          right = (crypto.getRandomValues(new Uint8Array(1))[0] & 1) ? 1 : -1;
+        }
+        if (right===1) rights++;
+        steps.push(right);
+      }
+      return { steps, slotIndex: rights };
+    }
+
+    async function animateDrop(path){
+      const N = state.rows;
+      const W = 800;
+      const margin = 60;
+      const usableWidth = W - margin*2;
+      const colGap = usableWidth / (N+1);
+      const rowGap = 58;
+
+      let x = W/2, y = margin + 8;
+      const ball = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ball.setAttribute('cx', x); ball.setAttribute('cy', y); ball.setAttribute('r', 10);
+      ball.setAttribute('fill','var(--gold)'); ball.setAttribute('opacity','0.98');
+      ball.style.filter='drop-shadow(0 4px 10px rgba(224,169,74,.35))';
+      svg.appendChild(ball);
+
+      function trail(x,y){
+        const t = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        t.setAttribute('cx', x); t.setAttribute('cy', y); t.setAttribute('r', 7);
+        t.setAttribute('fill','var(--gold)'); t.setAttribute('opacity','0.28');
+        svg.appendChild(t);
+        const d = 360/state.gravity;
+        let t0=null; function fade(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/d); t.setAttribute('opacity', String(0.28*(1-p))); if(p<1) requestAnimationFrame(fade); else svg.removeChild(t); }
+        requestAnimationFrame(fade);
+      }
+
+      function tween(toX, toY, ms, squash=false){
+        ms = ms*state.gravity;
+        return new Promise(resolve=>{
+          const x0=x,y0=y, dx=toX-x0, dy=toY-y0;
+          let t0=null;
+          function step(t){
+            if(!t0)t0=t;
+            const p = Math.min(1,(t-t0)/ms);
+            const ease = p<.5 ? 2*p*p : -1+(4-2*p)*p;
+            const nx=x0+dx*ease, ny=y0+dy*ease;
+            ball.setAttribute('cx', nx); ball.setAttribute('cy', ny);
+            if (squash) {
+              const scale = 1 - 0.08*Math.sin(p*Math.PI);
+              ball.setAttribute('transform', `translate(${nx},${ny}) scale(1,${scale}) translate(${-nx},${-ny})`);
+            }
+            if (p<1){ requestAnimationFrame(step); } else { x=toX; y=toY; ball.removeAttribute('transform'); trail(x,y); resolve(); }
+          }
+          requestAnimationFrame(step);
+        });
+      }
+
+      let rights = 0;
+      for (let r=0; r<N; r++){
+        const pegY = margin + rowGap*(r+1);
+        const decisionRight = path.steps[r] === 1;
+        if (decisionRight) rights++;
+        // drift toward next column
+        const targetX = (margin + (rights+0.5)*colGap);
+        await tween(targetX, pegY, 140, true);
+        // small settle drop
+        await tween(targetX, pegY + rowGap*0.42, 110, false);
+      }
+
+      // Final pocket fall
+      const slot = slots[path.slotIndex];
+      const slotsY = margin + rowGap*(N+1) + 34;
+      await tween(slot.x, slotsY, 240, true);
+
+      const prize = state.payoutsGBP[path.slotIndex] || 0;
+      state.drops += 1;
+      state.winnings += prize;
+
+      updateStatsUI();
+      highlightSlot(path.slotIndex);
+      const bounds = board.getBoundingClientRect();
+      if (prize >= 10) confettiBurst(bounds.left + slot.x*(bounds.width/800), bounds.top + slotsY*(bounds.height/900));
+      showToast(prize>0 ? `Win: ${fmtGBP(prize)} (Slot ${path.slotIndex})` : `No prize (Slot ${path.slotIndex})`);
+
+      // Fade the ball out
+      await new Promise(res=>{
+        let t0=null; function f(t){ if(!t0)t0=t; const p=Math.min(1,(t-t0)/(420/state.gravity)); ball.setAttribute('opacity', String(0.98*(1-p))); if(p<1) requestAnimationFrame(f); else res(); }
+        requestAnimationFrame(f);
+      });
+      svg.removeChild(ball);
+    }
+
+    async function drop(){
+      if (state.busy){ state.queue++; return; }
+      state.busy = true;
+      try{
+        const path = (state.mode==='server')
+          ? await serverOutcomeStub()
+          : simulatePath();
+        await animateDrop(path);
+      } finally {
+        state.busy = false;
+        if (state.queue>0){ state.queue--; drop(); }
+      }
+    }
+
+    // Placeholder server outcome demo hook
+    async function serverOutcomeStub(){
+      // For now mimic unbiased; here you would call Functions and return a secure slotIndex
+      return simulatePath();
+    }
+
+    /* ===== Wire UI ===== */
+    function setMode(next){
+      state.mode = next;
+      Object.entries(modeButtons).forEach(([k,btn])=> btn.setAttribute('aria-pressed', String(k===next)));
+      modeNote.textContent =
+        next==='unbiased' ? 'Unbiased: p=0.5; pure binomial.' :
+        next==='weighted' ? 'Weighted: slight centre bias (demo only).' :
+        'Server: production — outcomes decided by backend.';
+    }
+
+    modeButtons.unbiased.onclick = ()=> setMode('unbiased');
+    modeButtons.weighted.onclick = ()=> setMode('weighted');
+    modeButtons.server.onclick   = ()=> setMode('server');
+
+    rowsSlider.addEventListener('input', ()=>{
+      const v = Number(rowsSlider.value);
+      rowsVal.textContent = v;
+      state.rows = v;
+      state.payoutsGBP = defaultPayouts(state.rows);
+      buildBoard(); renderPayoutCards(); updatePills(); updateRTPUI();
+    });
+
+    stakeInput.addEventListener('change', ()=>{
+      const v = Math.max(.1, Number(stakeInput.value)||state.baseStakeGBP);
+      state.baseStakeGBP = v;
+      stakeInput.value = v.toFixed(2);
+      updatePills(); updateRTPUI(); updateStatsUI();
+    });
+
+    gravSlider.addEventListener('input', ()=>{
+      const v = Number(gravSlider.value);
+      state.gravity = v;
+      gravVal.textContent = v.toFixed(2)+'×';
+    });
+
     drop1.addEventListener('click', ()=> drop());
     drop3.addEventListener('click', ()=> { drop(); drop(); drop(); });
     resetBtn.addEventListener('click', ()=>{
-      session={drops:0,winnings:0}; updateStats(); buildBoard(); renderPayoutGrid(); updateSlotLabels(); updateMeta();
+      state.drops = 0; state.winnings = 0;
+      updateStatsUI();
+      buildBoard();
     });
 
-    modeSel.addEventListener('change', ()=>{
-      STATE.mode=modeSel.value;
-      pRow.style.display = STATE.mode==='weighted' ? '' : 'none';
-      targetRow.style.display = STATE.mode==='guided' ? '' : 'none';
-      modeNote.textContent = STATE.mode==='guided'
-        ? 'Guided: in production, the server picks the slot; client animation steers there.'
-        : STATE.mode==='weighted'
-          ? 'Weighted: per-peg right probability p; RTP reflects this.'
-          : 'Unbiased: p=0.5; pure binomial.';
-      updateMeta();
-    });
+    // Magnetic hover for primary button
+    (function magnet(){
+      const btn = drop1;
+      btn.addEventListener('mousemove', (e)=>{
+        const r = btn.getBoundingClientRect();
+        const x = (e.clientX - r.left - r.width/2)/r.width;
+        const y = (e.clientY - r.top - r.height/2)/r.height;
+        btn.style.transform = `translateY(-1px) perspective(300px) rotateX(${y*-4}deg) rotateY(${x*6}deg)`;
+      });
+      btn.addEventListener('mouseleave', ()=> btn.style.transform='');
+    })();
 
-    rowsInp.addEventListener('input', ()=>{
-      STATE.rows = Math.max(6, Math.min(16, Number(rowsInp.value)|0));
-      // resize payouts
-      const newP = Array(STATE.rows+1).fill(0);
-      for(let i=0;i<newP.length && i<STATE.payouts.length;i++) newP[i]=STATE.payouts[i];
-      STATE.payouts = newP;
-      buildBoard(); renderPayoutGrid(); renderPrizeForm(); updateSlotLabels(); updateMeta();
-      targetInp.max = STATE.rows; targetInp.value = Math.min(STATE.rows, Number(targetInp.value)|0);
-    });
+    /* ===== Init ===== */
+    (function init(){
+      state.payoutsGBP = defaultPayouts(state.rows);
+      buildBoard(); renderPayoutCards(); updatePills(); updateRTPUI(); updateStatsUI();
+      setMode('unbiased');
+    })();
 
-    pInp.addEventListener('input', ()=>{ STATE.p = Number(pInp.value); updateMeta(); });
-    targetInp.addEventListener('input', ()=>{ STATE.targetSlot = Math.max(0, Math.min(STATE.rows, Number(targetInp.value)|0)); });
-    stakeInp.addEventListener('input', ()=>{ STATE.stake = Math.max(0.01, Number(stakeInp.value)||1); updateMeta(); });
-    gravInp.addEventListener('input', ()=>{ STATE.g = Number(gravInp.value)||2600; });
-
-    // ------- Init -------
-    function init(){
-      rowsInp.value = STATE.rows;
-      pInp.value = STATE.p.toFixed(2);
-      targetInp.value = STATE.targetSlot;
-      stakeInp.value = STATE.stake.toFixed(2);
-      gravInp.value = STATE.g;
-
-      buildBoard(); renderPayoutGrid(); renderPrizeForm(); updateSlotLabels();
-      modeSel.dispatchEvent(new Event('change'));
-      updateMeta(); updateStats();
-    }
-    init();
+    /* ===== Integration Notes =====
+      - Replace simulatePath()/serverOutcomeStub() with a callable (e.g., startPlinkoDrop)
+        that returns an array of slot indices (or exact step sequences) for 1× / 3× drops.
+      - Load payouts from Firestore (admin_settings/plinkoSettings) and keep this UI read-only in production.
+      - Enforce stake/rows limits server-side; treat client values as hints only.
+    */
   </script>
 </body>
 </html>

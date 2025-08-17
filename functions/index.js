@@ -84,19 +84,19 @@ const functionOptions = {
 
 // --- allocateTicketsAndAwardTokens ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
-    // --- FIX: Updated Zod schema to include payment method and expected price ---
     const schema = z.object({
       compId: z.string().min(1),
       ticketsBought: z.number().int().positive(),
       expectedPrice: z.number().positive(),
       paymentMethod: z.enum(['card', 'credit']).default('card'),
+      tokenType: z.enum(['spinner', 'plinko']), // NEW: Which token to award
     });
 
     const validation = schema.safeParse(request.data);
     if (!validation.success) {
       throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
     }
-    const { compId, ticketsBought, expectedPrice, paymentMethod } = validation.data;
+    const { compId, ticketsBought, expectedPrice, paymentMethod, tokenType } = validation.data;
 
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -111,7 +111,6 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         const compData = compDoc.data();
         const userData = userDoc.data();
 
-        // --- FIX: Server-side price validation ---
         const tier = compData.ticketTiers.find(t => t.amount === ticketsBought);
         if (!tier) {
             throw new HttpsError('invalid-argument', 'Selected ticket bundle is not valid for this competition.');
@@ -121,7 +120,6 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         }
         
         let entryType = 'paid';
-        // --- FIX: Handle credit payment logic ---
         if (paymentMethod === 'credit') {
             entryType = 'credit';
             const userCredit = userData.creditBalance || 0;
@@ -147,23 +145,25 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             userId: uid, userDisplayName: userData.displayName || "N/A",
             ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
             enteredAt: FieldValue.serverTimestamp(), 
-            entryType: entryType, // Use the determined entry type
+            entryType: entryType,
         });
         
         let newTokens = [];
-        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
-            const earnedAt = new Date();
-            for (let i = 0; i < ticketsBought; i++) {
-                newTokens.push({
-                    tokenId: crypto.randomBytes(16).toString('hex'),
-                    compId: compId,
-                    compTitle: compData.title,
-                    earnedAt: earnedAt 
-                });
-            }
-            transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
+        const earnedAt = new Date();
+        for (let i = 0; i < ticketsBought; i++) {
+            newTokens.push({
+                tokenId: crypto.randomBytes(16).toString('hex'),
+                compId: compId,
+                compTitle: compData.title,
+                earnedAt: earnedAt 
+            });
         }
-        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens };
+        
+        // --- FIX: Award the correct type of token ---
+        const tokenFieldToUpdate = tokenType === 'plinko' ? 'plinkoTokens' : 'spinTokens';
+        transaction.update(userRef, { [tokenFieldToUpdate]: FieldValue.arrayUnion(...newTokens) });
+        
+        return { success: true, ticketsBought, awardedTokens: newTokens };
     });
 });
 
@@ -224,6 +224,72 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
             }
         }
         return finalPrize;
+    });
+});
+
+// --- playPlinko ---
+exports.playPlinko = onCall(functionOptions, async (request) => {
+    const schema = z.object({ tokenId: z.string().min(1) });
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'A valid tokenId is required.');
+    }
+    const { tokenId } = validation.data;
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+        
+        const userData = userDoc.data();
+        const userTokens = userData.plinkoTokens || [];
+        const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
+        if (tokenIndex === -1) {
+            throw new HttpsError('not-found', 'Plinko token not found or already spent.');
+        }
+        const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
+        transaction.update(userRef, { plinkoTokens: updatedTokens });
+
+        const PLINKO_ROWS = 12;
+        let rights = 0;
+        const steps = [];
+        for (let i = 0; i < PLINKO_ROWS; i++) {
+            const step = Math.random() < 0.5 ? -1 : 1;
+            steps.push(step);
+            if (step === 1) rights++;
+        }
+        const finalSlotIndex = rights;
+
+        const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
+        const settingsDoc = await settingsRef.get();
+        if (!settingsDoc.exists) {
+            throw new HttpsError('internal', 'Plinko prize configuration is not available.');
+        }
+        const payouts = settingsDoc.data().payouts || [];
+        const prizeValue = payouts[finalSlotIndex] || 0;
+
+        const finalPrize = {
+            won: prizeValue > 0,
+            type: 'credit',
+            value: prizeValue
+        };
+
+        if (finalPrize.won) {
+            const winLogRef = db.collection('plinko_wins').doc();
+            transaction.set(winLogRef, {
+                userId: uid,
+                prizeType: finalPrize.type,
+                prizeValue: finalPrize.value,
+                slotIndex: finalSlotIndex,
+                wonAt: FieldValue.serverTimestamp(),
+                tokenIdUsed: tokenId,
+            });
+            transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+        }
+        
+        return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };
     });
 });
 

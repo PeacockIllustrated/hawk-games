@@ -15,29 +15,62 @@
     <header class="main-header"></header>
 
     <main class="container">
+        <!-- NEW: Tab Navigation for the Game Hub -->
+        <nav class="game-tabs">
+            <button class="game-tab-btn active" data-gametab="spinner">
+                <span class="token-icon"></span> Spinner Game
+            </button>
+            <button class="game-tab-btn" data-gametab="plinko">
+                <span class="plinko-icon"></span> Plinko
+            </button>
+        </nav>
+
         <div class="instant-win-layout">
             <!-- Game Column -->
-            <section class="spin-game-panel">
-                <div class="spin-panel-header">
-                    <h1 class="section-title">Instant Win</h1>
-                    <p class="section-subtitle">Use your tokens for a chance to win cash prizes & site credit instantly!</p>
-                </div>
-                
-                <div class="wheel-area">
-                    <div class="wheel-container">
-                        <div class="wheel-pointer"></div>
-                        <div id="wheel" class="wheel">
+            <div class="game-content-container">
+                <!-- SPINNER GAME PANEL (Now inside a container) -->
+                <section id="spinner-game-container" class="game-panel active">
+                    <div class="spin-game-panel">
+                        <div class="spin-panel-header">
+                            <h1 class="section-title">Instant Win</h1>
+                            <p class="section-subtitle">Use your tokens for a chance to win cash prizes & site credit instantly!</p>
                         </div>
-                        <button id="spin-button" class="btn-spin-center" disabled>SPIN</button>
+                        <div class="wheel-area">
+                            <div class="wheel-container">
+                                <div class="wheel-pointer"></div>
+                                <div id="wheel" class="wheel"></div>
+                                <button id="spin-button" class="btn-spin-center" disabled>SPIN</button>
+                            </div>
+                        </div>
+                        <div class="spin-panel-footer">
+                            <div id="spin-result" class="spin-result-container"></div>
+                            <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="spin-panel-footer">
-                    <div id="spin-result" class="spin-result-container">
+                <!-- PLINKO GAME PANEL (NEW) -->
+                <section id="plinko-game-container" class="game-panel">
+                    <div class="plinko-game-panel card">
+                        <div class="hd">
+                            <h1>Plinko</h1>
+                            <div class="chips">
+                                <span class="chip">Rows: 12</span>
+                                <span class="chip">Tokens: 1 per drop</span>
+                            </div>
+                        </div>
+                        <div class="bd">
+                            <div class="board" id="plinko-board" title="Click anywhere to drop a ball">
+                                <div class="dropzone">Drop Zone</div>
+                                <svg id="plinko-svg" viewBox="0 0 800 900" aria-label="Plinko Board"></svg>
+                            </div>
+                            <div class="controls">
+                                <button id="plinko-drop-btn" class="btn btn-primary">Drop Ball</button>
+                            </div>
+                        </div>
                     </div>
-                    <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
-                </div>
-            </section>
+                </section>
+            </div>
 
             <!-- Inventory Column -->
             <aside class="inventory-panel">
@@ -51,7 +84,17 @@
                                 <span>Spin Tokens</span>
                             </div>
                         </div>
-                         <button id="buy-more-tokens-btn" class="btn-buy-tokens">+</button>
+                        <button id="buy-more-tokens-btn" class="btn-buy-tokens">+</button>
+                    </div>
+                    <!-- NEW: Plinko Token Balance -->
+                    <div class="balance-row">
+                        <div class="balance-item">
+                            <span class="plinko-icon"></span>
+                            <div class="balance-details">
+                                <span id="plinko-token-count" class="balance-value">0</span>
+                                <span>Plinko Tokens</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="balance-row">
                         <div class="balance-item">
@@ -75,7 +118,9 @@
     </main>
     
     <div id="purchase-modal" class="modal-container">
-        <div id="purchase-modal-content" class="modal-content">
+        <!-- Content is now styled via CSS and is scrollable -->
+        <div class="purchase-modal-content">
+            <div id="purchase-modal-body"></div>
         </div>
     </div>
     
@@ -86,10 +131,8 @@
             <button class="btn btn-secondary" style="margin-top: 1.5rem;" data-close-modal>Close</button>
         </div>
     </div>
-<!-- Win Celebration Modal Container -->
-    <div id="win-celebration-modal" class="modal-container win-celebration-modal">
-        <!-- JS will populate this dynamically -->
-    </div>
+    
+    <div id="win-celebration-modal" class="modal-container win-celebration-modal"></div>
     
     <footer class="main-footer"></footer>
 

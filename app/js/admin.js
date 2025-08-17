@@ -303,6 +303,10 @@ async function renderPlinkoSettingsView() {
         ]),
         createElement('fieldset', {}, [
             createElement('legend', {textContent: 'Prize Payouts'}),
+            createElement('div', {class: 'form-group'}, [
+                createElement('label', {for: 'plinko-stake', textContent: 'Cost Per Token (£) for RTP calculation'}),
+                createElement('input', {type: 'number', id: 'plinko-stake', value: 1.00, step: 0.01, min: 0.01})
+            ]),
             payoutsContainer,
             createElement('div', { id: 'plinko-rtp-display', class: 'rtp-display' }, ['Expected RTP: ', createElement('strong', {textContent: '0.00%'})])
         ]),
@@ -550,13 +554,20 @@ function initializePlinkoSettingsListeners() {
     const form = document.getElementById('plinko-settings-form');
     const payoutsContainer = document.getElementById('plinko-payouts-container');
     const rowsInput = document.getElementById('plinko-rows');
+    const stakeInput = document.getElementById('plinko-stake');
     const rtpDisplay = document.getElementById('plinko-rtp-display').querySelector('strong');
+    
     const nCr = (n, r) => { if (r<0 || r>n) return 0; if (r===0||r===n) return 1; let res=1; for(let i=1;i<=r;i++) res = res*(n-r+i)/i; return res; }
 
     const calculateRTP = () => {
         const rows = parseInt(rowsInput.value) || 12;
+        const stake = parseFloat(stakeInput.value) || 1.0;
         const inputs = Array.from(payoutsContainer.querySelectorAll('.plinko-payout-input'));
-        if (inputs.length !== rows + 1) return;
+        if (inputs.length !== rows + 1 || stake <= 0) {
+            rtpDisplay.textContent = 'N/A';
+            return;
+        }
+
         const denom = Math.pow(2, rows);
         let expectedValue = 0;
         for (let k = 0; k <= rows; k++) {
@@ -564,7 +575,8 @@ function initializePlinkoSettingsListeners() {
             const prizeValue = parseFloat(inputs[k].value) || 0;
             expectedValue += probability * prizeValue;
         }
-        const rtp = expectedValue / 1.00;
+        
+        const rtp = expectedValue / stake; 
         rtpDisplay.textContent = `${(rtp * 100).toFixed(2)}%`;
     };
 
@@ -590,6 +602,7 @@ function initializePlinkoSettingsListeners() {
             payoutsContainer.append(inputGroup);
         }
         payoutsContainer.addEventListener('input', calculateRTP);
+        stakeInput.addEventListener('input', calculateRTP);
         calculateRTP();
     };
 
@@ -605,10 +618,11 @@ function initializePlinkoSettingsListeners() {
         const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
         const docSnap = await getDoc(settingsRef);
         if (docSnap.exists()) {
-            const { rows = 12, gravity = 1.0, payouts = [], mode = 'server' } = docSnap.data();
+            const { rows = 12, gravity = 1.0, payouts = [], mode = 'server', stake = 1.0 } = docSnap.data();
             rowsInput.value = rows;
             document.getElementById('plinko-gravity').value = gravity;
             document.querySelector(`input[name="plinkoMode"][value="${mode}"]`).checked = true;
+            stakeInput.value = stake.toFixed(2);
             renderPayoutInputs(rows, payouts);
         } else {
             renderPayoutInputs(12, [
@@ -636,8 +650,9 @@ function initializePlinkoSettingsListeners() {
             const rows = parseInt(rowsInput.value);
             const gravity = parseFloat(document.getElementById('plinko-gravity').value);
             const mode = document.querySelector('input[name="plinkoMode"]:checked').value;
+            const stake = parseFloat(stakeInput.value);
 
-            await setDoc(doc(db, 'admin_settings', 'plinkoPrizes'), { rows, gravity, mode, payouts });
+            await setDoc(doc(db, 'admin_settings', 'plinkoPrizes'), { rows, gravity, mode, stake, payouts });
             alert('Plinko settings saved successfully!');
         } catch (error) {
             console.error('Error saving plinko payouts:', error);

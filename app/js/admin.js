@@ -222,10 +222,10 @@ function renderHeroCompView() {
 function renderTokenCompsView() {
     const formPanel = createCompetitionForm({
         type: 'token',
-        title: 'Create New Weekly Token Competition'
+        title: 'Create New Token Competition'
     });
     const queuePanel = createElement('div', {class: 'content-panel', style: {marginTop: '2rem'}}, [
-        createElement('h2', {textContent: 'Queued Token Competitions'}),
+        createElement('h2', {textContent: 'Live & Queued Token Competitions'}),
         createElement('div', {id: 'token-queue-list'})
     ]);
 
@@ -283,7 +283,6 @@ function renderSpinnerSettingsView() {
 }
 
 // --- FORM CREATION & LOGIC ---
-
 function createCompetitionForm({ type, title }) {
     const isMain = type === 'main';
     const isHero = type === 'hero';
@@ -305,7 +304,7 @@ function createCompetitionForm({ type, title }) {
                 createElement('div', { class: 'form-group' }, [createElement('label', { for: 'userEntryLimit', textContent: 'Max Entries Per User' }), createElement('input', { type: 'number', id: 'userEntryLimit', value: '75', required: true })])
             ].filter(Boolean)),
             createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'cashAlternative', textContent: 'Cash Alternative (£)' }), createElement('input', { type: 'number', id: 'cashAlternative', required: true })]),
+                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'cashAlternative', textContent: 'Prize / Cash Alt (£)' }), createElement('input', { type: 'number', id: 'cashAlternative', required: true })]),
                 !isToken && createElement('div', { class: 'form-group', id: 'end-date-group' }, [createElement('label', { for: 'endDate', textContent: 'End Date & Time' }), createElement('input', { type: 'datetime-local', id: 'endDate', required: !isToken })])
             ].filter(Boolean))
         ]),
@@ -366,12 +365,7 @@ async function handleCreateFormSubmit(e, formType) {
         
         let status = 'live';
         if (competitionType === 'token') {
-            status = 'queued';
-            const q = query(collection(db, 'competitions'), where('competitionType', '==', 'token'), where('status', '==', 'live'), limit(1));
-            const liveTokenComps = await getDocs(q);
-            if (liveTokenComps.empty) {
-                status = 'live';
-            }
+             status = 'live'; // Token competitions are live immediately to be in the pool
         }
         
         const title = form.querySelector('#title').value;
@@ -409,7 +403,7 @@ async function handleCreateFormSubmit(e, formType) {
                 correctAnswer: correctKey
             },
             ticketTiers,
-            prizeImage: form.querySelector('#prizeImage')?.value || null,
+            prizeImage: form.querySelector('#prizeImage')?.value || 'assets/logo-icon.png',
         };
         
         if (competitionType !== 'token') {

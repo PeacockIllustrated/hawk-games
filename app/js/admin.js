@@ -94,112 +94,25 @@ function renderView(viewName) {
     switch (viewName) {
         case 'dashboard': renderDashboardView(); break;
         case 'create': renderCreateCompView(); break;
+        case 'hero-comp': renderHeroCompView(); break;
+        case 'token-comps': renderTokenCompsView(); break;
         case 'spinner-settings': renderSpinnerSettingsView(); break;
     }
 }
 
+// --- VIEW: Dashboard ---
 function renderDashboardView() {
     const listContainer = createElement('div', { id: 'competition-list' }, [
         createElement('div', { class: 'placeholder', textContent: 'Loading competitions...' })
     ]);
     const panel = createElement('div', { class: 'content-panel' }, [
-        createElement('h2', { textContent: 'Manage Competitions' }),
+        createElement('h2', { textContent: 'All Competitions' }),
         listContainer
     ]);
     mainContentContainer.append(panel);
     loadAndRenderCompetitions(listContainer);
 }
 
-function renderCreateCompView() {
-    const tiersContainer = createElement('div', { id: 'ticket-tiers-container' });
-    const addTierBtn = createElement('button', { type: 'button', id: 'add-tier-btn', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Tier']);
-    
-    const parallaxImageGroup = createElement('div', { id: 'parallax-image-group', style: { display: 'none' } }, [
-        createElement('div', { class: 'form-group' }, [createElement('label', { for: 'prizeImageBg', textContent: 'Background Image URL (e.g., storm)' }), createElement('input', { type: 'url', id: 'prizeImageBg' })]),
-        createElement('div', { class: 'form-group' }, [createElement('label', { for: 'prizeImageFg', textContent: 'Foreground Image URL (e.g., car)' }), createElement('input', { type: 'url', id: 'prizeImageFg' })]),
-        createElement('div', { class: 'form-group' }, [createElement('label', { for: 'prizeImageThumb', textContent: 'Thumbnail URL (for mobile & homepage card)' }), createElement('input', { type: 'url', id: 'prizeImageThumb' })])
-    ]);
-
-    const form = createElement('form', { id: 'create-comp-form', class: 'admin-form' }, [
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Core Details' }),
-            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'title', textContent: 'Competition Title' }), createElement('input', { type: 'text', id: 'title', required: true })])
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Image Setup' }),
-            createElement('div', { class: 'form-group', id: 'main-image-group' }, [createElement('label', { for: 'prizeImage', textContent: 'Main Image URL' }), createElement('input', { type: 'url', id: 'prizeImage' })]),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('label', { for: 'hasParallax', style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [ 'Use Parallax Hero Image?', createElement('input', { type: 'checkbox', id: 'hasParallax', style: { width: 'auto', height: 'auto' } })])
-            ]),
-            parallaxImageGroup
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Competition Details' }),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'totalTickets', textContent: 'Total Tickets' }), createElement('input', { type: 'number', id: 'totalTickets', required: true })]),
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'userEntryLimit', textContent: 'Max Entries Per User' }), createElement('input', { type: 'number', id: 'userEntryLimit', value: '75', required: true })])
-            ]),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'cashAlternative', textContent: 'Cash Alternative (£)' }), createElement('input', { type: 'number', id: 'cashAlternative', required: true })]),
-                createElement('div', { class: 'form-group', id: 'end-date-group' }, [createElement('label', { for: 'endDate', textContent: 'End Date & Time' }), createElement('input', { type: 'datetime-local', id: 'endDate', required: true })])
-            ]),
-             createElement('div', { id: 'token-comp-notice', class: 'form-hint', style: { display: 'none', marginTop: '1rem', color: '#888' }, textContent: "End date is not required. Token competitions run weekly and are managed automatically by the system."})
-        ]),
-        createElement('fieldset', {}, [createElement('legend', { textContent: 'Ticket Pricing' }), tiersContainer, addTierBtn]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Competition Type' }),
-            createElement('div', { class: 'admin-radio-group' }, [
-                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'main', checked: true }), 'Main Prize Competition' ]),
-                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'instant' }), 'Main Prize + Instant Win Tokens' ]),
-                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'hero' }), 'Hero Competition (+ Instant Win Tokens)' ]),
-                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'competitionType', value: 'token' }), 'Token Competition (Weekly Recurring)' ])
-            ])
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Skill Question' }),
-            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'questionText', textContent: 'Question' }), createElement('input', { type: 'text', id: 'questionText', required: true })]),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'correctAnswer', textContent: 'Correct Answer' }), createElement('input', { type: 'text', id: 'correctAnswer', required: true })]),
-                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'otherAnswers', textContent: 'Incorrect Answers (comma separated)' }), createElement('input', { type: 'text', id: 'otherAnswers', required: true })])
-            ])
-        ]),
-        createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Create Competition'])
-    ]);
-
-    const panel = createElement('div', { class: 'content-panel' }, [
-        createElement('h2', { textContent: 'Create New Competition' }),
-        form
-    ]);
-
-    mainContentContainer.append(panel);
-    initializeCreateFormListeners();
-}
-
-function renderSpinnerSettingsView() {
-    const prizesContainer = createElement('div', { id: 'spinner-prizes-container' });
-    const addPrizeBtn = createElement('button', { type: 'button', id: 'add-spinner-prize-btn', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Prize Tier']);
-    const rtpDisplay = createElement('div', { class: 'rtp-display' }, ['Total RTP: ', createElement('strong', { id: 'total-rtp-display', textContent: '0.00%' })]);
-    const saveBtn = createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Save Spinner Settings']);
-
-    const form = createElement('form', { id: 'spinner-settings-form', class: 'admin-form', style: { marginTop: '2rem' } }, [
-        prizesContainer,
-        addPrizeBtn,
-        rtpDisplay,
-        createElement('hr', { style: { borderColor: 'var(--border-color)', margin: '1.5rem 0' } }),
-        saveBtn
-    ]);
-
-    const panel = createElement('div', { class: 'content-panel' }, [
-        createElement('h2', { textContent: 'Spinner Prize Settings' }),
-        createElement('p', { style: { padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }, textContent: 'Define the prize pool for the global Spin Wheel game. The odds determine the probability of winning each prize on any given spin. The total RTP (Return to Player) shows the average percentage of revenue paid out as prizes.'}),
-        form
-    ]);
-
-    mainContentContainer.append(panel);
-    initializeSpinnerSettingsListeners();
-}
-
-// --- Data Fetching & Rendering Logic ---
 async function loadAndRenderCompetitions(listDiv) {
     try {
         const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
@@ -223,20 +136,21 @@ function renderCompetitionRow(comp) {
     const progress = (comp.ticketsSold / comp.totalTickets) * 100;
 
     let titleBadges = [];
-    const type = comp.competitionType || 'main'; // Default to 'main' for legacy comps
-    switch(type) {
-        case 'hero':
-            titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
-            break;
-        case 'instant':
-            titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
-            break;
-        case 'token':
-            titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-token'], textContent: '🎟️ Token Comp' }));
-            break;
-        case 'main':
-        default:
-             titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
+    if (comp.isHeroComp) {
+        titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-hero'], textContent: '⭐ Hero Comp' }));
+    } else {
+        const type = comp.competitionType || 'main';
+        switch(type) {
+            case 'instant':
+                titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-instant'], textContent: '⚡️ Instant Win' }));
+                break;
+            case 'token':
+                titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-token'], textContent: '🎟️ Token Comp' }));
+                break;
+            case 'main':
+            default:
+                 titleBadges.push(createElement('span', { class: ['title-badge', 'title-badge-main'], textContent: 'Main Prize' }));
+        }
     }
     
     let statusContent;
@@ -283,35 +197,138 @@ function renderCompetitionRow(comp) {
     ]);
 }
 
-// --- Event Listener Initialization ---
-function initializeCreateFormListeners() {
-    const form = document.getElementById('create-comp-form');
-    const addTierBtn = document.getElementById('add-tier-btn');
-    const tiersContainer = document.getElementById('ticket-tiers-container');
-    const hasParallaxCheck = document.getElementById('hasParallax');
-    const endDateGroup = document.getElementById('end-date-group');
-    const totalTicketsInput = document.getElementById('totalTickets');
-    const tokenCompNotice = document.getElementById('token-comp-notice');
-
-    form.elements.competitionType.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            const isTokenComp = e.target.value === 'token';
-            endDateGroup.style.display = isTokenComp ? 'none' : 'block';
-            endDateGroup.querySelector('input').required = !isTokenComp;
-            tokenCompNotice.style.display = isTokenComp ? 'block' : 'none';
-            if (isTokenComp) {
-                totalTicketsInput.value = 1000000;
-            }
-        });
+// --- VIEW: Create Main / Instant Comp ---
+function renderCreateCompView() {
+    const form = createCompetitionForm({
+        type: 'main',
+        title: 'Create Main or Instant Win Competition'
     });
+    mainContentContainer.append(form);
+    form.addEventListener('submit', (e) => handleCreateFormSubmit(e, 'main'));
+}
+
+// --- VIEW: Hero Competition ---
+function renderHeroCompView() {
+    const form = createCompetitionForm({
+        type: 'hero',
+        title: 'Manage Hero Competition'
+    });
+    mainContentContainer.append(form);
+    // TODO: Load existing hero comp data into the form
+    form.addEventListener('submit', (e) => handleCreateFormSubmit(e, 'hero'));
+}
+
+// --- VIEW: Token Competitions ---
+function renderTokenCompsView() {
+    const formPanel = createCompetitionForm({
+        type: 'token',
+        title: 'Create New Weekly Token Competition'
+    });
+    const queuePanel = createElement('div', {class: 'content-panel', style: {marginTop: '2rem'}}, [
+        createElement('h2', {textContent: 'Queued Token Competitions'}),
+        createElement('div', {id: 'token-queue-list'})
+    ]);
+
+    mainContentContainer.append(formPanel, queuePanel);
+    formPanel.addEventListener('submit', (e) => handleCreateFormSubmit(e, 'token'));
+    loadAndRenderTokenQueue(document.getElementById('token-queue-list'));
+}
+
+async function loadAndRenderTokenQueue(listDiv) {
+    listDiv.innerHTML = `<div class="placeholder">Loading queue...</div>`;
+    try {
+        const q = query(
+            collection(db, "competitions"), 
+            where("competitionType", "==", "token"),
+            where("status", "in", ["queued", "live"]),
+            orderBy("createdAt", "asc")
+        );
+        const snapshot = await getDocs(q);
+        const comps = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        listDiv.innerHTML = '';
+        if (comps.length === 0) {
+            listDiv.append(createElement('div', {class: 'placeholder', textContent: 'No token competitions are live or queued.'}));
+            return;
+        }
+        comps.forEach(comp => listDiv.append(renderCompetitionRow(comp)));
+    } catch(err) {
+        console.error("Error loading token queue:", err);
+        listDiv.innerHTML = `<div class="placeholder" style="color:red">Failed to load queue.</div>`;
+    }
+}
+
+
+// --- VIEW: Spinner Settings ---
+function renderSpinnerSettingsView() {
+    const prizesContainer = createElement('div', { id: 'spinner-prizes-container' });
+    const addPrizeBtn = createElement('button', { type: 'button', id: 'add-spinner-prize-btn', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Prize Tier']);
+    const saveBtn = createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Save Spinner Settings']);
+
+    const form = createElement('form', { id: 'spinner-settings-form', class: 'admin-form', style: { marginTop: '2rem' } }, [
+        prizesContainer,
+        addPrizeBtn,
+        createElement('hr', { style: { borderColor: 'var(--border-color)', margin: '1.5rem 0' } }),
+        saveBtn
+    ]);
+
+    const panel = createElement('div', { class: 'content-panel' }, [
+        createElement('h2', { textContent: 'Spinner Prize Settings' }),
+        createElement('p', { style: { padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }, textContent: 'Define the prize pool for the global Spin Wheel game. The odds determine the probability of winning each prize on any given spin.'}),
+        form
+    ]);
+
+    mainContentContainer.append(panel);
+    initializeSpinnerSettingsListeners();
+}
+
+// --- FORM CREATION & LOGIC ---
+
+function createCompetitionForm({ type, title }) {
+    const isMain = type === 'main';
+    const isHero = type === 'hero';
+    const isToken = type === 'token';
+
+    const tiersContainer = createElement('div', { id: 'ticket-tiers-container' });
+    const addTierBtn = createElement('button', { type: 'button', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Tier']);
     
-    hasParallaxCheck.addEventListener('change', (e) => {
-        const mainImageGroup = document.getElementById('main-image-group');
-        const parallaxImageGroup = document.getElementById('parallax-image-group');
-        mainImageGroup.style.display = e.target.checked ? 'none' : 'block';
-        parallaxImageGroup.style.display = e.target.checked ? 'block' : 'none';
-    });
+    const form = createElement('form', { class: 'admin-form' }, [
+        createElement('fieldset', {}, [
+            createElement('legend', { textContent: 'Core Details' }),
+            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'title', textContent: 'Competition Title' }), createElement('input', { type: 'text', id: 'title', required: true })]),
+            isHero && createElement('div', { class: 'form-group' }, [createElement('label', { for: 'prizeImage', textContent: 'Main Image URL' }), createElement('input', { type: 'url', id: 'prizeImage', required: true })])
+        ]),
+        createElement('fieldset', {}, [
+            createElement('legend', { textContent: 'Competition Details' }),
+            createElement('div', { class: 'form-group-inline' }, [
+                !isToken && createElement('div', { class: 'form-group' }, [createElement('label', { for: 'totalTickets', textContent: 'Total Tickets' }), createElement('input', { type: 'number', id: 'totalTickets', required: !isToken })]),
+                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'userEntryLimit', textContent: 'Max Entries Per User' }), createElement('input', { type: 'number', id: 'userEntryLimit', value: '75', required: true })])
+            ].filter(Boolean)),
+            createElement('div', { class: 'form-group-inline' }, [
+                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'cashAlternative', textContent: 'Cash Alternative (£)' }), createElement('input', { type: 'number', id: 'cashAlternative', required: true })]),
+                !isToken && createElement('div', { class: 'form-group', id: 'end-date-group' }, [createElement('label', { for: 'endDate', textContent: 'End Date & Time' }), createElement('input', { type: 'datetime-local', id: 'endDate', required: !isToken })])
+            ].filter(Boolean))
+        ]),
+        createElement('fieldset', {}, [createElement('legend', { textContent: 'Ticket Pricing' }), tiersContainer, addTierBtn]),
+        isMain && createElement('fieldset', {}, [
+            createElement('legend', {textContent: 'Competition Sub-Type'}),
+            createElement('div', {class: 'admin-radio-group'}, [
+                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'mainSubType', value: 'main', checked: true }), 'Standard Main Competition' ]),
+                createElement('label', {}, [ createElement('input', { type: 'radio', name: 'mainSubType', value: 'instant' }), 'Main Competition + Instant Win Tokens' ]),
+            ])
+        ]),
+        createElement('fieldset', {}, [
+            createElement('legend', { textContent: 'Skill Question' }),
+            createElement('div', { class: 'form-group' }, [createElement('label', { for: 'questionText', textContent: 'Question' }), createElement('input', { type: 'text', id: 'questionText', required: true })]),
+            createElement('div', { class: 'form-group-inline' }, [
+                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'correctAnswer', textContent: 'Correct Answer' }), createElement('input', { type: 'text', id: 'correctAnswer', required: true })]),
+                createElement('div', { class: 'form-group' }, [createElement('label', { for: 'otherAnswers', textContent: 'Incorrect Answers (comma separated)' }), createElement('input', { type: 'text', id: 'otherAnswers', required: true })])
+            ])
+        ]),
+        createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, [ isHero ? 'Save Hero Competition' : 'Create Competition' ])
+    ]);
 
+    // Initialize tiers
     const addTier = () => {
         const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
         const tierEl = createElement('div', { class: ['form-group-inline', 'ticket-tier-row'] }, [
@@ -324,38 +341,43 @@ function initializeCreateFormListeners() {
     };
     addTierBtn.addEventListener('click', addTier);
     addTier();
-    
-    form.addEventListener('submit', handleCreateFormSubmit);
+
+    return createElement('div', { class: 'content-panel' }, [
+        createElement('h2', { textContent: title }),
+        form
+    ]);
 }
 
-async function handleCreateFormSubmit(e) {
+async function handleCreateFormSubmit(e, formType) {
     e.preventDefault();
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Creating...';
+    submitBtn.textContent = 'Saving...';
 
     try {
-        const competitionType = form.querySelector('input[name="competitionType"]:checked').value;
+        let competitionType = formType;
+        if (formType === 'main') {
+            competitionType = form.querySelector('input[name="mainSubType"]:checked').value;
+        }
+
+        const isHeroComp = formType === 'hero';
+        const instantWinsEnabled = ['instant', 'hero', 'token'].includes(competitionType);
         
-        let status = 'queued';
-        // If this is the VERY FIRST token comp, make it live immediately.
+        let status = 'live';
         if (competitionType === 'token') {
+            status = 'queued';
             const q = query(collection(db, 'competitions'), where('competitionType', '==', 'token'), where('status', '==', 'live'), limit(1));
             const liveTokenComps = await getDocs(q);
             if (liveTokenComps.empty) {
                 status = 'live';
             }
-        } else {
-             status = 'live'; // All other comps go live immediately
         }
-
+        
         const title = form.querySelector('#title').value;
-        const totalTickets = parseInt(form.querySelector('#totalTickets').value);
+        const totalTickets = competitionType === 'token' ? 1000000 : parseInt(form.querySelector('#totalTickets').value);
         const userEntryLimit = parseInt(form.querySelector('#userEntryLimit').value);
         const cashAlternative = parseFloat(form.querySelector('#cashAlternative').value);
-        const isHeroComp = competitionType === 'hero';
-        const instantWinsEnabled = ['instant', 'hero', 'token'].includes(competitionType);
         
         const correctAnswerText = form.querySelector('#correctAnswer').value.trim();
         const otherAnswersText = form.querySelector('#otherAnswers').value.split(',').map(a => a.trim());
@@ -387,25 +409,25 @@ async function handleCreateFormSubmit(e) {
                 correctAnswer: correctKey
             },
             ticketTiers,
-            prizeImage: form.querySelector('#prizeImage').value || null,
+            prizeImage: form.querySelector('#prizeImage')?.value || null,
         };
         
         if (competitionType !== 'token') {
              competitionPayload.endDate = Timestamp.fromDate(new Date(form.querySelector('#endDate').value));
         }
 
-        const docRef = await addDoc(collection(db, 'competitions'), competitionPayload);
+        await addDoc(collection(db, 'competitions'), competitionPayload);
         
-        alert(`Competition "${title}" created successfully with ID: ${docRef.id}`);
+        alert(`Competition "${title}" created successfully.`);
         form.reset();
-        renderView('dashboard');
+        renderView(formType === 'token' ? 'token-comps' : 'dashboard');
 
     } catch (error) {
         console.error("Error creating competition:", error);
         alert(`Failed to create competition: ${error.message}`);
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Competition';
+        submitBtn.textContent = isHeroComp ? 'Save Hero Competition' : 'Create Competition';
     }
 }
 
@@ -413,17 +435,6 @@ function initializeSpinnerSettingsListeners() {
     const form = document.getElementById('spinner-settings-form');
     const prizesContainer = document.getElementById('spinner-prizes-container');
     const addPrizeBtn = document.getElementById('add-spinner-prize-btn');
-    const rtpDisplay = document.getElementById('total-rtp-display');
-
-    const calculateRTP = () => {
-        let totalRTP = 0;
-        prizesContainer.querySelectorAll('.spinner-prize-row').forEach(row => {
-            const value = parseFloat(row.querySelector('.spinner-prize-value').value) || 0;
-            const odds = parseInt(row.querySelector('.spinner-prize-odds').value) || 0;
-            if (value > 0 && odds > 0) totalRTP += (value / odds);
-        });
-        rtpDisplay.textContent = `${((totalRTP / 1.00) * 100).toFixed(2)}%`;
-    };
 
     const addPrizeTier = (type = 'credit', value = '', odds = '') => {
         const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
@@ -441,10 +452,9 @@ function initializeSpinnerSettingsListeners() {
         ]);
         prizeEl.querySelector('.spinner-prize-type').value = type;
         prizesContainer.appendChild(prizeEl);
-        removeBtn.addEventListener('click', () => { prizeEl.remove(); calculateRTP(); });
+        removeBtn.addEventListener('click', () => { prizeEl.remove(); });
     };
 
-    prizesContainer.addEventListener('input', calculateRTP);
     addPrizeBtn.addEventListener('click', () => addPrizeTier());
 
     const loadSettings = async () => { 
@@ -455,7 +465,6 @@ function initializeSpinnerSettingsListeners() {
             docSnap.data().prizes.forEach(p => addPrizeTier(p.type, p.value, p.odds));
         }
         if (prizesContainer.children.length === 0) addPrizeTier();
-        calculateRTP();
     };
     loadSettings();
 

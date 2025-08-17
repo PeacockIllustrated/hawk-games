@@ -1,275 +1,367 @@
-'use strict';
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { initializeApp } = require("firebase-admin/app");
+const crypto = require("crypto");
+const { z } = require("zod");
+const { logger } = require("firebase-functions");
 
-import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-import { app } from './auth.js'; 
+initializeApp();
+const db = getFirestore();
 
-const db = getFirestore(app);
+// --- Internal Helper for Reusable Draw Logic ---
+const performDraw = async (compId) => {
+    const compRef = db.collection('competitions').doc(compId);
+    const entriesRef = compRef.collection('entries');
 
-// --- SECURITY: Helper for safe element creation ---
-function createElement(tag, options = {}, children = []) {
-    const el = document.createElement(tag);
-    Object.entries(options).forEach(([key, value]) => {
-        if (key === 'class') {
-            const classes = Array.isArray(value) ? value : String(value).split(' ');
-            classes.forEach(c => {
-                if (c) el.classList.add(c);
-            });
-        } else if (key === 'textContent') {
-            el.textContent = value;
-        } else if (key === 'style') {
-            Object.assign(el.style, value);
-        } else {
-            el.setAttribute(key, value);
-        }
+    const compDocForCheck = await compRef.get();
+    if (!compDocForCheck.exists) throw new Error(`Competition ${compId} not found for drawing.`);
+    
+    const compDataForCheck = compDocForCheck.data();
+    if (compDataForCheck.status !== 'ended') throw new Error(`Competition ${compId} must be in 'ended' status to be drawn.`);
+    if (compDataForCheck.winnerId) throw new Error(`Winner already drawn for competition ${compId}.`);
+    if (!compDataForCheck.ticketsSold || compDataForCheck.ticketsSold === 0) {
+        await compRef.update({ status: 'drawn', drawnAt: FieldValue.serverTimestamp(), winnerDisplayName: 'No entries' });
+        logger.warn(`Competition ${compId} had no entries. Marked as drawn.`);
+        return { success: true, winnerDisplayName: 'No entries', winningTicketNumber: -1 };
+    }
+
+    const winningTicketNumber = crypto.randomInt(0, compDataForCheck.ticketsSold);
+    const winnerQuery = entriesRef.where('ticketStart', '<=', winningTicketNumber).orderBy('ticketStart', 'desc').limit(1);
+    const winnerSnapshot = await winnerQuery.get();
+
+    if (winnerSnapshot.empty) throw new Error(`Could not find an entry for winning ticket number ${winningTicketNumber} in competition ${compId}.`);
+
+    const winnerEntryDoc = winnerSnapshot.docs[0];
+    const winnerData = winnerEntryDoc.data();
+    const winnerId = winnerData.userId;
+
+    return await db.runTransaction(async (transaction) => {
+        const winnerUserDocSnap = await db.collection('users').doc(winnerId).get();
+        const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
+        const winnerDisplayName = winnerData.userDisplayName;
+
+        transaction.update(compRef, { 
+            status: 'drawn', 
+            winnerId, 
+            winnerDisplayName, 
+            winningTicketNumber, 
+            drawnAt: FieldValue.serverTimestamp() 
+        });
+
+        const pastWinnerRef = db.collection('pastWinners').doc(compId);
+        transaction.set(pastWinnerRef, { 
+            prizeTitle: compDataForCheck.title, 
+            prizeImage: compDataForCheck.prizeImage, 
+            winnerId, 
+            winnerDisplayName, 
+            winnerPhotoURL, 
+            winningTicketNumber, 
+            drawDate: FieldValue.serverTimestamp() 
+        });
+
+        return { success: true, winnerDisplayName, winningTicketNumber };
     });
-    children.forEach(child => child && el.append(child));
-    return el;
-}
+};
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadAllCompetitions();
-    loadPastWinners();
-    initializeHeaderScroll();
-    initializeHowItWorks();
-    initializeSmoothScroll();
+
+// --- Helpers ---
+const assertIsAdmin = async (context) => {
+    if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
+    const userDoc = await db.collection('users').doc(context.auth.uid).get();
+    if (!userDoc.exists || !userDoc.data().isAdmin) throw new HttpsError('permission-denied', 'Admin privileges required.');
+};
+const assertIsAuthenticated = (context) => {
+    if (!context.auth) throw new HttpsError('unauthenticated', 'You must be logged in.');
+};
+
+// --- SECURITY: Enforce App Check on all callable functions ---
+const functionOptions = {
+    region: "us-central1",
+    enforceAppCheck: true,
+    cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
+};
+
+// --- allocateTicketsAndAwardTokens ---
+exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
+    const schema = z.object({
+      compId: z.string().min(1),
+      ticketsBought: z.number().int().positive(),
+      expectedPrice: z.number().positive(),
+      paymentMethod: z.enum(['card', 'credit']).default('card'),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
+    }
+    const { compId, ticketsBought, expectedPrice, paymentMethod } = validation.data;
+
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const compRef = db.collection('competitions').doc(compId);
+    const userRef = db.collection('users').doc(uid);
+    
+    return await db.runTransaction(async (transaction) => {
+        const compDoc = await transaction.get(compRef);
+        const userDoc = await transaction.get(userRef);
+        if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+        const compData = compDoc.data();
+        const userData = userDoc.data();
+
+        const tier = compData.ticketTiers.find(t => t.amount === ticketsBought);
+        if (!tier) {
+            throw new HttpsError('invalid-argument', 'Selected ticket bundle is not valid for this competition.');
+        }
+        if (tier.price !== expectedPrice) {
+            throw new HttpsError('invalid-argument', 'Price mismatch. Please refresh and try again.');
+        }
+        
+        let entryType = 'paid';
+        if (paymentMethod === 'credit') {
+            entryType = 'credit';
+            const userCredit = userData.creditBalance || 0;
+            if (userCredit < expectedPrice) {
+                throw new HttpsError('failed-precondition', 'Insufficient credit balance.');
+            }
+            transaction.update(userRef, { creditBalance: FieldValue.increment(-expectedPrice) });
+        }
+
+        if (compData.status !== 'live') throw new HttpsError('failed-precondition', 'Competition is not live.');
+        const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
+        const limit = compData.userEntryLimit || 75;
+        if (userEntryCount + ticketsBought > limit) throw new HttpsError('failed-precondition', `Entry limit exceeded.`);
+        const ticketsSoldBefore = compData.ticketsSold || 0;
+        if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available.`);
+        const ticketStartNumber = ticketsSoldBefore;
+
+        transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsBought) });
+        transaction.update(userRef, { [`entryCount.${compId}`]: FieldValue.increment(ticketsBought) });
+        
+        const entryRef = compRef.collection('entries').doc();
+        transaction.set(entryRef, {
+            userId: uid, userDisplayName: userData.displayName || "N/A",
+            ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
+            enteredAt: FieldValue.serverTimestamp(), 
+            entryType: entryType,
+        });
+        
+        let newTokens = [];
+        if (compData.instantWinsConfig && compData.instantWinsConfig.enabled) {
+            const earnedAt = new Date();
+            for (let i = 0; i < ticketsBought; i++) {
+                newTokens.push({
+                    tokenId: crypto.randomBytes(16).toString('hex'),
+                    compId: compId,
+                    compTitle: compData.title,
+                    earnedAt: earnedAt 
+                });
+            }
+            transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
+        }
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens: newTokens };
+    });
 });
 
-const initializeSmoothScroll = () => {
-    document.addEventListener('click', (e) => {
-        const link = e.target.closest('a[href*="#"]');
-        if (link && link.pathname === window.location.pathname) {
-            const hash = link.hash;
-            const targetElement = document.querySelector(hash);
-            if (targetElement) {
-                e.preventDefault();
-                targetElement.scrollIntoView({ behavior: 'smooth' });
-                history.pushState(null, null, hash);
-            }
-        }
-    });
-};
-
-const initializeHeaderScroll = () => {
-    const header = document.querySelector('.main-header');
-    if (!header) return;
-    window.addEventListener('scroll', () => {
-        header.classList.toggle('scrolled', window.scrollY > 50);
-    });
-};
-
-const initializeHowItWorks = () => {
-    const stepCards = document.querySelectorAll('.how-it-works-grid .step-card');
-    stepCards.forEach(card => {
-        card.addEventListener('click', () => {
-            const isActive = card.classList.contains('active');
-            stepCards.forEach(c => c.classList.remove('active'));
-            if (!isActive) card.classList.add('active');
-        });
-    });
-};
-
-const loadAllCompetitions = async () => {
-    const heroContainer = document.getElementById('hero-competition-section');
-    const mainGrid = document.getElementById('main-competition-grid');
-    const instantWinGrid = document.getElementById('instant-win-grid');
-    const spinnerGrid = document.getElementById('spinner-competition-grid');
-
-    try {
-        const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            instantWinGrid.innerHTML = '';
-            mainGrid.innerHTML = '';
-            spinnerGrid.innerHTML = '';
-            instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
-            mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Main Prize competitions are live right now.'}));
-            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active.'}));
-            heroContainer.style.display = 'none';
-            return;
-        }
-
-        let heroComp = null;
-        const mainComps = [];
-        const instantWinComps = [];
-        const tokenComps = [];
-
-        querySnapshot.forEach((doc) => {
-            const compData = { id: doc.id, ...doc.data() };
-            
-            // CORRECTED LOGIC: Prioritize the isHeroComp flag to correctly categorize.
-            if (compData.isHeroComp === true) {
-                heroComp = compData; // If it's a hero, it only goes here.
-            } else {
-                switch (compData.competitionType) {
-                    case 'instant':
-                        instantWinComps.push(compData);
-                        break;
-                    case 'token':
-                        tokenComps.push(compData);
-                        break;
-                    case 'main':
-                    default: // Catches legacy comps without a type
-                        mainComps.push(compData);
-                        break;
-                }
-            }
-        });
-        
-        // Render Hero Competition
-        heroContainer.innerHTML = '';
-        if (heroComp) {
-            heroContainer.append(createHeroCompetitionCard(heroComp));
-            heroContainer.style.display = 'block';
-        } else {
-            heroContainer.style.display = 'none';
-        }
-
-        // Render Main Competitions
-        mainGrid.innerHTML = '';
-        if (mainComps.length > 0) mainComps.forEach(comp => mainGrid.append(createCompetitionCard(comp)));
-        else mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No main prize competitions are live right now.'}));
-
-        // Render Instant Win Competitions
-        instantWinGrid.innerHTML = '';
-        if (instantWinComps.length > 0) instantWinComps.forEach(comp => instantWinGrid.append(createCompetitionCard(comp)));
-        else instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
-        
-        // Render Token Competitions
-        spinnerGrid.innerHTML = '';
-        if (tokenComps.length > 0) tokenComps.forEach(comp => spinnerGrid.append(createCompetitionCard(comp, true))); // Pass true to use 'Get Spins' text
-        else spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active right now.'}));
-
-
-        startAllCountdowns();
-
-    } catch (error) {
-        console.error("Error loading competitions:", error);
-        mainGrid.innerHTML = '';
-        mainGrid.append(createElement('div', { class: 'hawk-card placeholder', style: {color: 'red'}, textContent: 'Could not load competitions.'}));
+// --- spendSpinToken ---
+exports.spendSpinToken = onCall(functionOptions, async (request) => {
+    const schema = z.object({ tokenId: z.string().min(1) });
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'A valid tokenId is required.');
     }
-};
+    const { tokenId } = validation.data;
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
 
-const loadPastWinners = async () => {
-    const winnersGrid = document.getElementById('past-winners-grid');
-    if (!winnersGrid) return;
-    winnersGrid.innerHTML = '';
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+        const userData = userDoc.data();
+        const userTokens = userData.spinTokens || [];
+        const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
+        if (tokenIndex === -1) {
+            throw new HttpsError('not-found', 'Spin token not found or already spent.');
+        }
+        const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
+        transaction.update(userRef, { spinTokens: updatedTokens });
+        const settingsRef = db.collection('admin_settings').doc('spinnerPrizes');
+        const settingsDoc = await settingsRef.get();
+        if (!settingsDoc.exists) {
+            throw new HttpsError('internal', 'Spinner prize configuration is not available.');
+        }
+        const prizes = settingsDoc.data().prizes;
+        const cumulativeProbabilities = [];
+        let cumulative = 0;
+        for (const prize of prizes) {
+            cumulative += (1 / prize.odds);
+            cumulativeProbabilities.push({ ...prize, cumulativeProb: cumulative });
+        }
+        const random = Math.random();
+        let finalPrize = { won: false, prizeType: 'none', value: 0 };
+        for (const prize of cumulativeProbabilities) {
+            if (random < prize.cumulativeProb) {
+                finalPrize = { won: true, prizeType: prize.type, value: prize.value };
+                break;
+            }
+        }
+        if (finalPrize.won) {
+            const winLogRef = db.collection('spin_wins').doc();
+            transaction.set(winLogRef, {
+                userId: uid,
+                prizeType: finalPrize.prizeType,
+                prizeValue: finalPrize.value,
+                wonAt: FieldValue.serverTimestamp(),
+                tokenIdUsed: tokenId,
+            });
+            if (finalPrize.prizeType === 'credit') {
+                transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            }
+        }
+        return finalPrize;
+    });
+});
 
-    try {
-        const q = query(collection(db, "pastWinners"), orderBy("drawDate", "desc"));
-        const querySnapshot = await getDocs(q);
+// --- NEW: playPlinko ---
+exports.playPlinko = onCall(functionOptions, async (request) => {
+    const schema = z.object({ tokenId: z.string().min(1) });
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'A valid tokenId is required.');
+    }
+    const { tokenId } = validation.data;
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
         
-        const validWinners = querySnapshot.docs.map(doc => doc.data()).filter(winner => winner.winnerDisplayName);
+        const userData = userDoc.data();
+        const userTokens = userData.plinkoTokens || [];
+        const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
+        if (tokenIndex === -1) {
+            throw new HttpsError('not-found', 'Plinko token not found or already spent.');
+        }
+        const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
+        transaction.update(userRef, { plinkoTokens: updatedTokens });
 
-        if (validWinners.length === 0) {
-            winnersGrid.append(createElement('div', { class: 'placeholder', textContent: 'Our first winners will be announced soon!'}));
-            return;
+        // Generate the path using pure binomial distribution (p=0.5)
+        const PLINKO_ROWS = 12;
+        let rights = 0;
+        const steps = [];
+        for (let i = 0; i < PLINKO_ROWS; i++) {
+            const step = Math.random() < 0.5 ? -1 : 1; // -1 for left, 1 for right
+            steps.push(step);
+            if (step === 1) rights++;
+        }
+        const finalSlotIndex = rights;
+
+        // Fetch prize settings
+        const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
+        const settingsDoc = await settingsRef.get();
+        if (!settingsDoc.exists) {
+            throw new HttpsError('internal', 'Plinko prize configuration is not available.');
+        }
+        const payouts = settingsDoc.data().payouts || [];
+        const prizeValue = payouts[finalSlotIndex] || 0;
+
+        const finalPrize = {
+            won: prizeValue > 0,
+            type: 'credit', // Assume all Plinko prizes are site credit for now
+            value: prizeValue
+        };
+
+        if (finalPrize.won) {
+            const winLogRef = db.collection('plinko_wins').doc();
+            transaction.set(winLogRef, {
+                userId: uid,
+                prizeType: finalPrize.type,
+                prizeValue: finalPrize.value,
+                slotIndex: finalSlotIndex,
+                wonAt: FieldValue.serverTimestamp(),
+                tokenIdUsed: tokenId,
+            });
+            transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
         }
         
-        validWinners.forEach(winner => winnersGrid.append(createWinnerCard(winner)));
+        return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };
+    });
+});
 
-    } catch (error) {
-        console.error("Error loading past winners:", error);
-        winnersGrid.innerHTML = '<div class="placeholder" style="color:red;">Could not load winner information.</div>';
+
+// --- drawWinner ---
+exports.drawWinner = onCall(functionOptions, async (request) => {
+    const schema = z.object({ compId: z.string().min(1) });
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+      throw new HttpsError('invalid-argument', 'Competition ID is required.');
     }
-};
+    const { compId } = validation.data;
 
-function createWinnerCard(winnerData) {
-    return createElement('div', { class: 'winner-card' }, [
-        createElement('img', { src: winnerData.winnerPhotoURL || `https://i.pravatar.cc/150?u=${winnerData.winnerId}`, alt: `${winnerData.winnerDisplayName}'s avatar` }),
-        createElement('h4', { textContent: winnerData.winnerDisplayName }),
-        createElement('p', { textContent: `Won the ${winnerData.prizeTitle}` })
-    ]);
-}
-
-function createHeroCompetitionCard(compData) {
-    const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
-    const endDate = compData.endDate.toDate();
-    const price = compData.ticketTiers?.[0]?.price || 0.00;
-    const instantWinBadge = compData.instantWinsConfig?.enabled 
-        ? createElement('div', { class: 'hawk-card__instant-win-badge', textContent: '⚡️ Instant Wins' })
-        : null;
-
-    return createElement('a', { href: `competition.html?id=${compData.id}`, class: 'hero-competition-card' }, [
-        instantWinBadge,
-        createElement('div', { class: 'hero-card-image' }, [
-            createElement('img', { src: compData.prizeImage, alt: compData.title })
-        ]),
-        createElement('div', { class: 'hero-card-content' }, [
-            createElement('span', { class: 'hero-card-tagline', textContent: 'Main Event' }),
-            createElement('h2', { class: 'hero-card-title', textContent: compData.title }),
-            createElement('div', { class: 'hero-card-timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' }),
-            createElement('div', { class: 'progress-bar' }, [
-                createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })
-            ]),
-            createElement('p', { class: 'hawk-card__progress-text', textContent: `${compData.ticketsSold || 0} / ${compData.totalTickets} sold` }),
-            createElement('div', { class: 'hero-card-footer' }, [
-                createElement('span', { class: 'hawk-card__price', textContent: `£${price.toFixed(2)}` }),
-                createElement('span', { class: 'btn', textContent: 'Enter' })
-            ])
-        ])
-    ]);
-}
-
-function createCompetitionCard(compData, isTokenComp = false) {
-    const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
-    const endDate = compData.endDate ? compData.endDate.toDate() : null;
-    const price = compData.ticketTiers?.[0]?.price || 0.00;
-    const instantWinBadge = compData.instantWinsConfig?.enabled 
-        ? createElement('div', { class: 'hawk-card__instant-win-badge', textContent: '⚡️ Instant Wins' })
-        : null;
-
-    const timerElement = endDate
-        ? createElement('div', { class: 'hawk-card__timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' })
-        : createElement('div', { class: 'hawk-card__timer', textContent: 'Draws Weekly' });
-
-    const buttonText = isTokenComp ? 'Get Spins' : 'Enter Now';
-    const linkHref = `competition.html?id=${compData.id}`;
-
-    return createElement('a', { href: linkHref, class: 'hawk-card' }, [
-        instantWinBadge,
-        createElement('img', { src: compData.prizeImage || 'https://via.placeholder.com/600x400.png?text=Prize', alt: compData.title, class: 'hawk-card__image' }),
-        createElement('div', { class: 'hawk-card__content' }, [
-            createElement('h3', { class: 'hawk-card__title', textContent: compData.title }),
-            timerElement,
-            createElement('div', { class: 'progress-bar' }, [
-                createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })
-            ]),
-            createElement('p', { class: 'hawk-card__progress-text', textContent: `${compData.ticketsSold || 0} / ${compData.totalTickets} sold` }),
-            createElement('div', { class: 'hawk-card__footer' }, [
-                createElement('span', { class: 'hawk-card__price', textContent: `£${price.toFixed(2)}` }),
-                createElement('span', { class: 'btn', textContent: buttonText })
-            ])
-        ])
-    ]);
-}
-
-function startAllCountdowns() {
-    const timerElements = document.querySelectorAll('.hawk-card__timer[data-end-date], .hero-card-timer[data-end-date]');
-    if (timerElements.length === 0) return;
-
-    const updateTimers = () => {
-        timerElements.forEach(timer => {
-            const endDate = new Date(timer.dataset.endDate);
-            const distance = endDate.getTime() - new Date().getTime();
-            timer.innerHTML = ''; 
-
-            if (distance < 0) {
-                timer.append(createElement('strong', { textContent: "Competition Closed" }));
-                return;
-            }
-
-            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-            
-            timer.append(
-                createElement('strong', { textContent: `${days}D ${hours}H ${minutes}M` }),
-                ' LEFT TO ENTER'
-            );
-        });
-    };
+    await assertIsAdmin(request);
     
-    updateTimers(); 
-    setInterval(updateTimers, 60000);
-}
+    const compRef = db.collection('competitions').doc(compId);
+    const compDoc = await compRef.get();
+    if (!compDoc.exists || compDoc.data().status !== 'ended') {
+        throw new HttpsError('failed-precondition', 'Competition must be in "ended" status to be drawn manually.');
+    }
+
+    try {
+        const result = await performDraw(compId);
+        return { success: true, ...result };
+    } catch (error) {
+        logger.error(`Manual draw failed for compId: ${compId}`, error);
+        throw new HttpsError('internal', error.message || 'An internal error occurred during the draw.');
+    }
+});
+
+// --- weeklyTokenCompMaintenance ---
+exports.weeklyTokenCompMaintenance = onSchedule({
+    schedule: "every monday 12:00",
+    timeZone: "Europe/London",
+}, async (event) => {
+    logger.log("Starting weekly token competition maintenance...");
+
+    const compsRef = db.collection('competitions');
+    const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const oldCompsQuery = query(compsRef, 
+        where('competitionType', '==', 'token'), 
+        where('status', '==', 'live'),
+        where('createdAt', '<=', oneWeekAgo)
+    );
+    
+    const snapshot = await oldCompsQuery.get();
+
+    if (snapshot.empty) {
+        logger.log("No old token competitions found needing cleanup. Exiting.");
+        return null;
+    }
+
+    logger.log(`Found ${snapshot.docs.length} old token competitions to process.`);
+
+    for (const doc of snapshot.docs) {
+        const compId = doc.id;
+        logger.log(`Processing competition ${compId}...`);
+        try {
+            await doc.ref.update({ status: 'ended' });
+            logger.log(`Competition ${compId} status set to 'ended'.`);
+            const drawResult = await performDraw(compId);
+            logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
+        } catch (error) {
+            logger.error(`Failed to process and draw winner for ${compId}`, error);
+        }
+    }
+
+    const liveTokenQuery = query(compsRef, where('competitionType', '==', 'token'), where('status', '==', 'live'));
+    const liveTokenSnapshot = await liveTokenQuery.get();
+    if (liveTokenSnapshot.size < 3) {
+        logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
+    }
+
+    return null;
+});

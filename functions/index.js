@@ -1,5 +1,5 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https"); // CORRECTED IMPORT
-const { onSchedule } = require("firebase-functions/v2/scheduler"); // CORRECTED IMPORT
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const crypto = require("crypto");
@@ -21,7 +21,6 @@ const performDraw = async (compId) => {
     if (compDataForCheck.status !== 'ended') throw new Error(`Competition ${compId} must be in 'ended' status to be drawn.`);
     if (compDataForCheck.winnerId) throw new Error(`Winner already drawn for competition ${compId}.`);
     if (!compDataForCheck.ticketsSold || compDataForCheck.ticketsSold === 0) {
-        // If no tickets sold, we just mark it as drawn without a winner.
         await compRef.update({ status: 'drawn', drawnAt: FieldValue.serverTimestamp(), winnerDisplayName: 'No entries' });
         logger.warn(`Competition ${compId} had no entries. Marked as drawn.`);
         return { success: true, winnerDisplayName: 'No entries', winningTicketNumber: -1 };
@@ -80,10 +79,10 @@ const assertIsAuthenticated = (context) => {
 const functionOptions = {
     region: "us-central1",
     enforceAppCheck: true,
-    cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000" ]
+    cors: [ "https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://12-7.0.0.1:5000" ]
 };
 
-// --- allocateTicketsAndAwardTokens (No changes needed) ---
+// --- allocateTicketsAndAwardTokens (Handles all entry types) ---
 exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
     const schema = z.object({
       compId: z.string().min(1),
@@ -143,11 +142,9 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
     });
 });
 
-// --- spendSpinToken (No changes needed) ---
+// --- spendSpinToken ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
-    const schema = z.object({
-        tokenId: z.string().min(1),
-    });
+    const schema = z.object({ tokenId: z.string().min(1) });
     const validation = schema.safeParse(request.data);
     if (!validation.success) {
       throw new HttpsError('invalid-argument', 'A valid tokenId is required.');
@@ -177,8 +174,7 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
         const cumulativeProbabilities = [];
         let cumulative = 0;
         for (const prize of prizes) {
-            const probability = 1 / prize.odds;
-            cumulative += probability;
+            cumulative += (1 / prize.odds);
             cumulativeProbabilities.push({ ...prize, cumulativeProb: cumulative });
         }
         const random = Math.random();
@@ -206,11 +202,9 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- drawWinner (Refactored to use internal function) ---
+// --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {
-    const schema = z.object({
-        compId: z.string().min(1),
-    });
+    const schema = z.object({ compId: z.string().min(1) });
     const validation = schema.safeParse(request.data);
     if (!validation.success) {
       throw new HttpsError('invalid-argument', 'Competition ID is required.');
@@ -219,7 +213,6 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
 
     await assertIsAdmin(request);
     
-    // Manual draw still requires ending the competition first via the admin panel
     const compRef = db.collection('competitions').doc(compId);
     const compDoc = await compRef.get();
     if (!compDoc.exists || compDoc.data().status !== 'ended') {
@@ -235,71 +228,55 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     }
 });
 
-// --- NEW SCHEDULED FUNCTION ---
-exports.weeklyTokenCompDraw = onSchedule({
+// --- REVISED SCHEDULED FUNCTION ---
+exports.weeklyTokenCompMaintenance = onSchedule({
     schedule: "every monday 12:00",
     timeZone: "Europe/London",
 }, async (event) => {
-    logger.log("Starting weekly token competition cycle...");
+    logger.log("Starting weekly token competition maintenance...");
 
     const compsRef = db.collection('competitions');
+    const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    // Find all LIVE token competitions created more than a week ago
+    const oldCompsQuery = query(compsRef, 
+        where('competitionType', '==', 'token'), 
+        where('status', '==', 'live'),
+        where('createdAt', '<=', oneWeekAgo)
+    );
     
-    // 1. Find the currently live token competition
-    const liveQuery = query(compsRef, where('competitionType', '==', 'token'), where('status', '==', 'live'), limit(1));
-    const liveSnapshot = await liveQuery.get();
+    const snapshot = await oldCompsQuery.get();
 
-    if (!liveSnapshot.empty) {
-        const liveDoc = liveSnapshot.docs[0];
-        logger.log(`Found live token competition to close: ${liveDoc.id}`);
-
-        // 2. End it and draw a winner
-        await liveDoc.ref.update({ status: 'ended' });
-        try {
-            const drawResult = await performDraw(liveDoc.id);
-            logger.log(`Successfully drew winner for ${liveDoc.id}: ${drawResult.winnerDisplayName}`);
-        } catch (error) {
-            logger.error(`Failed to automatically draw winner for ${liveDoc.id}`, error);
-        }
-    } else {
-        logger.warn("No live token competition found to cycle. Will proceed to activate a new one if available.");
+    if (snapshot.empty) {
+        logger.log("No old token competitions found needing cleanup. Exiting.");
+        return null;
     }
 
-    // 3. Find the next queued token competition
-    const queuedQuery = query(compsRef, where('competitionType', '==', 'token'), where('status', '==', 'queued'), orderBy('createdAt', 'asc'), limit(1));
-    const queuedSnapshot = await queuedQuery.get();
-    
-    if (!queuedSnapshot.empty) {
-        const nextDoc = queuedSnapshot.docs[0];
-        logger.log(`Activating next token competition: ${nextDoc.id}`);
+    logger.log(`Found ${snapshot.docs.length} old token competitions to process.`);
 
-        // 4. Activate it
-        await nextDoc.ref.update({ 
-            status: 'live',
-            // Set the end date to next Monday at 12:00 London time
-            endDate: Timestamp.fromDate(getNextMondayNoon())
-        });
-        logger.log(`Competition ${nextDoc.id} is now live.`);
-    } else {
-        logger.error("CRITICAL: No queued token competitions available to activate. Admin action required.");
+    for (const doc of snapshot.docs) {
+        const compId = doc.id;
+        logger.log(`Processing competition ${compId}...`);
+        try {
+            // 1. End the competition
+            await doc.ref.update({ status: 'ended' });
+            logger.log(`Competition ${compId} status set to 'ended'.`);
+
+            // 2. Perform the draw
+            const drawResult = await performDraw(compId);
+            logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
+        } catch (error) {
+            logger.error(`Failed to process and draw winner for ${compId}`, error);
+            // We continue to the next one even if one fails
+        }
+    }
+
+    // Optional: Add logic to check if the pool of available token comps is low
+    const liveTokenQuery = query(compsRef, where('competitionType', '==', 'token'), where('status', '==', 'live'));
+    const liveTokenSnapshot = await liveTokenQuery.get();
+    if (liveTokenSnapshot.size < 3) {
+        logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
     }
 
     return null;
 });
-
-function getNextMondayNoon() {
-    const now = new Date();
-    // Use a robust method to get the current date in London time
-    const londonTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/London' }));
-
-    const dayOfWeek = londonTime.getDay(); // Sunday = 0, Monday = 1...
-    let daysUntilMonday = 1 - dayOfWeek;
-    if (daysUntilMonday <= 0) {
-        daysUntilMonday += 7;
-    }
-
-    const nextMonday = new Date(londonTime);
-    nextMonday.setDate(londonTime.getDate() + daysUntilMonday);
-    nextMonday.setHours(12, 0, 0, 0);
-
-    return nextMonday;
-}

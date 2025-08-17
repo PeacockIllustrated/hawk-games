@@ -354,74 +354,14 @@ async function createAssignmentPanel(gameType) {
 }
 
 // --- FORM CREATION & LOGIC ---
-function createCompetitionForm({ type, title }) { /* ... Unchanged ... */ }
-async function handleCreateFormSubmit(e, formType) { /* ... Unchanged ... */ }
-function initializeSpinnerSettingsListeners() { /* ... Unchanged ... */ }
-function initializePlinkoSettingsListeners() {
-    const form = document.getElementById('plinko-settings-form');
-    const payoutsContainer = document.getElementById('plinko-payouts-container');
-    const PLINKO_SLOTS = 13;
-
-    const renderInputs = (payouts = []) => {
-        payoutsContainer.innerHTML = '';
-        for (let i = 0; i < PLINKO_SLOTS; i++) {
-            const val = payouts[i] !== undefined ? payouts[i] : 0;
-            const inputGroup = createElement('div', {class: 'form-group'}, [
-                createElement('label', {textContent: `Slot ${i} Payout (£)`}),
-                createElement('input', { type: 'number', 'data-slot': i, class: 'plinko-payout-input', value: val.toFixed(2), step: '0.01', required: true })
-            ]);
-            payoutsContainer.append(inputGroup);
-        }
-    };
-
-    const loadSettings = async () => {
-        const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
-        const docSnap = await getDoc(settingsRef);
-        if (docSnap.exists() && docSnap.data().payouts) {
-            renderInputs(docSnap.data().payouts);
-        } else {
-            renderInputs([0, 0.20, 0.50, 1, 2, 5, 10, 5, 2, 1, 0.50, 0.20, 0]);
-        }
-    };
-    loadSettings();
-    
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
-        try {
-            const inputs = Array.from(payoutsContainer.querySelectorAll('.plinko-payout-input'));
-            const payouts = inputs.map(input => parseFloat(input.value) || 0);
-            await setDoc(doc(db, 'admin_settings', 'plinkoPrizes'), { payouts });
-            alert('Plinko payouts saved successfully!');
-        } catch (error) {
-            console.error('Error saving plinko payouts:', error);
-            alert('Error: ' + error.message);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Plinko Payouts';
-        }
-    });
-}
-
-// --- Event Handlers & Modal Logic ---
-function handleDashboardClick(e) { /* ... Unchanged ... */ }
-async function handleEndCompetition(compId, button) { /* ... Unchanged ... */ }
-async function handleDrawWinner(compId, button) { /* ... Unchanged ... */ }
-function showAddFerModal(compId) { /* ... Unchanged ... */ }
-async function handleAddFerSubmit(e, compId) { /* ... Unchanged ... */ }
-function setupModal() { /* ... Unchanged ... */ }
-function openModal(content) { /* ... Unchanged ... */ }
-function closeModal() { /* ... Unchanged ... */ }
-
-// --- Re-pasting unchanged functions for completeness ---
 function createCompetitionForm({ type, title }) {
     const isMain = type === 'main';
     const isHero = type === 'hero';
     const isToken = type === 'token';
+
     const tiersContainer = createElement('div', { id: 'ticket-tiers-container' });
     const addTierBtn = createElement('button', { type: 'button', class: ['btn', 'btn-secondary', 'btn-small'] }, ['Add Tier']);
+    
     const form = createElement('form', { class: 'admin-form' }, [
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Core Details' }),
@@ -457,6 +397,7 @@ function createCompetitionForm({ type, title }) {
         ]),
         createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, [ isHero ? 'Save Hero Competition' : 'Create Competition' ])
     ]);
+
     const addTier = () => {
         const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
         const tierEl = createElement('div', { class: ['form-group-inline', 'ticket-tier-row'] }, [
@@ -469,39 +410,52 @@ function createCompetitionForm({ type, title }) {
     };
     addTierBtn.addEventListener('click', addTier);
     addTier();
-    return createElement('div', { class: 'content-panel' }, [ createElement('h2', { textContent: title }), form ]);
+
+    return createElement('div', { class: 'content-panel' }, [
+        createElement('h2', { textContent: title }),
+        form
+    ]);
 }
+
 async function handleCreateFormSubmit(e, formType) {
     e.preventDefault();
     const form = e.target;
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Saving...';
+
     try {
         let competitionType = formType;
         if (formType === 'main') {
             competitionType = form.querySelector('input[name="mainSubType"]:checked').value;
         }
+
         const isHeroComp = formType === 'hero';
         const instantWinsEnabled = ['instant', 'hero', 'token'].includes(competitionType);
+        
         let status = 'live';
+        
         const title = form.querySelector('#title').value;
         const totalTickets = competitionType === 'token' ? 1000000 : parseInt(form.querySelector('#totalTickets').value);
         const userEntryLimit = parseInt(form.querySelector('#userEntryLimit').value);
         const cashAlternative = parseFloat(form.querySelector('#cashAlternative').value);
+        
         const correctAnswerText = form.querySelector('#correctAnswer').value.trim();
         const otherAnswersText = form.querySelector('#otherAnswers').value.split(',').map(a => a.trim());
         const allAnswersArray = [correctAnswerText, ...otherAnswersText].sort(() => Math.random() - 0.5);
+        
         const answersObject = {};
         let correctKey = '';
         ['A', 'B', 'C', 'D'].slice(0, allAnswersArray.length).forEach((key, index) => {
             answersObject[key] = allAnswersArray[index];
             if (allAnswersArray[index] === correctAnswerText) { correctKey = key; }
         });
+
         const ticketTiers = Array.from(form.querySelectorAll('.ticket-tier-row')).map(row => ({
             amount: parseInt(row.querySelector('.tier-amount').value),
             price: parseFloat(row.querySelector('.tier-price').value)
         }));
+        
         const competitionPayload = {
             title, totalTickets, userEntryLimit, cashAlternative,
             ticketsSold: 0,
@@ -510,17 +464,25 @@ async function handleCreateFormSubmit(e, formType) {
             competitionType,
             isHeroComp,
             instantWinsConfig: { enabled: instantWinsEnabled },
-            skillQuestion: { text: form.querySelector('#questionText').value, answers: answersObject, correctAnswer: correctKey },
+            skillQuestion: {
+                text: form.querySelector('#questionText').value,
+                answers: answersObject,
+                correctAnswer: correctKey
+            },
             ticketTiers,
             prizeImage: form.querySelector('#prizeImage')?.value || 'assets/logo-icon.png',
         };
+        
         if (competitionType !== 'token') {
              competitionPayload.endDate = Timestamp.fromDate(new Date(form.querySelector('#endDate').value));
         }
+
         await addDoc(collection(db, 'competitions'), competitionPayload);
+        
         alert(`Competition "${title}" created successfully.`);
         form.reset();
         renderView(formType === 'token' ? 'token-comps' : 'dashboard');
+
     } catch (error) {
         console.error("Error creating competition:", error);
         alert(`Failed to create competition: ${error.message}`);
@@ -529,6 +491,7 @@ async function handleCreateFormSubmit(e, formType) {
         submitBtn.textContent = isHeroComp ? 'Save Hero Competition' : 'Create Competition';
     }
 }
+
 function initializeSpinnerSettingsListeners() {
     const form = document.getElementById('spinner-settings-form');
     const prizesContainer = document.getElementById('spinner-prizes-container');
@@ -582,6 +545,53 @@ function initializeSpinnerSettingsListeners() {
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Spinner Settings';
+        }
+    });
+}
+function initializePlinkoSettingsListeners() {
+    const form = document.getElementById('plinko-settings-form');
+    const payoutsContainer = document.getElementById('plinko-payouts-container');
+    const PLINKO_SLOTS = 13;
+
+    const renderInputs = (payouts = []) => {
+        payoutsContainer.innerHTML = '';
+        for (let i = 0; i < PLINKO_SLOTS; i++) {
+            const val = payouts[i] !== undefined ? payouts[i] : 0;
+            const inputGroup = createElement('div', {class: 'form-group'}, [
+                createElement('label', {textContent: `Slot ${i} Payout (£)`}),
+                createElement('input', { type: 'number', 'data-slot': i, class: 'plinko-payout-input', value: val.toFixed(2), step: '0.01', required: true })
+            ]);
+            payoutsContainer.append(inputGroup);
+        }
+    };
+
+    const loadSettings = async () => {
+        const settingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
+        const docSnap = await getDoc(settingsRef);
+        if (docSnap.exists() && docSnap.data().payouts) {
+            renderInputs(docSnap.data().payouts);
+        } else {
+            renderInputs([0, 0.20, 0.50, 1, 2, 5, 10, 5, 2, 1, 0.50, 0.20, 0]);
+        }
+    };
+    loadSettings();
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        try {
+            const inputs = Array.from(payoutsContainer.querySelectorAll('.plinko-payout-input'));
+            const payouts = inputs.map(input => parseFloat(input.value) || 0);
+            await setDoc(doc(db, 'admin_settings', 'plinkoPrizes'), { payouts });
+            alert('Plinko payouts saved successfully!');
+        } catch (error) {
+            console.error('Error saving plinko payouts:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Plinko Payouts';
         }
     });
 }

@@ -82,7 +82,6 @@ auth.onAuthStateChanged((user) => {
 });
 
 async function loadAllGameSettings() {
-    // Load spinner prizes
     try {
         const settingsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(settingsRef);
@@ -92,17 +91,21 @@ async function loadAllGameSettings() {
         } else { console.error("Spinner settings not found."); }
     } catch (error) { console.error("Error fetching spinner prizes:", error); }
 
-    // Load plinko settings
     try {
         const plinkoSettingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
         const docSnap = await getDoc(plinkoSettingsRef);
         if (docSnap.exists()) {
             plinkoConfig = docSnap.data();
         } else {
-            // Default config if not set in admin
-            plinkoConfig = { rows: 12, gravity: 1.0, payouts: [0, 0.2, 0.5, 1, 2, 5, 10, 5, 2, 1, 0.5, 0.2, 0] };
+            plinkoConfig = { rows: 12, gravity: 1.0, payouts: [
+                {type: 'credit', value: 0}, {type: 'credit', value: 0.2}, {type: 'credit', value: 0.5},
+                {type: 'credit', value: 1}, {type: 'credit', value: 2}, {type: 'credit', value: 5},
+                {type: 'credit', value: 10}, {type: 'credit', value: 5}, {type: 'credit', value: 2},
+                {type: 'credit', value: 1}, {type: 'credit', value: 0.5}, {type: 'credit', value: 0.2},
+                {type: 'credit', value: 0}
+            ] };
         }
-        initializePlinkoBoard(); // Re-initialize with fetched/default config
+        initializePlinkoBoard();
     } catch (error) { console.error("Error fetching plinko prizes:", error); }
 }
 
@@ -254,6 +257,17 @@ function initializePlinkoBoard() {
     const PLINKO_ROWS = plinkoConfig.rows || 12;
     while (plinkoSvg.firstChild) plinkoSvg.removeChild(plinkoSvg.firstChild);
 
+    // --- FIX: Add SVG definitions for the gold gradient ---
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `
+        <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f4d488"/>
+            <stop offset="45%" stop-color="#e0a94a"/>
+            <stop offset="100%" stop-color="#b38a37"/>
+        </linearGradient>
+    `;
+    plinkoSvg.appendChild(defs);
+
     const W = 800, H = 900, margin = 60, rowGap = 58;
     const usableWidth = W - margin * 2;
     const colGap = usableWidth / (PLINKO_ROWS + 1);
@@ -288,9 +302,11 @@ function initializePlinkoBoard() {
         rect.setAttribute('class', 'pocket');
         plinkoSvg.appendChild(rect);
         const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 38); t2.setAttribute('text-anchor', 'middle');
+        t2.setAttribute('x', x); t2.setAttribute('y', slotsY + 32); // Adjusted Y for better centering
+        t2.setAttribute('text-anchor', 'middle');
         t2.setAttribute('class', 'payoutLabel');
-        t2.textContent = `£${(plinkoConfig.payouts?.[s] || 0).toFixed(2)}`;
+        const prize = plinkoConfig.payouts?.[s] || {value: 0};
+        t2.textContent = `£${(prize.value || 0).toFixed(2)}`;
         t2.setAttribute('data-slot-payout', String(s));
         plinkoSvg.appendChild(t2);
     }
@@ -331,7 +347,7 @@ async function animatePlinkoDrop(path, prize) {
     plinkoSvg.appendChild(ball);
 
     const tween = (toX, toY, ms) => new Promise(resolve => {
-        ms = ms * gravity; // Apply gravity multiplier
+        ms = ms * gravity;
         const x0 = x, y0 = y, dx = toX - x0, dy = toY - y0; let t0 = null;
         const step = t => {
             if (!t0) t0 = t; const p = Math.min(1, (t - t0) / ms); const ease = p < .5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
@@ -518,8 +534,10 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
 
     const form = target.closest('form');
     if (!form) return;
-
-    const currentTokenType = form.contains(document.querySelector('#buy-spinner-tokens-btn')) ? 'spinner' : 'plinko';
+    
+    // Determine token type based on which button was originally clicked to open the modal
+    // This is a bit of a simplification; a more robust way would be to store this in a state variable.
+    const currentTokenType = activeTokenCompetition.title.toLowerCase().includes('plinko') ? 'plinko' : 'spinner';
 
     if (target.classList.contains('answer-btn')) {
         form.querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));

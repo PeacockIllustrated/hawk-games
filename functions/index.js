@@ -88,15 +88,14 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
       compId: z.string().min(1),
       ticketsBought: z.number().int().positive(),
       expectedPrice: z.number().positive(),
-      paymentMethod: z.enum(['card', 'credit']).default('card'),
-      tokenType: z.enum(['spinner', 'plinko']),
+      paymentMethod: z.enum(['card', 'credit']).default('card')
     });
 
     const validation = schema.safeParse(request.data);
     if (!validation.success) {
       throw new HttpsError('invalid-argument', 'Invalid or malformed request data.');
     }
-    const { compId, ticketsBought, expectedPrice, paymentMethod, tokenType } = validation.data;
+    const { compId, ticketsBought, expectedPrice, paymentMethod } = validation.data;
 
     assertIsAuthenticated(request);
     const uid = request.auth.uid;
@@ -148,21 +147,24 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             entryType: entryType,
         });
         
-        const newTokens = [];
-        const earnedAt = new Date();
-        for (let i = 0; i < ticketsBought; i++) {
-            newTokens.push({
-                tokenId: crypto.randomBytes(16).toString('hex'),
-                compId: compId,
-                compTitle: compData.title,
-                earnedAt: earnedAt 
-            });
+        let awardedTokens = [];
+        if (compData.instantWinsConfig?.enabled === true) {
+            const newTokens = [];
+            const earnedAt = new Date();
+            for (let i = 0; i < ticketsBought; i++) {
+                newTokens.push({
+                    tokenId: crypto.randomBytes(16).toString('hex'),
+                    compId: compId,
+                    compTitle: compData.title,
+                    earnedAt: earnedAt
+                });
+            }
+            // Defaulting to 'spinTokens' as per README; plinko token logic is unclear.
+            transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
+            awardedTokens = newTokens;
         }
         
-        const tokenFieldToUpdate = tokenType === 'plinko' ? 'plinkoTokens' : 'spinTokens';
-        transaction.update(userRef, { [tokenFieldToUpdate]: FieldValue.arrayUnion(...newTokens) });
-        
-        return { success: true, ticketsBought, awardedTokens: newTokens };
+        return { success: true, ticketsBought, awardedTokens };
     });
 });
 

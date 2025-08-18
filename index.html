@@ -1,496 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Hawk Games - Coming Soon</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary-gold: #e0a94a;
-            --light-white: #f0f0f0;
-            --dark-bg: #121212;
-            --banner-bg: #111;
-            --success-green: #28a745;
-            --failure-red: #dc3545;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            color: var(--light-white);
-            background-color: var(--dark-bg);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* --- Main Hero Section --- */
-        .hero-section {
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            min-height: 60vh;
-        }
-        
-        .hero-section img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; 
-        }
-
-        /* --- Bottom Info Banner --- */
-        .info-banner {
-            display: flex;
-            justify-content: center; 
-            gap: 3rem;
-            align-items: center;
-            padding: 2rem;
-            background-color: var(--banner-bg);
-            border-top: 2px solid var(--primary-gold);
-            font-family: 'Oswald', sans-serif;
-            text-transform: uppercase;
-        }
-
-        .taglines-wrapper {
-            display: contents;
-        }
-        
-        .tagline-block {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-            text-align: center;
-        }
-
-        .tagline-block:first-child { order: 1; }
-        .cta-wrapper { order: 2; }
-        .tagline-block:last-child { order: 3; }
-
-        .tag-large {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--primary-gold);
-        }
-
-        .tag-small {
-            font-size: 1rem;
-            font-weight: 500;
-            color: var(--light-white);
-            letter-spacing: 2px;
-        }
-
-        /* --- CTA & Form Styles --- */
-        .cta-wrapper {
-            max-width: 450px; /* Increased max-width */
-            width: 100%;
-            text-align: center;
-        }
-
-        .cta-wrapper h3 {
-            font-size: 1.2rem;
-            letter-spacing: 1px;
-            margin-bottom: 0.75rem;
-        }
-        
-        .cta-form {
-            display: flex;
-            flex-direction: column; /* Stack form elements vertically */
-            gap: 0.75rem;
-        }
-
-        .form-name-group {
-            display: flex;
-            gap: 0.75rem;
-        }
-
-        .cta-form input[type="email"],
-        .cta-form input[type="text"] {
-            width: 100%;
-            flex-grow: 1;
-            padding: 0.7rem 1rem;
-            background-color: rgba(0, 0, 0, 0.3);
-            border: 1px solid #444;
-            color: var(--light-white);
-            border-radius: 4px;
-            font-family: 'Roboto', sans-serif;
-            font-size: 1rem;
-        }
-
-        .form-email-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        /* --- Prize Preference Styles (New) --- */
-        .form-prize-pref {
-            text-align: left;
-            font-family: 'Roboto', sans-serif;
-        }
-
-        .form-prize-pref h4 {
-            text-transform: none;
-            font-size: 0.9rem;
-            font-weight: 400;
-            margin-bottom: 0.5rem;
-            color: #aaa;
-        }
-
-        .prize-tags-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-
-        .prize-tag {
-            padding: 0.4rem 0.8rem;
-            border: 1px solid #555;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            text-transform: none;
-        }
-
-        .prize-tag:hover {
-            border-color: var(--primary-gold);
-        }
-
-        .prize-tag.selected {
-            background-color: var(--primary-gold);
-            color: var(--dark-bg);
-            border-color: var(--primary-gold);
-            font-weight: 700;
-        }
-        
-        .btn {
-            padding: 0.7rem 1.5rem;
-            background-color: var(--primary-gold);
-            color: var(--dark-bg);
-            border: 2px solid var(--primary-gold);
-            border-radius: 4px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-        
-        .btn:hover {
-            background-color: transparent;
-            color: var(--primary-gold);
-        }
-
-        /* --- Completion Modal --- */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-
-        .modal-overlay.visible {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .modal-content {
-            background: var(--dark-bg);
-            padding: 2.5rem 3rem;
-            border-radius: 8px;
-            text-align: center;
-            position: relative;
-            border: 2px solid var(--primary-gold);
-            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
-            transform: scale(0.9);
-            transition: transform 0.3s ease;
-        }
-
-        .modal-overlay.visible .modal-content {
-            transform: scale(1);
-        }
-
-        .modal-close-btn {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 2.2rem;
-            line-height: 1;
-            color: var(--light-white);
-            cursor: pointer;
-            transition: color 0.2s ease;
-        }
-
-        .modal-close-btn:hover {
-            color: var(--primary-gold);
-        }
-
-        .modal-icon {
-            margin-bottom: 1rem;
-        }
-
-        .modal-icon .icon-svg {
-            width: 80px;
-            height: 80px;
-        }
-
-        .modal-icon .icon-circle {
-            stroke-dasharray: 283;
-            stroke-dashoffset: 283;
-            animation: draw-circle 0.5s ease-out forwards;
-        }
-
-        .modal-icon .icon-path {
-            stroke-dasharray: 48;
-            stroke-dashoffset: 48;
-            animation: draw-path 0.4s 0.4s ease-out forwards;
-        }
-        
-        #modal-title {
-            font-family: 'Oswald', sans-serif;
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .modal-content.success #modal-title { color: var(--success-green); }
-        .modal-content.failure #modal-title { color: var(--failure-red); }
-
-        #modal-message {
-            font-size: 1rem;
-            max-width: 350px;
-        }
-
-        @keyframes draw-circle { to { stroke-dashoffset: 0; } }
-        @keyframes draw-path { to { stroke-dashoffset: 0; } }
-
-        /* --- Responsive Adjustments --- */
-        @media (max-width: 1200px) {
-            .info-banner {
-                flex-direction: column;
-            }
-            .taglines-wrapper {
-                display: flex;
-                gap: 3rem;
-                order: 2;
-            }
-            .cta-wrapper {
-                order: 1;
-            }
-            .tagline-block:first-child,
-            .tagline-block:last-child {
-                order: 0;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            body {
-                overflow-y: auto;
-            }
-            .info-banner {
-                padding: 1.5rem;
-            }
-            .taglines-wrapper {
-                gap: 1.5rem;
-                width: 100%;
-                justify-content: center;
-            }
-            .tag-large {
-                font-size: 1.5rem;
-            }
-            .tag-small {
-                font-size: 0.7rem;
-            }
-            .form-email-group { /* Stack email and button on smallest screens */
-                flex-direction: column;
-            }
-            .modal-content {
-                padding: 2rem 1.5rem;
-                width: 90%;
-            }
-            #modal-title { font-size: 1.5rem; }
-            #modal-message { font-size: 0.9rem; }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Hawk Games — Instant Wins & Skill‑Based Prize Comps</title>
+  <meta name="description" content="The Hawk Games — a modern, secure, and fair prize competition platform. Instant Wins, live competitions, free entry route, and skill‑based access.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/home/home.css" />
+  <!-- Spline web component for the 3D logo -->
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.5/build/spline-viewer.js"></script>
 </head>
+
 <body>
+  <div class="container">
+    <!-- NAV -->
+    <nav class="nav" aria-label="Primary">
+      <a href="/" class="brand" aria-label="The Hawk Games">
+        <div class="logo-wrap glow">
+          <!-- simple SVG hawk mark as a fallback while the Spline loads -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 12c5-1 8-5 9-9 3 5 5 7 9 8-4 1-6 3-8 7-2-3-5-5-10-6Z" fill="currentColor"/>
+          </svg>
+        </div>
+        <span>The Hawk Games</span>
+      </a>
+      <div class="nav-actions">
+        <span class="badge">🔒 Secure & Fair</span>
+        <button class="btn" data-signin type="button">Sign in</button>
+        <a class="btn primary" href="/app/">Open App</a>
+      </div>
+    </nav>
 
-    <main class="hero-section">
-        <img src="the-hawk-games-banner.png" alt="The Hawk Games - Coming Soon">
+    <!-- HERO -->
+    <main class="hero">
+      <section class="hero-grid">
+        <!-- Left: Copy & CTAs -->
+        <div>
+          <div class="badge">✨ New platform just launched</div>
+          <h1 class="headline" data-greet>
+            A new era of <strong>instant wins</strong> & skill‑based prize comps.
+          </h1>
+          <p class="sub">
+            No fluff. Just beautifully engineered games, transparent odds, and lightning‑fast play.
+            Free entry route included. Built for trust from day one.
+          </p>
+          <div class="pills" role="list">
+            <span class="pill" role="listitem">Instant Wins</span>
+            <span class="pill" role="listitem">Live Competitions</span>
+            <span class="pill" role="listitem">Skill‑Based Entry</span>
+            <span class="pill" role="listitem">Free Entry Route</span>
+            <span class="pill" role="listitem">Modern UI</span>
+          </div>
+
+          <div class="cta-row" role="group" aria-label="Primary actions">
+            <a class="btn primary" data-cta="primary" href="/app/">Enter now</a>
+            <a class="btn" data-cta="secondary" href="/app/">View competitions</a>
+          </div>
+
+          <div class="stats" aria-label="Highlights">
+            <div class="stat">
+              <div class="num">Skill‑checked</div>
+              <div class="label">Legal, fair entry</div>
+            </div>
+            <div class="stat">
+              <div class="num">Free Entry</div>
+              <div class="label">Postal route available</div>
+            </div>
+            <div class="stat">
+              <div class="num">Instant Wins</div>
+              <div class="label">Play in seconds</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: 3D Spline Logo Showcase -->
+        <div class="spline-card glow" aria-label="3D logo showcase">
+          <div class="spline-header">
+            <span class="tag">3D Logo</span>
+            <span class="tag">Live</span>
+          </div>
+
+          <!-- Placeholder Spline scene; set the URL in /home/home.js -->
+          <spline-viewer style="width:100%; height:100%; display:block; min-height:420px;" loading="lazy"></spline-viewer>
+
+          <div class="spline-footer">
+            <a class="btn" href="/app/">Open App</a>
+            <a class="btn" href="/login.html">Log in</a>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer-mini">
+        <span>&copy; <span id="year"></span> The Hawk Games Ltd</span>
+        <span>
+          <a href="/app/legal/terms.html">Terms</a> ·
+          <a href="/app/legal/privacy.html">Privacy</a> ·
+          <a href="/app/legal/free-entry.html">Free Entry Route</a>
+        </span>
+      </div>
     </main>
+  </div>
 
-    <footer class="info-banner">
-        <div class="taglines-wrapper">
-            <div class="tagline-block">
-                <span class="tag-small">Instant</span>
-                <span class="tag-large">Wins</span>
-                <span class="tag-small">and</span>
-                <span class="tag-large">Huge</span>
-                <span class="tag-small">Competitions</span>
-            </div>
-            
-            <div class="tagline-block">
-                <span class="tag-small">That Could</span>
-                <span class="tag-large">Change</span>
-                <span class="tag-small">Your</span>
-                <span class="tag-large">Life</span>
-                <span class="tag-small">Forever</span>
-            </div>
-        </div>
-        
-        <div class="cta-wrapper">
-            <h3>Be The First To Play</h3>
-            <form class="cta-form" id="notify-form" action="https://hook.eu2.make.com/759pxut80lhjk189jd1tyvoof8r3f9kq" method="post">
-                <!-- New Name Fields -->
-                <div class="form-name-group">
-                    <input type="text" name="firstName" placeholder="First Name*" required>
-                    <input type="text" name="lastName" placeholder="Last Name (Optional)">
-                </div>
-                
-                <!-- New Prize Preference Section -->
-                <div class="form-prize-pref">
-                    <h4>What's your main reason to play? (Optional)</h4>
-                    <div class="prize-tags-container">
-                        <div class="prize-tag" data-value="Tech">💻 Tech</div>
-                        <div class="prize-tag" data-value="Cash">💰 Cash</div>
-                        <div class="prize-tag" data-value="Travel">✈️ Travel</div>
-                        <div class="prize-tag" data-value="Luxury">💎 Luxury</div>
-                        <div class="prize-tag" data-value="Vehicle">🚗 Vehicle</div>
-                    </div>
-                    <input type="hidden" name="prizePreference" id="prize-preference-input">
-                </div>
-                
-                <!-- Email and Submit Button -->
-                <div class="form-email-group">
-                    <input type="email" name="email" placeholder="Enter your email" required>
-                    <button type="submit" class="btn">Notify Me</button>
-                </div>
-            </form>
-        </div>
-    </footer>
-
-    <!-- Completion Modal -->
-    <div id="completion-modal" class="modal-overlay">
-        <div class="modal-content">
-            <span class="modal-close-btn">×</span>
-            <div id="modal-icon-container" class="modal-icon"></div>
-            <h2 id="modal-title"></h2>
-            <p id="modal-message"></p>
-        </div>
-    </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const notifyForm = document.getElementById('notify-form');
-            const modalOverlay = document.getElementById('completion-modal');
-            const modalContent = modalOverlay.querySelector('.modal-content');
-            const modalCloseBtn = modalOverlay.querySelector('.modal-close-btn');
-            const modalIconContainer = document.getElementById('modal-icon-container');
-            const modalTitle = document.getElementById('modal-title');
-            const modalMessage = document.getElementById('modal-message');
-
-            // --- New Prize Tag Logic ---
-            const prizeTags = document.querySelectorAll('.prize-tag');
-            const prizePreferenceInput = document.getElementById('prize-preference-input');
-
-            prizeTags.forEach(tag => {
-                tag.addEventListener('click', () => {
-                    const selectedTag = document.querySelector('.prize-tag.selected');
-                    // If clicking the already selected tag, deselect it
-                    if (selectedTag && selectedTag === tag) {
-                        tag.classList.remove('selected');
-                        prizePreferenceInput.value = '';
-                    } else {
-                        // Deselect the previous tag if one exists
-                        if (selectedTag) {
-                            selectedTag.classList.remove('selected');
-                        }
-                        // Select the new tag
-                        tag.classList.add('selected');
-                        prizePreferenceInput.value = tag.dataset.value;
-                    }
-                });
-            });
-            
-            const successIconSVG = `<svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4"/><path class="icon-path" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--success-green').trim()}" stroke-width="4" d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg>`;
-            const failureIconSVG = `<svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><circle class="icon-circle" cx="26" cy="26" r="25" fill="none" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4"/><path class="icon-path" stroke="${getComputedStyle(document.documentElement).getPropertyValue('--failure-red').trim()}" stroke-width="4" d="M16 16 36 36 M36 16 16 36"/></svg>`;
-
-            const showModal = (status) => {
-                if (status === 'success') {
-                    modalContent.className = 'modal-content success';
-                    modalIconContainer.innerHTML = successIconSVG;
-                    modalTitle.textContent = 'YOU\'RE ON THE LIST!';
-                    modalMessage.textContent = 'Submission successful. We\'ll drop you an email the second the gates open.';
-                } else {
-                    modalContent.className = 'modal-content failure';
-                    modalIconContainer.innerHTML = failureIconSVG;
-                    modalTitle.textContent = 'SOMETHING WENT WRONG';
-                    modalMessage.textContent = 'We couldn\'t process your request right now. Please check your connection and try again.';
-                }
-                modalOverlay.classList.add('visible');
-            };
-
-            const hideModal = () => {
-                modalOverlay.classList.remove('visible');
-            };
-
-            notifyForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const submitButton = notifyForm.querySelector('.btn');
-                const originalButtonText = submitButton.textContent;
-                submitButton.textContent = 'Submitting...';
-                submitButton.disabled = true;
-
-                try {
-                    const response = await fetch(notifyForm.action, {
-                        method: 'POST',
-                        body: new FormData(notifyForm)
-                    });
-
-                    if (response.ok) {
-                        showModal('success');
-                        notifyForm.reset();
-                        // Also reset the prize preference UI
-                        const selectedTag = document.querySelector('.prize-tag.selected');
-                        if (selectedTag) {
-                            selectedTag.classList.remove('selected');
-                        }
-                    } else {
-                        throw new Error('Server responded with an error');
-                    }
-                } catch (error) {
-                    console.error('Submission failed:', error);
-                    showModal('failure');
-                } finally {
-                    submitButton.textContent = originalButtonText;
-                    submitButton.disabled = false;
-                }
-            });
-
-            modalCloseBtn.addEventListener('click', hideModal);
-            modalOverlay.addEventListener('click', (e) => {
-                if (e.target === modalOverlay) {
-                    hideModal();
-                }
-            });
-        });
-    </script>
-
+  <script>
+    // Year stamp
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+  <script type="module" src="/home/home.js"></script>
 </body>
 </html>

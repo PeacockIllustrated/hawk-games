@@ -254,11 +254,6 @@ function initializeParallax() {
 }
 
 function createHeroPageElements(data) {
-    // Add robustness for main competitions that may lack a full imageSet.
-    const hasImageSet = data.imageSet && data.imageSet.background && data.imageSet.foreground;
-    const bgImage = hasImageSet ? data.imageSet.background : data.prizeImage;
-    const fgImage = hasImageSet ? data.imageSet.foreground : data.prizeImage;
-
     const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value }));
     
     let bestValueAmount = -1;
@@ -282,10 +277,24 @@ function createHeroPageElements(data) {
         'AMG Spec', 'Diesel Coupe', 'Premium Black Finish', `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
     ].map(spec => createElement('li', { textContent: spec }));
 
-    const header = createElement('header', { class: 'hero-comp-header' }, [
-        createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${bgImage}')` } }),
-        createElement('img', { class: 'hero-comp-header-fg', src: fgImage, alt: data.title })
-    ]);
+    let header;
+    const isTrueHero = data.isHeroComp && data.hasParallax;
+
+    if (isTrueHero) {
+        header = createElement('header', { class: 'hero-comp-header' }, [
+            createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
+            createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
+        ]);
+    } else {
+        // For main comps, use a simpler header that just displays the main prize image.
+        header = createElement('header', { class: 'container', style: { paddingTop: '120px' } }, [ // Add padding to clear fixed nav
+            createElement('div', { class: 'prize-image-panel' }, [
+                createElement('img', { src: data.prizeImage, alt: data.title })
+            ])
+        ]);
+    }
+
+    const glanceImage = isTrueHero ? data.imageSet.foreground : data.prizeImage;
 
     const main = createElement('main', { class: 'hero-comp-main' }, [
         createElement('div', { class: 'container' }, [
@@ -316,14 +325,14 @@ function createHeroPageElements(data) {
             data.isHeroComp ? createElement('section', { class: 'hero-comp-glance-section' }, [
                 createElement('h2', { textContent: '3. Prize At a Glance' }),
                 createElement('div', { class: 'glance-content' }, [
-                    createElement('img', { src: fgImage, alt: 'Prize image' }),
+                    createElement('img', { src: glanceImage, alt: 'Prize image' }),
                     createElement('ul', {}, prizeSpecs)
                 ])
             ]) : null,
             createElement('section', { class: 'hero-comp-trust-section' }, [
                 createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
                 createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
+                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', 'textContent': '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
             ])
         ])
     ]);

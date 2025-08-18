@@ -9,7 +9,23 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local"
-      ]  
+      ]
     }
-  ]
+  ],
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "README.md",
+      ".firebaserc",
+      "firestore.rules",
+      "context/**",
+      "functions/**",
+      "home/**",
+      "login.html",
+      "plinko-mvp.html",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
 }

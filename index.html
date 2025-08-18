@@ -3,42 +3,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Hawk Games — We’ve Launched</title>
-  <meta name="description" content="The Hawk Games is now live. Skill‑based competitions, instant wins, and a premium experience — all in one place.">
+  <title>The Hawk Games — Launching Soon</title>
+  <meta name="description" content="A premium, fair, and fast prize competition platform. Launching soon with instant wins and headline prizes.">
   <link rel="stylesheet" href="app/css/hawk-games.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-  <!-- Minimal overrides to fit the Spline logo into the existing hero pattern -->
+  <!-- Minimal landing overrides -->
   <link rel="stylesheet" href="/home/home.css">
   <!-- Spline web component -->
   <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.5/build/spline-viewer.js"></script>
 </head>
 <body data-page="landing">
-  <header class="main-header"></header>
-
   <main>
-    <!-- HERO (uses existing app styles) -->
-    <section class="hero-home">
+    <!-- HERO -->
+    <section class="hero-home" style="background-image: url('app/assets/hero-bg.png');">
       <div class="hero-overlay"></div>
       <div class="hero-content">
+        <div class="launch-pill">The Hawk Games — Launching Soon</div>
         <div class="hero-logo">
-          <!-- 3D Spline logo (sized by .hero-logo overrides) -->
           <spline-viewer loading="lazy" aria-label="Hawk Games 3D logo"></spline-viewer>
         </div>
+        <h1>Headline Prizes. Instant Wins. Premium Experience.</h1>
+        <p>We’re putting fairness, speed, and style first. Here’s a taste of what you’ll find on launch day.</p>
 
-        <h1>We’ve launched the new <span style="color: var(--primary-gold);">Hawk Games</span></h1>
-        <p>Instant Wins, live competitions, and a clean, fast experience — with skill‑based entry and a free entry route. Built for transparency from day one.</p>
-        <a href="/app/index.html" class="btn">Open the site</a>
+        <!-- Showcase (static, no links) -->
+        <div class="showcase container">
+          <div class="competition-grid-container">
+            
+            <div class="hawk-card">
+              <div class="hawk-card__instant-win-badge">COMING SOON</div>
+              <img class="hawk-card__image" src="app/assets/spin-wheel-bg-empty.png" alt="Prize placeholder">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Mercedes A-Class AMG Line</h3>
+                <div class="hawk-card__footer">
+                  <div class="hawk-card__price">Grand Prize</div>
+                  <div class="note">Launch Day Reveal</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hawk-card">
+              <div class="hawk-card__instant-win-badge">COMING SOON</div>
+              <img class="hawk-card__image" src="app/assets/spin-wheel-bg.png" alt="Prize placeholder">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">PlayStation 5 Slim</h3>
+                <div class="hawk-card__footer">
+                  <div class="hawk-card__price">Tech</div>
+                  <div class="note">Launch Day Reveal</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hawk-card">
+              <div class="hawk-card__instant-win-badge">COMING SOON</div>
+              <img class="hawk-card__image" src="app/assets/spin-wheel-bg-empty.png" alt="Prize placeholder">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Apple Watch Ultra 2</h3>
+                <div class="hawk-card__footer">
+                  <div class="hawk-card__price">Wearables</div>
+                  <div class="note">Launch Day Reveal</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hawk-card">
+              <div class="hawk-card__instant-win-badge">COMING SOON</div>
+              <img class="hawk-card__image" src="app/assets/spin-wheel-bg.png" alt="Prize placeholder">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Nintendo Switch OLED</h3>
+                <div class="hawk-card__footer">
+                  <div class="hawk-card__price">Gaming</div>
+                  <div class="note">Launch Day Reveal</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hawk-card">
+              <div class="hawk-card__instant-win-badge">COMING SOON</div>
+              <img class="hawk-card__image" src="app/assets/spin-wheel-bg-empty.png" alt="Prize placeholder">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Callaway Golf Set</h3>
+                <div class="hawk-card__footer">
+                  <div class="hawk-card__price">Sports</div>
+                  <div class="note">Launch Day Reveal</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hawk-card">
+              <div class="hawk-card__instant-win-badge">COMING SOON</div>
+              <img class="hawk-card__image" src="app/assets/spin-wheel-bg.png" alt="Prize placeholder">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Ultimate Driving Experience</h3>
+                <div class="hawk-card__footer">
+                  <div class="hawk-card__price">Experience</div>
+                  <div class="note">Launch Day Reveal</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </section>
   </main>
 
-  <footer class="main-footer"></footer>
-
-  <!-- Auth renders brand‑consistent header/footer and uses Firebase under the hood -->
-  <script type="module" src="app/js/auth.js"></script>
-  <!-- Patch links to /app/ and set Spline URL -->
-  <script type="module" src="/home/landing.js"></script>
+  <!-- No header/footer, no links to other pages -->
+  <script>
+    // Set your Spline scene URL here
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.querySelector('spline-viewer');
+      if (el) el.setAttribute('url', 'https://prod.spline.design/PLACEHOLDER/scene.splinecode');
+    });
+  </script>
 </body>
 </html>

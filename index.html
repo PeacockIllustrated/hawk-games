@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   <title>The Hawk Games — Launching Soon</title>
 
   <!-- Use the main site stylesheet for variables/typography/base -->
@@ -508,6 +509,66 @@
   </style>
 </head>
 
+=======
+  <title>The Hawk Games — Competitions</title>
+
+  <!-- Main brand stylesheet -->
+  <link rel="stylesheet" href="app/css/hawk-games.css">
+
+  <!-- Fonts to match the app -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* Landing-only scaffolding (keeps brand styles intact) */
+    :root{
+      --gold: var(--primary-gold, #e0a94a);
+      --text: var(--light-white, #f5f7fb);
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: #0d0f12 url('app/assets/hero-bg.png') center/cover no-repeat fixed;
+      color: var(--text);
+      overflow-x: hidden;
+    }
+    body::before{
+      content:""; position:fixed; inset:0;
+      background: radial-gradient(70% 60% at 60% 10%, rgba(0,0,0,.3), transparent 60%),
+                  linear-gradient(180deg, rgba(0,0,0,.2), rgba(0,0,0,.6));
+      pointer-events:none;
+    }
+    .container{ width:min(1240px, 92vw); margin:0 auto; padding: clamp(12px, 2.2vw, 24px) 0 40px; }
+
+    /* Brand topper like the mockup */
+    .brand-top{ display:flex; align-items:center; gap:12px; padding: 4px 0 12px; }
+    .brand-top .name{ font-family: var(--font-heading); font-weight: 700; letter-spacing: 3px; }
+    .brand-top .tag{ color: var(--gold); font-weight: 700; letter-spacing: 2px; opacity: .95; }
+    .gold-rule{ height:1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); opacity:.8; margin: 8px 0 16px; }
+
+    /* Layout: hero + grids */
+    .hero-wrap{ margin-top: 12px; }
+    .section{ margin-top: clamp(16px, 3vw, 28px); }
+
+    /* Restore card links to /app paths */
+    a.hawk-card, a.hero-competition-card { text-decoration: none; }
+
+    /* Grid wrappers to match app spacing */
+    .grid-3{ display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+    @media (max-width: 980px){ .grid-3{ grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 620px){ .grid-3{ grid-template-columns: 1fr; } }
+
+    /* Hero card full width */
+    #hero-competition-section .hero-competition-card{ width: 100%; }
+
+    /* Small helper states */
+    .placeholder{ padding: 24px; text-align: center; border:1px dashed rgba(255,255,255,.18); border-radius: 10px; background: rgba(0,0,0,.25); }
+    .section-title{ font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 2px; color:#dfe3ea; margin:0 0 10px; }
+  </style>
+</head>
+
+>>>>>>> Stashed changes
 <body>
   <div class="container">
 
@@ -736,6 +797,9 @@
     }
 
     loadAllCompetitions();
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   </script>
 </body>

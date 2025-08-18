@@ -254,14 +254,15 @@ function initializeParallax() {
 }
 
 function createHeroPageElements(data) {
+    // --- Common element creation ---
     const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value }));
+    const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
     
     let bestValueAmount = -1;
     if (data.ticketTiers && data.ticketTiers.length > 1) {
         const bestTier = data.ticketTiers.reduce((best, current) => (current.price / current.amount < best.price / best.amount) ? current : best);
         bestValueAmount = bestTier.amount;
     }
-
     const ticketTiers = data.ticketTiers.map(tier => {
         const isBestValue = tier.amount === bestValueAmount;
         return createElement('div', { class: ['ticket-option', 'card-style-option', isBestValue ? 'best-value' : ''], 'data-amount': tier.amount, 'data-price': tier.price }, [
@@ -271,33 +272,20 @@ function createHeroPageElements(data) {
             createElement('span', { class: 'ticket-price', textContent: `£${tier.price.toFixed(2)}` })
         ]);
     });
-    const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
-    const prizeSpecs = [
-        'AMG Spec', 'Diesel Coupe', 'Premium Black Finish', `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
-    ].map(spec => createElement('li', { textContent: spec }));
-
-    let header;
     const isTrueHero = data.isHeroComp && data.hasParallax;
+    let header;
+    const mainContentSections = [];
 
+    // --- Build page sections based on competition type ---
     if (isTrueHero) {
+        // --- HERO COMPETITION LAYOUT ---
         header = createElement('header', { class: 'hero-comp-header' }, [
             createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
             createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
         ]);
-    } else {
-        // For main comps, use a simpler header that just displays the main prize image.
-        header = createElement('header', { class: 'container', style: { paddingTop: '120px' } }, [ // Add padding to clear fixed nav
-            createElement('div', { class: 'prize-image-panel' }, [
-                createElement('img', { src: data.prizeImage, alt: data.title })
-            ])
-        ]);
-    }
 
-    const glanceImage = isTrueHero ? data.imageSet.foreground : data.prizeImage;
-
-    const main = createElement('main', { class: 'hero-comp-main' }, [
-        createElement('div', { class: 'container' }, [
+        mainContentSections.push(
             createElement('section', { class: 'hero-comp-title-section' }, [
                 createElement('h1', { textContent: `Win a ${data.title}` }),
                 createElement('p', { class: 'cash-alternative-hero' }, ['Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
@@ -307,35 +295,85 @@ function createHeroPageElements(data) {
             createElement('section', { class: 'hero-comp-progress-section' }, [
                 createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
                 createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
+            ])
+        );
+    } else {
+        // --- MAIN COMPETITION LAYOUT ---
+        header = createElement('header'); // Empty header, does not take up space
+
+        const introDetails = createElement('div', { style: { flex: '1 1 50%', display: 'flex', flexDirection: 'column' } }, [
+            createElement('h1', { textContent: `Win a ${data.title}` }),
+            createElement('p', { class: 'cash-alternative-hero' }, ['Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
+            createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING', style: { marginTop: 'auto' } }),
+            createElement('div', { id: 'timer', class: 'hero-digital-timer' }),
+            createElement('div', { class: 'hero-comp-progress-section', style: { marginTop: '1rem' } }, [
+                createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
+                createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
+            ])
+        ]);
+
+        const introSection = createElement('section', {
+            style: { display: 'flex', gap: '2rem', paddingTop: '120px' }
+        }, [
+            createElement('div', { style: { flex: '1 1 50%' } }, [
+                createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
             ]),
-            createElement('section', { class: 'hero-comp-entry-flow' }, [
-                createElement('div', { class: 'entry-step question-step' }, [
-                    createElement('h2', { textContent: '1. Answer The Question' }),
-                    createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
-                    createElement('div', { class: 'answer-options' }, answers)
-                ]),
-                createElement('div', { class: 'entry-step tickets-step' }, [
-                    createElement('h2', { textContent: '2. Choose Your Tickets' }),
-                    createElement('div', { class: 'ticket-options' }, ticketTiers)
-                ])
+            introDetails
+        ]);
+        mainContentSections.push(introSection);
+    }
+
+    // --- Add common sections for both layouts ---
+    mainContentSections.push(
+        createElement('section', { class: 'hero-comp-entry-flow' }, [
+            createElement('div', { class: 'entry-step question-step' }, [
+                createElement('h2', { textContent: '1. Answer The Question' }),
+                createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
+                createElement('div', { class: 'answer-options' }, answers)
             ]),
-            createElement('section', { class: 'hero-comp-confirm-section' }, [
-                createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [ 'Enter Now', createElement('span', { textContent: 'Secure Your Chance' }) ])
-            ]),
-            data.isHeroComp ? createElement('section', { class: 'hero-comp-glance-section' }, [
+            createElement('div', { class: 'entry-step tickets-step' }, [
+                createElement('h2', { textContent: '2. Choose Your Tickets' }),
+                createElement('div', { class: 'ticket-options' }, ticketTiers)
+            ])
+        ]),
+        createElement('section', { class: 'hero-comp-confirm-section' }, [
+            createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [ 'Enter Now', createElement('span', { textContent: 'Secure Your Chance' }) ])
+        ])
+    );
+
+    // --- Add hero-only sections ---
+    if (isTrueHero) {
+        const prizeSpecs = [
+            'AMG Spec', 'Diesel Coupe', 'Premium Black Finish', `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
+        ].map(spec => createElement('li', { textContent: spec }));
+
+        const glanceImage = data.imageSet.foreground;
+
+        mainContentSections.push(
+            createElement('section', { class: 'hero-comp-glance-section' }, [
                 createElement('h2', { textContent: '3. Prize At a Glance' }),
                 createElement('div', { class: 'glance-content' }, [
                     createElement('img', { src: glanceImage, alt: 'Prize image' }),
                     createElement('ul', {}, prizeSpecs)
                 ])
-            ]) : null,
-            createElement('section', { class: 'hero-comp-trust-section' }, [
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', 'textContent': '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
             ])
+        );
+    }
+
+    // --- Add final common section ---
+    mainContentSections.push(
+        createElement('section', { class: 'hero-comp-trust-section' }, [
+            createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
+            createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),
+            createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', 'textContent': '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
         ])
+    );
+
+    // --- Assemble and return final elements ---
+    const main = createElement('main', { class: 'hero-comp-main' }, [
+        createElement('div', { class: 'container' }, mainContentSections)
     ]);
+
     return [header, main];
 }
 

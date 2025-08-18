@@ -313,13 +313,13 @@ function createHeroPageElements(data) {
             createElement('section', { class: 'hero-comp-confirm-section' }, [
                 createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [ 'Enter Now', createElement('span', { textContent: 'Secure Your Chance' }) ])
             ]),
-            createElement('section', { class: 'hero-comp-glance-section' }, [
+            data.isHeroComp ? createElement('section', { class: 'hero-comp-glance-section' }, [
                 createElement('h2', { textContent: '3. Prize At a Glance' }),
                 createElement('div', { class: 'glance-content' }, [
                     createElement('img', { src: fgImage, alt: 'Prize image' }),
                     createElement('ul', {}, prizeSpecs)
                 ])
-            ]),
+            ]) : null,
             createElement('section', { class: 'hero-comp-trust-section' }, [
                 createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
                 createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),

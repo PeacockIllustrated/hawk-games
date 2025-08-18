@@ -68,11 +68,12 @@ async function loadCompetitionDetails(id) {
             document.title = `${currentCompetitionData.title} | The Hawk Games`;
 
             pageContent.innerHTML = ''; // Clear placeholders
-            if (currentCompetitionData.isHeroComp && currentCompetitionData.hasParallax) {
-                pageContent.append(...createHeroPageElements(currentCompetitionData));
+            // Always use the hero layout for all competitions.
+            pageContent.append(...createHeroPageElements(currentCompetitionData));
+
+            // Only initialize parallax if the data supports it.
+            if (currentCompetitionData.hasParallax) {
                 initializeParallax();
-            } else {
-                pageContent.append(createStandardPageElement(currentCompetitionData));
             }
             
             if (currentCompetitionData.endDate) {
@@ -252,44 +253,12 @@ function initializeParallax() {
     });
 }
 
-function createStandardPageElement(data) {
-    const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('button', { class: 'answer-btn', 'data-answer': key, textContent: value }));
-    const ticketTiers = data.ticketTiers.map(tier => createElement('button', { class: 'ticket-option', 'data-amount': tier.amount, 'data-price': tier.price, textContent: `${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}` }));
-    const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
-    
-    const timerElement = data.endDate 
-        ? createElement('div', { id: 'timer', class: 'detail-timer' })
-        : createElement('div', { class: 'detail-timer', textContent: 'Draws Weekly' });
-    
-    return createElement('main', {}, [
-        createElement('div', { id: 'competition-container', class: 'container' }, [
-            createElement('div', { class: 'competition-detail-view' }, [
-                createElement('div', { class: 'prize-image-panel' }, [createElement('img', { src: data.prizeImage, alt: data.title })]),
-                createElement('div', { class: 'entry-details-panel' }, [
-                    createElement('h1', { textContent: data.title }),
-                    createElement('p', { class: 'cash-alternative' }, ['Or ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
-                    timerElement,
-                    createElement('div', { class: 'detail-progress' }, [
-                        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })]),
-                        createElement('p', { textContent: `${data.ticketsSold || 0} / ${data.totalTickets} sold` })
-                    ]),
-                    createElement('div', { class: 'detail-section skill-question-box' }, [
-                        createElement('h3', {}, [createElement('span', { textContent: '1.' }), ' Answer The Question']),
-                        createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
-                        createElement('div', { class: 'answer-options' }, answers)
-                    ]),
-                    createElement('div', { class: 'detail-section ticket-selector-box' }, [
-                        createElement('h3', {}, [createElement('span', { textContent: '2.' }), ' Choose Your Tickets']),
-                        createElement('div', { class: 'ticket-options' }, ticketTiers)
-                    ]),
-                    createElement('button', { id: 'entry-button', class: 'btn', disabled: true }, ['Select Tickets'])
-                ])
-            ])
-        ])
-    ]);
-}
-
 function createHeroPageElements(data) {
+    // Add robustness for main competitions that may lack a full imageSet.
+    const hasImageSet = data.imageSet && data.imageSet.background && data.imageSet.foreground;
+    const bgImage = hasImageSet ? data.imageSet.background : data.prizeImage;
+    const fgImage = hasImageSet ? data.imageSet.foreground : data.prizeImage;
+
     const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value }));
     
     let bestValueAmount = -1;
@@ -314,8 +283,8 @@ function createHeroPageElements(data) {
     ].map(spec => createElement('li', { textContent: spec }));
 
     const header = createElement('header', { class: 'hero-comp-header' }, [
-        createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
-        createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
+        createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${bgImage}')` } }),
+        createElement('img', { class: 'hero-comp-header-fg', src: fgImage, alt: data.title })
     ]);
 
     const main = createElement('main', { class: 'hero-comp-main' }, [
@@ -347,7 +316,7 @@ function createHeroPageElements(data) {
             createElement('section', { class: 'hero-comp-glance-section' }, [
                 createElement('h2', { textContent: '3. Prize At a Glance' }),
                 createElement('div', { class: 'glance-content' }, [
-                    createElement('img', { src: data.imageSet.foreground, alt: 'Prize image' }),
+                    createElement('img', { src: fgImage, alt: 'Prize image' }),
                     createElement('ul', {}, prizeSpecs)
                 ])
             ]),

@@ -9,114 +9,35 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-  <!-- Minimal landing overrides -->
-  <link rel="stylesheet" href="/home/home.css">
-  <!-- Spline web component -->
+  <link rel="stylesheet" href="home/landing.css">
   <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.5/build/spline-viewer.js"></script>
 </head>
-<body data-page="landing">
-  <main>
-    <!-- HERO -->
-    <section class="hero-home" style="background-image: url('app/assets/hero-bg.png');">
-      <div class="hero-overlay"></div>
-      <div class="hero-content">
-        <div class="launch-pill">The Hawk Games — Launching Soon</div>
-        <div class="hero-logo">
-          <spline-viewer loading="lazy" aria-label="Hawk Games 3D logo"></spline-viewer>
+<body data-page="landing" data-spline-url="">
+  <main class="landing-wrap">
+    <!-- Left: brand/identity -->
+    <section class="brand-pane">
+      <div class="brand-logo">
+        <div class="brand-logo-visual">
+          <!-- If you set data-spline-url on <body>, the Spline viewer will be used; else, PNG logo is shown -->
+          <spline-viewer style="width: 140px; height: 140px; border-radius: 20px; overflow:hidden;" aria-label="3D Hawk logo"></spline-viewer>
         </div>
-        <h1>Headline Prizes. Instant Wins. Premium Experience.</h1>
-        <p>We’re putting fairness, speed, and style first. Here’s a taste of what you’ll find on launch day.</p>
+      </div>
+      <h1 class="tagline">The Hawk Games</h1>
+      <div class="launch-pill">Launching soon</div>
+      <p class="brand-sub">Skill‑based prize competitions and instant wins. Built for fairness, speed, and a premium experience.</p>
+    </section>
 
-        <!-- Showcase (static, no links) -->
-        <div class="showcase container">
-          <div class="competition-grid-container">
-            
-            <div class="hawk-card">
-              <div class="hawk-card__instant-win-badge">COMING SOON</div>
-              <img class="hawk-card__image" src="app/assets/spin-wheel-bg-empty.png" alt="Prize placeholder">
-              <div class="hawk-card__content">
-                <h3 class="hawk-card__title">Mercedes A-Class AMG Line</h3>
-                <div class="hawk-card__footer">
-                  <div class="hawk-card__price">Grand Prize</div>
-                  <div class="note">Launch Day Reveal</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hawk-card">
-              <div class="hawk-card__instant-win-badge">COMING SOON</div>
-              <img class="hawk-card__image" src="app/assets/spin-wheel-bg.png" alt="Prize placeholder">
-              <div class="hawk-card__content">
-                <h3 class="hawk-card__title">PlayStation 5 Slim</h3>
-                <div class="hawk-card__footer">
-                  <div class="hawk-card__price">Tech</div>
-                  <div class="note">Launch Day Reveal</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hawk-card">
-              <div class="hawk-card__instant-win-badge">COMING SOON</div>
-              <img class="hawk-card__image" src="app/assets/spin-wheel-bg-empty.png" alt="Prize placeholder">
-              <div class="hawk-card__content">
-                <h3 class="hawk-card__title">Apple Watch Ultra 2</h3>
-                <div class="hawk-card__footer">
-                  <div class="hawk-card__price">Wearables</div>
-                  <div class="note">Launch Day Reveal</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hawk-card">
-              <div class="hawk-card__instant-win-badge">COMING SOON</div>
-              <img class="hawk-card__image" src="app/assets/spin-wheel-bg.png" alt="Prize placeholder">
-              <div class="hawk-card__content">
-                <h3 class="hawk-card__title">Nintendo Switch OLED</h3>
-                <div class="hawk-card__footer">
-                  <div class="hawk-card__price">Gaming</div>
-                  <div class="note">Launch Day Reveal</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hawk-card">
-              <div class="hawk-card__instant-win-badge">COMING SOON</div>
-              <img class="hawk-card__image" src="app/assets/spin-wheel-bg-empty.png" alt="Prize placeholder">
-              <div class="hawk-card__content">
-                <h3 class="hawk-card__title">Callaway Golf Set</h3>
-                <div class="hawk-card__footer">
-                  <div class="hawk-card__price">Sports</div>
-                  <div class="note">Launch Day Reveal</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hawk-card">
-              <div class="hawk-card__instant-win-badge">COMING SOON</div>
-              <img class="hawk-card__image" src="app/assets/spin-wheel-bg.png" alt="Prize placeholder">
-              <div class="hawk-card__content">
-                <h3 class="hawk-card__title">Ultimate Driving Experience</h3>
-                <div class="hawk-card__footer">
-                  <div class="hawk-card__price">Experience</div>
-                  <div class="note">Launch Day Reveal</div>
-                </div>
-              </div>
-            </div>
-
-          </div>
+    <!-- Right: revolving collection (top-to-bottom) -->
+    <section class="reel-pane" aria-label="Prize showcase">
+      <div class="reel-viewport">
+        <div class="reel-track" id="reelTrack">
+          <div class="reel-list" id="reelListA"></div>
+          <div class="reel-list" id="reelListB" aria-hidden="true"></div>
         </div>
-
       </div>
     </section>
   </main>
 
-  <!-- No header/footer, no links to other pages -->
-  <script>
-    // Set your Spline scene URL here
-    document.addEventListener('DOMContentLoaded', () => {
-      const el = document.querySelector('spline-viewer');
-      if (el) el.setAttribute('url', 'https://prod.spline.design/PLACEHOLDER/scene.splinecode');
-    });
-  </script>
+  <script type="module" src="home/landing.js"></script>
 </body>
 </html>

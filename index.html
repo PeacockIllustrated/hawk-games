@@ -1,112 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>The Hawk Games — Instant Wins & Skill‑Based Prize Comps</title>
-  <meta name="description" content="The Hawk Games — a modern, secure, and fair prize competition platform. Instant Wins, live competitions, free entry route, and skill‑based access.">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Hawk Games — We’ve Launched</title>
+  <meta name="description" content="The Hawk Games is now live. Skill‑based competitions, instant wins, and a premium experience — all in one place.">
+  <link rel="stylesheet" href="app/css/hawk-games.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/home/home.css" />
-  <!-- Spline web component for the 3D logo -->
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Minimal overrides to fit the Spline logo into the existing hero pattern -->
+  <link rel="stylesheet" href="/home/home.css">
+  <!-- Spline web component -->
   <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.5/build/spline-viewer.js"></script>
 </head>
+<body data-page="landing">
+  <header class="main-header"></header>
 
-<body>
-  <div class="container">
-    <!-- NAV -->
-    <nav class="nav" aria-label="Primary">
-      <a href="/" class="brand" aria-label="The Hawk Games">
-        <div class="logo-wrap glow">
-          <!-- simple SVG hawk mark as a fallback while the Spline loads -->
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 12c5-1 8-5 9-9 3 5 5 7 9 8-4 1-6 3-8 7-2-3-5-5-10-6Z" fill="currentColor"/>
-          </svg>
+  <main>
+    <!-- HERO (uses existing app styles) -->
+    <section class="hero-home">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <div class="hero-logo">
+          <!-- 3D Spline logo (sized by .hero-logo overrides) -->
+          <spline-viewer loading="lazy" aria-label="Hawk Games 3D logo"></spline-viewer>
         </div>
-        <span>The Hawk Games</span>
-      </a>
-      <div class="nav-actions">
-        <span class="badge">🔒 Secure & Fair</span>
-        <button class="btn" data-signin type="button">Sign in</button>
-        <a class="btn primary" href="/app/">Open App</a>
+
+        <h1>We’ve launched the new <span style="color: var(--primary-gold);">Hawk Games</span></h1>
+        <p>Instant Wins, live competitions, and a clean, fast experience — with skill‑based entry and a free entry route. Built for transparency from day one.</p>
+        <a href="/app/index.html" class="btn">Open the site</a>
       </div>
-    </nav>
+    </section>
+  </main>
 
-    <!-- HERO -->
-    <main class="hero">
-      <section class="hero-grid">
-        <!-- Left: Copy & CTAs -->
-        <div>
-          <div class="badge">✨ New platform just launched</div>
-          <h1 class="headline" data-greet>
-            A new era of <strong>instant wins</strong> & skill‑based prize comps.
-          </h1>
-          <p class="sub">
-            No fluff. Just beautifully engineered games, transparent odds, and lightning‑fast play.
-            Free entry route included. Built for trust from day one.
-          </p>
-          <div class="pills" role="list">
-            <span class="pill" role="listitem">Instant Wins</span>
-            <span class="pill" role="listitem">Live Competitions</span>
-            <span class="pill" role="listitem">Skill‑Based Entry</span>
-            <span class="pill" role="listitem">Free Entry Route</span>
-            <span class="pill" role="listitem">Modern UI</span>
-          </div>
+  <footer class="main-footer"></footer>
 
-          <div class="cta-row" role="group" aria-label="Primary actions">
-            <a class="btn primary" data-cta="primary" href="/app/">Enter now</a>
-            <a class="btn" data-cta="secondary" href="/app/">View competitions</a>
-          </div>
-
-          <div class="stats" aria-label="Highlights">
-            <div class="stat">
-              <div class="num">Skill‑checked</div>
-              <div class="label">Legal, fair entry</div>
-            </div>
-            <div class="stat">
-              <div class="num">Free Entry</div>
-              <div class="label">Postal route available</div>
-            </div>
-            <div class="stat">
-              <div class="num">Instant Wins</div>
-              <div class="label">Play in seconds</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Right: 3D Spline Logo Showcase -->
-        <div class="spline-card glow" aria-label="3D logo showcase">
-          <div class="spline-header">
-            <span class="tag">3D Logo</span>
-            <span class="tag">Live</span>
-          </div>
-
-          <!-- Placeholder Spline scene; set the URL in /home/home.js -->
-          <spline-viewer style="width:100%; height:100%; display:block; min-height:420px;" loading="lazy"></spline-viewer>
-
-          <div class="spline-footer">
-            <a class="btn" href="/app/">Open App</a>
-            <a class="btn" href="/login.html">Log in</a>
-          </div>
-        </div>
-      </section>
-
-      <div class="footer-mini">
-        <span>&copy; <span id="year"></span> The Hawk Games Ltd</span>
-        <span>
-          <a href="/app/legal/terms.html">Terms</a> ·
-          <a href="/app/legal/privacy.html">Privacy</a> ·
-          <a href="/app/legal/free-entry.html">Free Entry Route</a>
-        </span>
-      </div>
-    </main>
-  </div>
-
-  <script>
-    // Year stamp
-    document.getElementById('year').textContent = new Date().getFullYear();
-  </script>
-  <script type="module" src="/home/home.js"></script>
+  <!-- Auth renders brand‑consistent header/footer and uses Firebase under the hood -->
+  <script type="module" src="app/js/auth.js"></script>
+  <!-- Patch links to /app/ and set Spline URL -->
+  <script type="module" src="/home/landing.js"></script>
 </body>
 </html>

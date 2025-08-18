@@ -10,23 +10,23 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app);
 let userTokens = []; // Spinner tokens
-let userPlinkoTokens = []; // Plinko tokens
+// let userPlinkoTokens = []; // Plinko tokens
 let userProfile = {};
 let userCreditBalance = 0;
 let spinnerPrizes = [];
-let plinkoConfig = {};
+// let plinkoConfig = {};
 let isSpinning = false;
 let userProfileUnsubscribe = null;
 let activeTokenCompetition = null;
 
 // --- DOM Elements ---
 const tokenCountElement = document.getElementById('token-count');
-const plinkoTokenCountElement = document.getElementById('plinko-token-count');
+// const plinkoTokenCountElement = document.getElementById('plinko-token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
 const buySpinnerBtn = document.getElementById('buy-spinner-tokens-btn');
-const buyPlinkoBtn = document.getElementById('buy-plinko-tokens-btn');
-const buyPlinkoBtn2 = document.getElementById('buy-plinko-tokens-btn-2');
+// const buyPlinkoBtn = document.getElementById('buy-plinko-tokens-btn');
+// const buyPlinkoBtn2 = document.getElementById('buy-plinko-tokens-btn-2');
 const purchaseModal = document.getElementById('purchase-modal');
 const winCelebrationModal = document.getElementById('win-celebration-modal');
 
@@ -39,13 +39,13 @@ const prizesModal = document.getElementById('prizes-modal');
 const prizesTableContainer = document.getElementById('prizes-table-container');
 
 // Plinko Elements
-const plinkoSvg = document.getElementById('plinko-svg');
-const plinkoBoard = document.getElementById('plinko-board');
-const plinkoDrop1Btn = document.getElementById('plinko-drop-1');
-const plinkoDrop3Btn = document.getElementById('plinko-drop-3');
-const plinkoBalanceDisplay = document.getElementById('plinko-balance-display');
-let plinkoActiveBalls = 0;
-const MAX_PLINKO_BALLS = 12;
+// const plinkoSvg = document.getElementById('plinko-svg');
+// const plinkoBoard = document.getElementById('plinko-board');
+// const plinkoDrop1Btn = document.getElementById('plinko-drop-1');
+// const plinkoDrop3Btn = document.getElementById('plinko-drop-3');
+// const plinkoBalanceDisplay = document.getElementById('plinko-balance-display');
+// let plinkoActiveBalls = 0;
+// const MAX_PLINKO_BALLS = 12;
 
 // --- Utility Functions ---
 function createElement(tag, options = {}, children = []) {
@@ -72,7 +72,7 @@ auth.onAuthStateChanged((user) => {
                 userProfile = docSnap.data();
                 userCreditBalance = userProfile.creditBalance || 0;
                 userTokens = (userProfile.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
-                userPlinkoTokens = (userProfile.plinkoTokens || []);
+                // userPlinkoTokens = (userProfile.plinkoTokens || []);
                 if (!isSpinning) {
                     updateUI();
                 }
@@ -94,6 +94,7 @@ async function loadAllGameSettings() {
         } else { console.error("Spinner settings not found."); }
     } catch (error) { console.error("Error fetching spinner prizes:", error); }
 
+    /*
     try {
         const plinkoSettingsRef = doc(db, 'admin_settings', 'plinkoPrizes');
         const docSnap = await getDoc(plinkoSettingsRef);
@@ -110,18 +111,19 @@ async function loadAllGameSettings() {
         }
         initializePlinkoBoard();
     } catch (error) { console.error("Error fetching plinko prizes:", error); }
+    */
 }
 
 
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
-    plinkoTokenCountElement.textContent = userPlinkoTokens.length;
-    plinkoBalanceDisplay.textContent = userPlinkoTokens.length;
+    // plinkoTokenCountElement.textContent = userPlinkoTokens.length;
+    // plinkoBalanceDisplay.textContent = userPlinkoTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
     
-    const canPlayPlinko = userPlinkoTokens.length > 0 && plinkoActiveBalls < MAX_PLINKO_BALLS;
-    plinkoDrop1Btn.disabled = !canPlayPlinko;
-    plinkoDrop3Btn.disabled = !(canPlayPlinko && userPlinkoTokens.length >= 3);
+    // const canPlayPlinko = userPlinkoTokens.length > 0 && plinkoActiveBalls < MAX_PLINKO_BALLS;
+    // plinkoDrop1Btn.disabled = !canPlayPlinko;
+    // plinkoDrop3Btn.disabled = !(canPlayPlinko && userPlinkoTokens.length >= 3);
     
     spinButton.disabled = userTokens.length === 0 || isSpinning;
     renderTokenAccordion();
@@ -175,9 +177,9 @@ function renderPrizesTable(prizes) {
 function showWinCelebrationModal(prizeType, value, game = 'spinner') {
     const prizeValueText = `£${value.toFixed(2)}`;
     const prizeTypeText = prizeType === 'credit' ? "SITE CREDIT" : "CASH";
-    const remainingTokens = game === 'spinner' ? userTokens.length : userPlinkoTokens.length;
+    const remainingTokens = userTokens.length;
 
-    const playAgainBtn = createElement('button', { class: 'btn', textContent: `Play ${game === 'spinner' ? 'Spinner' : 'Plinko'} Again` });
+    const playAgainBtn = createElement('button', { class: 'btn', textContent: `Play Spinner Again` });
     const tokenInfo = createElement('p', { class: 'win-modal-token-info' });
 
     if (remainingTokens > 0) {
@@ -190,7 +192,7 @@ function showWinCelebrationModal(prizeType, value, game = 'spinner') {
     
     playAgainBtn.addEventListener('click', () => {
         closeWinCelebrationModal();
-        setTimeout(game === 'spinner' ? handleSpin : handlePlinkoDrop, 400);
+        setTimeout(handleSpin, 400);
     }, { once: true });
 
     const closeBtn = createElement('button', { class: 'btn btn-secondary', textContent: 'Close' });
@@ -264,6 +266,7 @@ spinButton.addEventListener('click', handleSpin);
 
 
 // --- Plinko Logic ---
+/*
 let plinkoPegs = [], plinkoSlots = [], plinkoOffsets = [];
 
 function initializePlinkoBoard() {
@@ -406,11 +409,13 @@ async function animatePlinkoDrop(path, prize) {
 plinkoDrop1Btn.addEventListener('click', () => handlePlinkoDrop(1));
 plinkoDrop3Btn.addEventListener('click', () => handlePlinkoDrop(3));
 plinkoBoard.addEventListener('click', () => handlePlinkoDrop(1));
+*/
 
 
 // --- Shared Modal & Accordion Logic ---
 function renderTokenAccordion() {
     tokenAccordionContainer.innerHTML = '';
+    const userPlinkoTokens = [];
     const allTokens = [
         ...userTokens.map(t => ({...t, type: 'Spinner'})),
         ...userPlinkoTokens.map(t => ({...t, type: 'Plinko'}))
@@ -445,7 +450,7 @@ function renderTokenAccordion() {
 async function openPurchaseModal(tokenType) {
     const modalBody = document.getElementById('purchase-modal-body');
     modalBody.innerHTML = '';
-    modalBody.append(createElement('h2', { textContent: `Get More ${tokenType === 'spinner' ? 'Spins' : 'Drops'}` }), createElement('p', { class: 'placeholder', textContent: 'Finding assigned competition...' }));
+    modalBody.append(createElement('h2', { textContent: `Get More Spins` }), createElement('p', { class: 'placeholder', textContent: 'Finding assigned competition...' }));
     purchaseModal.classList.add('show');
 
     try {
@@ -454,8 +459,8 @@ async function openPurchaseModal(tokenType) {
         if (!assignmentsSnap.exists()) throw new Error('Game assignments not configured by admin.');
         
         const assignments = assignmentsSnap.data();
-        const compId = tokenType === 'spinner' ? assignments.spinnerCompId : assignments.plinkoCompId;
-        if (!compId) throw new Error(`No token competition has been assigned to the ${tokenType} game.`);
+        const compId = assignments.spinnerCompId;
+        if (!compId) throw new Error(`No token competition has been assigned to the spinner game.`);
 
         const compRef = doc(db, 'competitions', compId);
         const compSnap = await getDoc(compRef);
@@ -511,8 +516,8 @@ async function openPurchaseModal(tokenType) {
 }
 
 buySpinnerBtn.addEventListener('click', () => openPurchaseModal('spinner'));
-buyPlinkoBtn.addEventListener('click', () => openPurchaseModal('plinko'));
-buyPlinkoBtn2.addEventListener('click', () => openPurchaseModal('plinko'));
+// buyPlinkoBtn.addEventListener('click', () => openPurchaseModal('plinko'));
+// buyPlinkoBtn2.addEventListener('click', () => openPurchaseModal('plinko'));
 
 async function handleTokenCompEntry(form, tokenType, paymentMethod = 'card') {
     const selectedAnswer = form.querySelector('.answer-btn.selected');
@@ -564,7 +569,7 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
     const form = target.closest('form');
     if (!form) return;
     
-    const currentTokenType = activeTokenCompetition.title.toLowerCase().includes('plinko') ? 'plinko' : 'spinner';
+    const currentTokenType = 'spinner';
 
     if (target.classList.contains('answer-btn')) {
         form.querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));

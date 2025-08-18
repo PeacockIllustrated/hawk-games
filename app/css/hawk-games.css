@@ -735,13 +735,13 @@ input:checked + .slider:before { transform: translateX(26px); }
     border-bottom-color: var(--primary-gold);
 }
 
-.plinko-icon {
+/*.plinko-icon {
     display: inline-block;
     width: 24px;
     height: 24px;
     background-color: #4a69e0;
     border-radius: 50%;
-}
+}*/
 
 .game-panel, .game-controls-panel {
     display: none;
@@ -765,7 +765,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     align-items: flex-start;
 }
 
-.instant-win-layout.plinko-active {
+/*.instant-win-layout.plinko-active {
     display: flex;
     flex-direction: column;
     gap: 3rem;
@@ -791,7 +791,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 /* NEW: Plinko Controls Panel */
-.plinko-controls-panel {
+/*.plinko-controls-panel {
     padding: 2rem;
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -817,7 +817,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     margin-bottom: 1.5rem;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1rem;
-}
+}*/
 
 @media(max-width: 768px) {
     .instant-win-layout.spinner-active {
@@ -891,7 +891,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* ==          SECTION 26: PLINKO STYLES            == */
 /* == (Migrated from plinko-mvp.html for integration)== */
 /* =================================================== */
-
+/*
 .plinko-game-panel.card {
     background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, .0));
     border: 1px solid var(--border-color);
@@ -1049,3 +1049,4 @@ input:checked + .slider:before { transform: translateX(26px); }
 @media (prefers-reduced-motion: reduce) {
     .plinko-game-panel .dropzone, .plinko-confetti { animation: none; transition: none }
 }
+*/

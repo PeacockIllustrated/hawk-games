@@ -49,6 +49,11 @@
             object-fit: cover; 
         }
 
+        .hero-section spline-viewer {
+            width: 100%;
+            height: 100%;
+        }
+
         /* --- Bottom Info Banner --- */
         .info-banner {
             display: flex;
@@ -332,7 +337,8 @@
 <body>
 
     <main class="hero-section">
-        <img src="the-hawk-games-banner.png" alt="The Hawk Games - Coming Soon">
+        <script type="module" src="https://unpkg.com/@splinetool/viewer@1.10.48/build/spline-viewer.js"></script>
+        <spline-viewer url="https://prod.spline.design/cuI6cfg4J8l5mSg5/scene.splinecode"></spline-viewer>
     </main>
 
     <footer class="info-banner">

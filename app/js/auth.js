@@ -181,7 +181,8 @@ function renderHeader(user) {
     const mobileNav = createElement('nav', { class: 'mobile-nav-links' }, createNavLinks(true));
     const mobileOverlay = createElement('div', { id: 'mobile-nav-overlay', class: 'mobile-nav-overlay' }, [mobileNav]);
 
-    headerEl.append(container, mobileOverlay);
+    headerEl.append(container);
+    document.body.append(mobileOverlay);
 
     hamburgerBtn.addEventListener('click', () => {
         document.body.classList.toggle('mobile-nav-open');

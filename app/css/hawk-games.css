@@ -1074,3 +1074,16 @@ input:checked + .slider:before { transform: translateX(26px); }
     height: 100%;
     border-radius: 8px;
 }
+
+.spline-mobile {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .spline-desktop {
+        display: none;
+    }
+    .spline-mobile {
+        display: block;
+    }
+}

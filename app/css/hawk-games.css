@@ -1063,10 +1063,12 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 .spline-embed-wrapper {
-    width: 100%;
+    width: 100vw;
     aspect-ratio: 16 / 9;
-    max-width: 1200px;
-    margin: 2rem auto 0;
+    margin: 2rem 0 0;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .spline-embed-wrapper spline-viewer {
@@ -1085,5 +1087,10 @@ input:checked + .slider:before { transform: translateX(26px); }
     }
     .spline-mobile {
         display: block;
+        width: 100%; /* Ensure it does not overflow */
+    }
+    .spline-embed-wrapper {
+        aspect-ratio: auto;
+        height: 80vh;
     }
 }

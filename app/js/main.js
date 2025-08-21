@@ -53,9 +53,6 @@ const initializeHeaderScroll = () => {
     const header = document.querySelector('.main-header');
     if (!header) return;
     window.addEventListener('scroll', () => {
-        if (document.body.classList.contains('mobile-nav-open')) {
-            return;
-        }
         header.classList.toggle('scrolled', window.scrollY > 50);
     });
 };

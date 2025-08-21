@@ -49,15 +49,6 @@
             object-fit: cover; 
         }
 
-        .hero-section spline-viewer {
-            width: 100vw;
-            height: 100%;
-        }
-
-        .spline-mobile {
-            display: none;
-        }
-
         /* --- Bottom Info Banner --- */
         .info-banner {
             display: flex;
@@ -309,12 +300,6 @@
         }
         
         @media (max-width: 768px) {
-            .spline-desktop {
-                display: none;
-            }
-            .spline-mobile {
-                display: block;
-            }
             body {
                 overflow-y: auto;
             }
@@ -347,9 +332,7 @@
 <body>
 
     <main class="hero-section">
-        <script type="module" src="https://unpkg.com/@splinetool/viewer@1.10.48/build/spline-viewer.js"></script>
-        <spline-viewer class="spline-desktop" url="https://prod.spline.design/cuI6cfg4J8l5mSg5/scene.splinecode" loading-anim="true" loading-anim-type="spinner-big-light"></spline-viewer>
-        <spline-viewer class="spline-mobile" url="https://prod.spline.design/aHOHah6kHS3O8PFa/scene.splinecode" loading-anim="true" loading-anim-type="spinner-big-light"></spline-viewer>
+        <img src="the-hawk-games-banner.png" alt="The Hawk Games - Coming Soon">
     </main>
 
     <footer class="info-banner">

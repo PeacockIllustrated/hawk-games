@@ -312,12 +312,53 @@ function createHeroPageElements(data) {
             ])
         ]);
 
+        // --- Create the new prize visuals panel with placeholders ---
+        const photoView = createElement('div', { class: 'view-panel photo-view active' }, [
+            createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
+        ]);
+        const threeDView = createElement('div', { class: 'view-panel spline-view' }); // Spline viewer will be added here later
+
+        const viewsContainer = createElement('div', { class: 'views-container' }, [photoView, threeDView]);
+
+        const photosButton = createElement('button', { class: ['btn', 'btn-small', 'active'], textContent: 'Photos' });
+        const threeDButton = createElement('button', { class: ['btn', 'btn-small'], textContent: '3D View', style: { display: 'none' } });
+
+        const viewToggle = createElement('div', { class: 'view-toggle-buttons' }, [photosButton, threeDButton]);
+
+        const prizeVisualsPanel = createElement('div', { style: { flex: '1 1 50%' } }, [
+            viewToggle,
+            viewsContainer
+        ]);
+
+        // --- Logic for 3D View Toggle ---
+        if (data.splineUrl) {
+            threeDButton.style.display = 'inline-block';
+
+            const splineViewer = createElement('spline-viewer', {
+                url: data.splineUrl,
+                'loading-anim': 'true'
+            });
+            threeDView.append(splineViewer);
+
+            photosButton.addEventListener('click', () => {
+                photosButton.classList.add('active');
+                threeDButton.classList.remove('active');
+                photoView.classList.add('active');
+                threeDView.classList.remove('active');
+            });
+
+            threeDButton.addEventListener('click', () => {
+                threeDButton.classList.add('active');
+                photosButton.classList.remove('active');
+                threeDView.classList.add('active');
+                photoView.classList.remove('active');
+            });
+        }
+
         const introSection = createElement('section', {
             style: { display: 'flex', gap: '2rem', paddingTop: '120px' }
         }, [
-            createElement('div', { style: { flex: '1 1 50%' } }, [
-                createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
-            ]),
+            prizeVisualsPanel,
             introDetails
         ]);
         mainContentSections.push(introSection);

@@ -224,98 +224,13 @@ input:checked + .slider:before { transform: translateX(26px); }
 .btn-buy-tokens:hover { background-color: #333; color: var(--light-white); }
 
 /* Token Inventory Accordion */
-.token-inventory {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 1.5rem;
-}
-.token-inventory h3 {
-    font-family: var(--font-heading);
-    text-transform: uppercase;
-    font-size: 1.4rem;
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1rem;
-}
-.accordion-item {
-    background-color: var(--dark-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    margin-bottom: 0.75rem;
-    overflow: hidden;
-}
-.accordion-item:last-child {
-    margin-bottom: 0;
-}
-.accordion-header {
-    background-color: #111;
-    border: none;
-    color: var(--light-white);
-    cursor: pointer;
-    padding: 1rem 1.5rem;
-    width: 100%;
-    text-align: left;
-    transition: background-color 0.2s ease;
-    display: grid;
-    grid-template-areas: "title arrow" "meta arrow";
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    row-gap: 0.25rem; /* Adds a small gap between title and meta */
-}
-
-.accordion-header > span:first-child {
-    grid-area: title;
-    font-size: 1.1rem;
-    font-weight: 700;
-}
-.accordion-header:hover {
-    background-color: #222;
-}
-.accordion-header .accordion-meta {
-    grid-area: meta;
-    font-size: 0.8rem;
-    color: #aaa;
-    font-weight: 400;
-}
-.accordion-arrow {
-    grid-area: arrow;
-    width: 12px;
-    height: 12px;
-    border-right: 2px solid var(--primary-gold);
-    border-bottom: 2px solid var(--primary-gold);
-    transform: rotate(45deg);
-    transition: transform 0.3s ease-out;
-}
-.accordion-header.active .accordion-arrow {
-    transform: rotate(225deg);
-}
-.accordion-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    background-color: var(--dark-bg);
-}
-.accordion-header.active + .accordion-content {
-    padding: 1rem 1.5rem;
-}
-.accordion-content ul {
-    list-style-type: none;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.accordion-content li {
-    background-color: #111;
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--primary-gold);
-    padding: 0.75rem 1rem;
-    border-radius: 3px;
-    color: #ccc;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-}
+.token-inventory h3 { font-family: var(--font-heading); text-transform: uppercase; font-size: 1.4rem; }
+.accordion-item { border-bottom: 1px solid var(--border-color); }
+.accordion-header { background-color: transparent; border: none; color: var(--light-white); cursor: pointer; padding: 1rem 0; width: 100%; text-align: left; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+.accordion-header:hover { color: var(--primary-gold); }
+.accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+.accordion-content ul { list-style-type: '•  '; padding: 0.5rem 0 1rem 1.5rem; }
+.accordion-content li { color: #aaa; font-family: monospace; font-size: 0.9rem; padding: 0.25rem 0; }
 
 
 /* --- 12. HERO SECTION --- */
@@ -1137,45 +1052,40 @@ input:checked + .slider:before { transform: translateX(26px); }
 */
 
 /* =================================================== */
-/* ==           SECTION 27: THE SHOWROOM            == */
+/* ==   SECTION 28: COMPETITION PAGE 3D VIEWER      == */
 /* =================================================== */
 
-#the-showroom-section {
-    border-top: 5px solid var(--primary-gold);
-    border-bottom: 5px solid var(--primary-gold);
-    padding: 5rem 0;
-    background-color: #0c0c0c;
+.view-toggle-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
 }
 
-.spline-embed-wrapper {
-    width: 100vw;
-    aspect-ratio: 16 / 9;
-    margin: 2rem 0 0;
+.views-container {
     position: relative;
-    left: 50%;
-    transform: translateX(-50%);
 }
 
-.spline-embed-wrapper spline-viewer {
-    width: 100%;
-    height: 100%;
-    border-radius: 8px;
-}
-
-.spline-mobile {
+.view-panel {
     display: none;
 }
 
-@media (max-width: 768px) {
-    .spline-desktop {
-        display: none;
-    }
-    .spline-mobile {
-        display: block;
-        width: 100%; /* Ensure it does not overflow */
-    }
-    .spline-embed-wrapper {
-        aspect-ratio: auto;
-        height: 80vh;
-    }
+.view-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out; /* Re-use existing fadeIn animation */
+}
+
+.spline-view {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background-color: #000; /* Black background for the container */
+    border-radius: 5px;
+    overflow: hidden; /* Hide anything that might spill out */
+}
+
+.spline-view spline-viewer {
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
 }

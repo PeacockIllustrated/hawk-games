@@ -316,7 +316,7 @@ function createHeroPageElements(data) {
         const photoView = createElement('div', { class: 'view-panel photo-view active' }, [
             createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
         ]);
-        const threeDView = createElement('div', { class: 'view-panel spline-view' }); // Spline viewer will be added here later
+        const threeDView = createElement('div', { class: 'view-panel spline-view' });
 
         const viewsContainer = createElement('div', { class: 'views-container' }, [photoView, threeDView]);
 
@@ -356,6 +356,7 @@ function createHeroPageElements(data) {
         }
 
         const introSection = createElement('section', {
+            class: 'main-comp-layout', // Class added for mobile stacking
             style: { display: 'flex', gap: '2rem', paddingTop: '120px' }
         }, [
             prizeVisualsPanel,

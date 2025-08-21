@@ -1092,3 +1092,36 @@ input:checked + .slider:before { transform: translateX(26px); }
     height: 100%;
     border-radius: 5px;
 }
+
+/* Showcase Page Styles */
+body[data-page="showcase"] {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    margin: 0;
+}
+
+body[data-page="showcase"] .main-header {
+    flex-shrink: 0;
+    position: static; /* Override sticky/fixed header for this page */
+}
+
+body[data-page="showcase"] .main-footer {
+    flex-shrink: 0;
+}
+
+main.showcase-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+main.showcase-container spline-viewer {
+    flex-grow: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+}

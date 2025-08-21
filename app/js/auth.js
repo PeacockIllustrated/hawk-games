@@ -133,7 +133,7 @@ function renderHeader(user) {
 
     const devBanner = createElement('div', {
         class: 'dev-banner',
-        textContent: 'This website is currently under development. Any tickets acquired or prizes won will not be redeemable until full launch.'
+        textContent: 'Currently under development. Any tickets acquired or prizes won will not be valid or redeemable, even after full launch.'
     });
     headerEl.append(devBanner);
 

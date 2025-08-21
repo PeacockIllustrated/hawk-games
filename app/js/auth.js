@@ -183,13 +183,27 @@ function renderHeader(user) {
 
     headerEl.append(container, mobileOverlay);
 
+    const header = document.querySelector('.main-header');
+
+    const closeMobileNav = () => {
+        document.body.classList.remove('mobile-nav-open');
+        if (window.scrollY > 50) {
+            header.classList.add('scrolled');
+        }
+    }
+
     hamburgerBtn.addEventListener('click', () => {
-        document.body.classList.toggle('mobile-nav-open');
+        if (document.body.classList.contains('mobile-nav-open')) {
+            closeMobileNav();
+        } else {
+            document.body.classList.add('mobile-nav-open');
+            header.classList.remove('scrolled');
+        }
     });
 
     mobileNav.addEventListener('click', (e) => {
         if (e.target.tagName === 'A' || e.target.closest('a')) {
-            document.body.classList.remove('mobile-nav-open');
+            closeMobileNav();
         }
     });
 }

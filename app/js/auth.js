@@ -131,6 +131,12 @@ function renderHeader(user) {
     if (!headerEl) return;
     headerEl.innerHTML = '';
 
+    const devBanner = createElement('div', {
+        class: 'dev-banner',
+        textContent: 'This website is currently under development. Any tickets acquired or prizes won will not be redeemable until full launch.'
+    });
+    headerEl.append(devBanner);
+
     let currentPage = document.body.dataset.page || '';
     if (window.location.pathname.endsWith('index.html') && window.location.hash === '#past-winners-section') {
         currentPage = 'winners';

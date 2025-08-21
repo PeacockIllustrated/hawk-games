@@ -37,6 +37,14 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .placeholder { padding: 4rem; text-align: center; font-family: var(--font-heading); color: #888; }
 
 /* --- 3. Layout: Header & Footer --- */
+.dev-banner {
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
 .main-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 100; padding: 1.5rem 0; background-color: transparent; border-bottom: 1px solid transparent; transition: background-color 0.3s ease, border-color 0.3s ease, padding 0.3s ease; }
 .main-header.scrolled { background-color: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px); border-color: var(--border-color); padding: 1rem 0; }
 .main-header .container, .main-footer .container { display: flex; justify-content: space-between; align-items: center; }

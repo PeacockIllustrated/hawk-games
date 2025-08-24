@@ -60,10 +60,6 @@ onAuthStateChanged(auth, (user) => {
             const tokenCount = data.spinTokens?.length || 0;
             const creditBalance = data.creditBalance || 0;
             
-            updateIndicator('spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
-            updateIndicator('mobile-spin-token-indicator', tokenCount, (el, count) => el.querySelector('.token-count').textContent = count);
-            updateIndicator('credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, creditBalance > 0);
-            updateIndicator('mobile-credit-balance-indicator', creditBalance, (el, val) => el.querySelector('.credit-amount').textContent = `£${val.toFixed(2)}`, creditBalance > 0);
         });
     } else {
         if (userProfileUnsubscribe) {
@@ -156,23 +152,12 @@ function renderHeader(user) {
 
         if (user) {
             links.push(createElement('a', { href: 'account.html', class: currentPage === 'account' ? 'active' : '' }, ['Account']));
-            links.push(
-                createElement('div', { id: `${isMobile ? 'mobile-' : ''}credit-balance-indicator`, class: 'credit-balance', style: 'display: none;' }, [
-                    createElement('span', { class: 'credit-amount' }, ['£0.00'])
-                ])
-            );
         } else {
             links.push(createElement('a', { href: 'login.html', class: currentPage === 'login' ? 'active' : '' }, ['Login']));
         }
         
         const instantWinLink = createElement('a', { href: 'instant-games.html', class: `btn ${currentPage === 'instant-wins' ? 'active' : ''}` }, ['Instant Wins']);
-        const tokenIndicator = createElement('div', { id: `${isMobile ? 'mobile-' : ''}spin-token-indicator`, class: 'token-indicator', style: 'display: none;' }, [
-            createElement('span', { class: 'token-icon' }),
-            createElement('span', { class: 'token-count' }, ['0'])
-        ]);
-        const instantWinNavItem = createElement('div', { class: 'instant-win-nav-item' }, [instantWinLink, tokenIndicator]);
-        
-        links.push(instantWinNavItem);
+        links.push(instantWinLink);
         return links;
     };
 

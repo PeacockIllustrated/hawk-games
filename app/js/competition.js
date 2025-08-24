@@ -57,8 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ... (The rest of the file's logic remains exactly the same as the complete version I provided previously)
-// The key fix was the helper function above. I will include the rest of the file for absolute certainty.
 
 async function loadCompetitionDetails(id) {
     const pageContent = document.getElementById('competition-page-content');
@@ -70,14 +68,18 @@ async function loadCompetitionDetails(id) {
             document.title = `${currentCompetitionData.title} | The Hawk Games`;
 
             pageContent.innerHTML = ''; // Clear placeholders
-            if (currentCompetitionData.isHeroComp && currentCompetitionData.hasParallax) {
-                pageContent.append(...createHeroPageElements(currentCompetitionData));
+            // Always use the hero layout for all competitions.
+            pageContent.append(...createHeroPageElements(currentCompetitionData));
+
+            // Only initialize parallax if the data supports it.
+            if (currentCompetitionData.hasParallax) {
                 initializeParallax();
-            } else {
-                pageContent.append(createStandardPageElement(currentCompetitionData));
             }
             
-            setupCountdown(currentCompetitionData.endDate.toDate());
+            if (currentCompetitionData.endDate) {
+                setupCountdown(currentCompetitionData.endDate.toDate());
+            }
+
             setupEntryLogic(currentCompetitionData.skillQuestion.correctAnswer);
         } else {
             pageContent.innerHTML = '';
@@ -138,26 +140,37 @@ function showConfirmationModal() {
         return;
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
-    const price = parseFloat(selectedTicket.dataset.price).toFixed(2);
+    const price = parseFloat(selectedTicket.dataset.price);
     
     const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn' }, ['Confirm & Pay']);
     const content = createElement('div', {}, [
         createElement('h2', { textContent: 'Confirm Your Entry' }),
-        createElement('p', {}, [`You are about to purchase `, createElement('strong', { textContent: `${tickets}` }), ` entries for `, createElement('strong', { textContent: `£${price}` }), `.`]),
+        createElement('p', {}, [`You are about to purchase `, createElement('strong', { textContent: `${tickets}` }), ` entries for `, createElement('strong', { textContent: `£${price.toFixed(2)}` }), `.`]),
         createElement('div', { class: 'modal-actions' }, [
             createElement('button', { 'data-close-modal': true, class: ['btn', 'btn-secondary'] }, ['Cancel']),
             confirmBtn
         ])
     ]);
     openModal(content);
-    confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
+    // --- FIX: Pass both tickets and price to the handler ---
+    confirmBtn.addEventListener('click', () => handleEntry(tickets, price), { once: true });
 }
 
-async function handleEntry(ticketsBought) {
+// --- FIX: Update function signature and payload ---
+async function handleEntry(ticketsBought, price) {
     openModal(createElement('div', {}, [createElement('h2', { textContent: 'Processing Entry...' }), createElement('div', { class: 'loader' }), createElement('p', { textContent: 'Please wait, do not close this window.' })]));
     try {
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
-        const result = await allocateTicketsAndAwardTokens({ compId: competitionId, ticketsBought });
+        
+        // --- FIX: Construct the full, valid payload ---
+        const payload = {
+            compId: competitionId,
+            ticketsBought: ticketsBought,
+            expectedPrice: price,
+            paymentMethod: 'card' // Default to 'card' for entries from this page
+        };
+        
+        const result = await allocateTicketsAndAwardTokens(payload);
         const data = result.data;
         
         if (data.awardedTokens && data.awardedTokens.length > 0) {
@@ -240,48 +253,16 @@ function initializeParallax() {
     });
 }
 
-function createStandardPageElement(data) {
-    const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('button', { class: 'answer-btn', 'data-answer': key, textContent: value }));
-    const ticketTiers = data.ticketTiers.map(tier => createElement('button', { class: 'ticket-option', 'data-amount': tier.amount, 'data-price': tier.price, textContent: `${tier.amount} Entr${tier.amount > 1 ? 'ies' : 'y'} for £${tier.price.toFixed(2)}` }));
-    const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
-    
-    return createElement('main', {}, [
-        createElement('div', { id: 'competition-container', class: 'container' }, [
-            createElement('div', { class: 'competition-detail-view' }, [
-                createElement('div', { class: 'prize-image-panel' }, [createElement('img', { src: data.prizeImage, alt: data.title })]),
-                createElement('div', { class: 'entry-details-panel' }, [
-                    createElement('h1', { textContent: data.title }),
-                    createElement('p', { class: 'cash-alternative' }, ['Or ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
-                    createElement('div', { id: 'timer', class: 'detail-timer' }),
-                    createElement('div', { class: 'detail-progress' }, [
-                        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })]),
-                        createElement('p', { textContent: `${data.ticketsSold || 0} / ${data.totalTickets} sold` })
-                    ]),
-                    createElement('div', { class: 'detail-section skill-question-box' }, [
-                        createElement('h3', {}, [createElement('span', { textContent: '1.' }), ' Answer The Question']),
-                        createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
-                        createElement('div', { class: 'answer-options' }, answers)
-                    ]),
-                    createElement('div', { class: 'detail-section ticket-selector-box' }, [
-                        createElement('h3', {}, [createElement('span', { textContent: '2.' }), ' Choose Your Tickets']),
-                        createElement('div', { class: 'ticket-options' }, ticketTiers)
-                    ]),
-                    createElement('button', { id: 'entry-button', class: 'btn', disabled: true }, ['Select Tickets'])
-                ])
-            ])
-        ])
-    ]);
-}
-
 function createHeroPageElements(data) {
+    // --- Common element creation ---
     const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) => createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value }));
+    const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
     
     let bestValueAmount = -1;
     if (data.ticketTiers && data.ticketTiers.length > 1) {
         const bestTier = data.ticketTiers.reduce((best, current) => (current.price / current.amount < best.price / best.amount) ? current : best);
         bestValueAmount = bestTier.amount;
     }
-
     const ticketTiers = data.ticketTiers.map(tier => {
         const isBestValue = tier.amount === bestValueAmount;
         return createElement('div', { class: ['ticket-option', 'card-style-option', isBestValue ? 'best-value' : ''], 'data-amount': tier.amount, 'data-price': tier.price }, [
@@ -291,19 +272,20 @@ function createHeroPageElements(data) {
             createElement('span', { class: 'ticket-price', textContent: `£${tier.price.toFixed(2)}` })
         ]);
     });
-    const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
-    const prizeSpecs = [
-        'AMG Spec', 'Diesel Coupe', 'Premium Black Finish', `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
-    ].map(spec => createElement('li', { textContent: spec }));
+    const isTrueHero = data.isHeroComp && data.hasParallax;
+    let header;
+    const mainContentSections = [];
 
-    const header = createElement('header', { class: 'hero-comp-header' }, [
-        createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
-        createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
-    ]);
+    // --- Build page sections based on competition type ---
+    if (isTrueHero) {
+        // --- HERO COMPETITION LAYOUT ---
+        header = createElement('header', { class: 'hero-comp-header' }, [
+            createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
+            createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
+        ]);
 
-    const main = createElement('main', { class: 'hero-comp-main' }, [
-        createElement('div', { class: 'container' }, [
+        mainContentSections.push(
             createElement('section', { class: 'hero-comp-title-section' }, [
                 createElement('h1', { textContent: `Win a ${data.title}` }),
                 createElement('p', { class: 'cash-alternative-hero' }, ['Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
@@ -313,39 +295,129 @@ function createHeroPageElements(data) {
             createElement('section', { class: 'hero-comp-progress-section' }, [
                 createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
                 createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
+            ])
+        );
+    } else {
+        // --- MAIN COMPETITION LAYOUT ---
+        header = createElement('header'); // Empty header, does not take up space
+
+        const introDetails = createElement('div', { style: { flex: '1 1 50%', display: 'flex', flexDirection: 'column' } }, [
+            createElement('h1', { textContent: `Win a ${data.title}` }),
+            createElement('p', { class: 'cash-alternative-hero' }, ['Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative']),
+            createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING', style: { marginTop: 'auto' } }),
+            createElement('div', { id: 'timer', class: 'hero-digital-timer' }),
+            createElement('div', { class: 'hero-comp-progress-section', style: { marginTop: '1rem' } }, [
+                createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
+                createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
+            ])
+        ]);
+
+        // --- Create the new prize visuals panel with placeholders ---
+        const photoView = createElement('div', { class: 'view-panel photo-view active' }, [
+            createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
+        ]);
+        const threeDView = createElement('div', { class: 'view-panel spline-view' });
+
+        const viewsContainer = createElement('div', { class: 'views-container' }, [photoView, threeDView]);
+
+        const photosButton = createElement('button', { class: ['btn', 'btn-small', 'active'], textContent: 'Photos' });
+        const threeDButton = createElement('button', { class: ['btn', 'btn-small'], textContent: '3D View', style: { display: 'none' } });
+
+        const viewToggle = createElement('div', { class: 'view-toggle-buttons' }, [photosButton, threeDButton]);
+
+        const prizeVisualsPanel = createElement('div', { style: { flex: '1 1 50%' } }, [
+            viewToggle,
+            viewsContainer
+        ]);
+
+        // --- Logic for 3D View Toggle ---
+        if (data.splineUrl) {
+            threeDButton.style.display = 'inline-block';
+
+            const splineViewer = createElement('spline-viewer', {
+                url: data.splineUrl,
+                'loading-anim': 'true'
+            });
+            threeDView.append(splineViewer);
+
+            photosButton.addEventListener('click', () => {
+                photosButton.classList.add('active');
+                threeDButton.classList.remove('active');
+                photoView.classList.add('active');
+                threeDView.classList.remove('active');
+            });
+
+            threeDButton.addEventListener('click', () => {
+                threeDButton.classList.add('active');
+                photosButton.classList.remove('active');
+                threeDView.classList.add('active');
+                photoView.classList.remove('active');
+            });
+        }
+
+        const introSection = createElement('section', {
+            class: 'main-comp-layout', // Class added for mobile stacking
+            style: { display: 'flex', gap: '2rem', paddingTop: '120px' }
+        }, [
+            prizeVisualsPanel,
+            introDetails
+        ]);
+        mainContentSections.push(introSection);
+    }
+
+    // --- Add common sections for both layouts ---
+    mainContentSections.push(
+        createElement('section', { class: 'hero-comp-entry-flow' }, [
+            createElement('div', { class: 'entry-step question-step' }, [
+                createElement('h2', { textContent: '1. Answer The Question' }),
+                createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
+                createElement('div', { class: 'answer-options' }, answers)
             ]),
-            createElement('section', { class: 'hero-comp-entry-flow' }, [
-                createElement('div', { class: 'entry-step question-step' }, [
-                    createElement('h2', { textContent: '1. Answer The Question' }),
-                    createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
-                    createElement('div', { class: 'answer-options' }, answers)
-                ]),
-                createElement('div', { class: 'entry-step tickets-step' }, [
-                    createElement('h2', { textContent: '2. Choose Your Tickets' }),
-                    createElement('div', { class: 'ticket-options' }, ticketTiers)
-                ])
-            ]),
-            createElement('section', { class: 'hero-comp-confirm-section' }, [
-                createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [ 'Enter Now', createElement('span', { textContent: 'Secure Your Chance' }) ])
-            ]),
+            createElement('div', { class: 'entry-step tickets-step' }, [
+                createElement('h2', { textContent: '2. Choose Your Tickets' }),
+                createElement('div', { class: 'ticket-options' }, ticketTiers)
+            ])
+        ]),
+        createElement('section', { class: 'hero-comp-confirm-section' }, [
+            createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [ 'Enter Now', createElement('span', { textContent: 'Secure Your Chance' }) ])
+        ])
+    );
+
+    // --- Add hero-only sections ---
+    if (isTrueHero) {
+        const prizeSpecs = [
+            'AMG Spec', 'Diesel Coupe', 'Premium Black Finish', `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
+        ].map(spec => createElement('li', { textContent: spec }));
+
+        const glanceImage = data.imageSet.foreground;
+
+        mainContentSections.push(
             createElement('section', { class: 'hero-comp-glance-section' }, [
                 createElement('h2', { textContent: '3. Prize At a Glance' }),
                 createElement('div', { class: 'glance-content' }, [
-                    createElement('img', { src: data.imageSet.foreground, alt: 'Prize image' }),
+                    createElement('img', { src: glanceImage, alt: 'Prize image' }),
                     createElement('ul', {}, prizeSpecs)
                 ])
-            ]),
-            createElement('section', { class: 'hero-comp-trust-section' }, [
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),
-                createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
             ])
+        );
+    }
+
+    // --- Add final common section ---
+    mainContentSections.push(
+        createElement('section', { class: 'hero-comp-trust-section' }, [
+            createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '🛡️' }), createElement('h3', { textContent: '100% Secure Payments' })]),
+            createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', textContent: '⚖️' }), createElement('h3', { textContent: 'Licensed & Fully Compliant' })]),
+            createElement('div', { class: 'trust-badge' }, [createElement('span', { class: 'trust-icon', 'textContent': '🏆' }), createElement('h3', { textContent: 'Real Winners Every Week' })])
         ])
+    );
+
+    // --- Assemble and return final elements ---
+    const main = createElement('main', { class: 'hero-comp-main' }, [
+        createElement('div', { class: 'container' }, mainContentSections)
     ]);
+
     return [header, main];
 }
-
-
 
 // --- INSTANT WIN MODAL LOGIC ---
 function showInstantWinModal(tokenCount) {
@@ -360,9 +432,9 @@ function showInstantWinModal(tokenCount) {
     
     spinButton.disabled = false;
     spinButton.textContent = "SPIN THE WHEEL";
-    spinButton.onclick = handleSpinButtonClick; // Re-assign the click handler
+    spinButton.onclick = handleSpinButtonClick;
     spinResultContainer.innerHTML = '';
-    wheel.style.transition = 'none'; // Reset any previous spin
+    wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
 
     modal.classList.add('show');

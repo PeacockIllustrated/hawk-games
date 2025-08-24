@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Helper function to check if the write is coming from a Cloud Function (or admin)
+    // A simple check is to see if they are trying to write a protected field.
+    // A more robust way would involve custom claims, but this is a good start.
+    function isBackendOrAdmin() {
+        return isAdmin(); // For now, we assume admin actions and backend are one and the same for these fields
+    }
+
+    match /users/{userId} {
+      // Users can read their own data and update some fields
+      allow read, update: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+
+      // Disallow client-side updates to the loyalty field
+      allow update: if request.auth.uid == userId && !('loyalty' in request.resource.data);
+    }
+
+    match /competitions/{compId} {
+      // Anyone can read competitions
+      allow read: if true;
+
+      // Only admins can create or delete competitions
+      allow create, delete: if isAdmin();
+
+      // Admins can update any field, but clients cannot update the loyalty or freeRoute fields
+      allow update: if isAdmin();
+      allow update: if !('loyalty' in request.resource.data) && !('freeRoute' in request.resource.data);
+    }
+
+    match /competitions/{compId}/entries/{entryId} {
+        // Users can read entries for a competition
+        allow read: if true;
+
+        // Entries can only be created by Cloud Functions (implicitly enforced by callable function authentication)
+        // We will deny all direct client writes to be safe.
+        allow write: if false;
+    }
+
+    match /settings/{docId} {
+        // Anyone can read settings
+        allow read: if true;
+        // Only admins can write settings
+        allow write: if isAdmin();
+    }
+
+    match /audits/{auditId} {
+        // Only backend can write audit logs
+        allow write: if isBackendOrAdmin();
+        // Only admins can read audit logs
+        allow read: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,23 @@
+
+/* Landing overrides (brand-respecting, no navigation) */
+
+/* Remove default main padding since there's no fixed header here */
+main { padding-top: 0 !important; }
+
+/* Tune hero to fully fill the first screen on most devices */
+.hero-home { height: 92vh; min-height: 640px; }
+
+/* Fit the Spline logo nicely within the hero logo block */
+.hero-logo { width: clamp(240px, 40vw, 520px); margin: 0 auto 1.5rem; }
+.hero-logo spline-viewer { display:block; width:100%; height:min(44vh, 380px); border-radius:16px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,0.35); }
+
+.hero-content h1 { margin-top: 1rem; }
+.hero-content .launch-pill { display:inline-block; padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05); font-size:12px; letter-spacing:.2px; }
+
+/* Showcase grid uses the existing competition grid classes */
+.showcase { margin-top: 2.5rem; }
+.hawk-card__footer .note { font-size: .9rem; color: #aaa; }
+.hawk-card__instant-win-badge { background: var(--primary-gold); color: var(--dark-bg); }
+
+/* Keep everything non-clickable */
+.hawk-card a, .hawk-card button { pointer-events: none; }

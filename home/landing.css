@@ -1,0 +1,149 @@
+
+/* Landing (pre-launch) — on-brand, no navigation/links */
+/* Uses app/css/hawk-games.css for variables, fonts, buttons, and card styling */
+
+:root{
+  --reel-speed: 34s; /* adjust to taste */
+}
+
+html, body { height: 100%; }
+body {
+  background: #121212 url('app/assets/hero-bg.png') center/cover no-repeat fixed;
+}
+
+/* Subtle vignette over the background */
+body::before{
+  content:""; position:fixed; inset:0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.75));
+  pointer-events:none;
+}
+
+/* ===== Layout ===== */
+.landing-wrap{
+  height: 100svh;
+  display: grid;
+  grid-template-columns: 1.05fr 1.25fr;
+  column-gap: clamp(16px, 3vw, 40px);
+  align-items: start;
+  padding: clamp(16px, 3vw, 32px);
+}
+
+.brand-pane{
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.brand-logo{
+  display:flex; align-items:center; gap: 12px;
+}
+
+.brand-logo img{
+  height: clamp(44px, 5vw, 56px);
+  display:block;
+  filter: drop-shadow(0 6px 20px rgba(0,0,0,0.5));
+}
+
+.tagline{
+  font-family: var(--font-heading);
+  font-size: clamp(22px, 3.6vw, 36px);
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+  text-shadow: 0 4px 18px rgba(0,0,0,0.45);
+}
+
+.launch-pill{
+  display:inline-block;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(6px);
+  color: var(--light-white);
+  margin-top: 6px;
+}
+
+.brand-sub{
+  color: #cfcfcf;
+  max-width: 48ch;
+  font-size: clamp(14px, 1.8vw, 16px);
+}
+
+/* ===== Reel (Right) ===== */
+.reel-pane{ position: relative; height: calc(100svh - 2*clamp(16px, 3vw, 32px)); }
+
+.reel-viewport{
+  position: absolute; inset: 0;
+  overflow: hidden;
+  /* fade top/bottom edges */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+
+.reel-track{
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: reelY var(--reel-speed) linear infinite;
+}
+
+.reel-track:hover { animation-play-state: paused; }
+
+.reel-list{ display: contents; } /* lists contribute children directly */
+
+/* Card sizing inside the reel */
+.reel-card.hawk-card{
+  width: 100%;
+  max-width: none;
+}
+.reel-card .hawk-card__image{
+  aspect-ratio: 16/9;
+  object-fit: cover;
+}
+
+/* ===== Motion switches for accessibility ===== */
+@media (prefers-reduced-motion: reduce){
+  .reel-track{ animation: none; }
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 900px){
+  .landing-wrap{
+    grid-template-columns: 1fr;
+    row-gap: 18px;
+    height: auto;
+    min-height: 100svh;
+  }
+  .reel-pane{
+    position: static;
+    height: auto;
+  }
+  .reel-viewport{
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  }
+  .reel-track{
+    flex-direction: row;
+    gap: 14px;
+    animation: reelX calc(var(--reel-speed) * 1.1) linear infinite;
+  }
+  .reel-card.hawk-card{
+    min-width: 78vw; /* horizontal swipe cards */
+    max-width: 78vw;
+  }
+}
+
+/* Keyframes for the infinite loop */
+@keyframes reelY{
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); } /* because we duplicate the list */
+}
+
+@keyframes reelX{
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}

@@ -1,16 +1,18 @@
+'use strict';
+
 import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { app } from './auth.js'; 
 
 const db = getFirestore(app);
 
-// --- SECURITY: Corrected helper function for safe element creation ---
+// --- SECURITY: Helper for safe element creation ---
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
         if (key === 'class') {
             const classes = Array.isArray(value) ? value : String(value).split(' ');
             classes.forEach(c => {
-                if (c) el.classList.add(c); // Check for empty strings
+                if (c) el.classList.add(c);
             });
         } else if (key === 'textContent') {
             el.textContent = value;
@@ -24,10 +26,8 @@ function createElement(tag, options = {}, children = []) {
     return el;
 }
 
-
 document.addEventListener('DOMContentLoaded', () => {
     loadAllCompetitions();
-    loadSpinnerCompetitions();
     loadPastWinners();
     initializeHeaderScroll();
     initializeHowItWorks();
@@ -72,16 +72,19 @@ const loadAllCompetitions = async () => {
     const heroContainer = document.getElementById('hero-competition-section');
     const mainGrid = document.getElementById('main-competition-grid');
     const instantWinGrid = document.getElementById('instant-win-grid');
+    const spinnerGrid = document.getElementById('spinner-competition-grid');
 
     try {
-        const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("endDate", "asc"));
+        const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
             instantWinGrid.innerHTML = '';
             mainGrid.innerHTML = '';
+            spinnerGrid.innerHTML = '';
             instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
             mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Main Prize competitions are live right now.'}));
+            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active.'}));
             heroContainer.style.display = 'none';
             return;
         }
@@ -89,14 +92,29 @@ const loadAllCompetitions = async () => {
         let heroComp = null;
         const mainComps = [];
         const instantWinComps = [];
+        const tokenComps = [];
 
         querySnapshot.forEach((doc) => {
             const compData = { id: doc.id, ...doc.data() };
-            if (compData.isHeroComp === true) heroComp = compData;
-            else if (compData.instantWinsConfig?.enabled === true) instantWinComps.push(compData);
-            else mainComps.push(compData);
+            
+            if (compData.isHeroComp === true) {
+                heroComp = compData;
+            } else {
+                switch (compData.competitionType) {
+                    case 'instant':
+                        instantWinComps.push(compData);
+                        break;
+                    case 'token':
+                        tokenComps.push(compData);
+                        break;
+                    case 'main':
+                    default:
+                        mainComps.push(compData);
+                        break;
+                }
+            }
         });
-
+        
         heroContainer.innerHTML = '';
         if (heroComp) {
             heroContainer.append(createHeroCompetitionCard(heroComp));
@@ -107,11 +125,19 @@ const loadAllCompetitions = async () => {
 
         mainGrid.innerHTML = '';
         if (mainComps.length > 0) mainComps.forEach(comp => mainGrid.append(createCompetitionCard(comp)));
-        else mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No other main prize competitions are live right now.'}));
+        else mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No main prize competitions are live right now.'}));
 
         instantWinGrid.innerHTML = '';
         if (instantWinComps.length > 0) instantWinComps.forEach(comp => instantWinGrid.append(createCompetitionCard(comp)));
         else instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
+        
+        spinnerGrid.innerHTML = '';
+        if (tokenComps.length > 0) {
+            // Render a single CTA card instead of all token comps
+             spinnerGrid.append(createTokenCompetitionCTA(tokenComps[0]));
+        } else {
+            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active right now.'}));
+        }
 
         startAllCountdowns();
 
@@ -119,31 +145,6 @@ const loadAllCompetitions = async () => {
         console.error("Error loading competitions:", error);
         mainGrid.innerHTML = '';
         mainGrid.append(createElement('div', { class: 'hawk-card placeholder', style: {color: 'red'}, textContent: 'Could not load competitions.'}));
-    }
-};
-
-const loadSpinnerCompetitions = async () => {
-    const spinnerGrid = document.getElementById('spinner-competition-grid');
-    if (!spinnerGrid) return;
-    spinnerGrid.innerHTML = '';
-
-    try {
-        const q = query(collection(db, "spinner_competitions"), where("isActive", "==", true));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No spinner competitions are active.'}));
-            return;
-        }
-
-        querySnapshot.forEach(doc => {
-            const data = { id: doc.id, ...doc.data() };
-            spinnerGrid.append(createSpinnerCompetitionCard(data));
-        });
-
-    } catch (error) {
-        console.error("Error loading spinner competitions:", error);
-        spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', style: {color: 'red'}, textContent: 'Could not load spinner competitions.'}));
     }
 };
 
@@ -167,7 +168,7 @@ const loadPastWinners = async () => {
 
     } catch (error) {
         console.error("Error loading past winners:", error);
-        winnersGrid.append(createElement('div', { class: 'placeholder', style: {color: 'red'}, textContent: 'Could not load winner information.'}));
+        winnersGrid.innerHTML = '<div class="placeholder" style="color:red;">Could not load winner information.</div>';
     }
 };
 
@@ -210,18 +211,22 @@ function createHeroCompetitionCard(compData) {
 
 function createCompetitionCard(compData) {
     const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
-    const endDate = compData.endDate.toDate();
+    const endDate = compData.endDate ? compData.endDate.toDate() : null;
     const price = compData.ticketTiers?.[0]?.price || 0.00;
     const instantWinBadge = compData.instantWinsConfig?.enabled 
         ? createElement('div', { class: 'hawk-card__instant-win-badge', textContent: '⚡️ Instant Wins' })
         : null;
+
+    const timerElement = endDate
+        ? createElement('div', { class: 'hawk-card__timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' })
+        : createElement('div', { class: 'hawk-card__timer', textContent: 'Draws Weekly' });
 
     return createElement('a', { href: `competition.html?id=${compData.id}`, class: 'hawk-card' }, [
         instantWinBadge,
         createElement('img', { src: compData.prizeImage || 'https://via.placeholder.com/600x400.png?text=Prize', alt: compData.title, class: 'hawk-card__image' }),
         createElement('div', { class: 'hawk-card__content' }, [
             createElement('h3', { class: 'hawk-card__title', textContent: compData.title }),
-            createElement('div', { class: 'hawk-card__timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' }),
+            timerElement,
             createElement('div', { class: 'progress-bar' }, [
                 createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })
             ]),
@@ -234,14 +239,16 @@ function createCompetitionCard(compData) {
     ]);
 }
 
-function createSpinnerCompetitionCard(data) {
+function createTokenCompetitionCTA(compData) {
+    const price = compData.ticketTiers?.[0]?.price || 0.00;
+
     return createElement('a', { href: 'instant-games.html', class: ['hawk-card', 'spinner-comp-card'] }, [
         createElement('div', { class: 'hawk-card__content' }, [
-            createElement('h3', { class: 'hawk-card__title', textContent: data.title }),
-            createElement('p', { class: 'spinner-comp-prize' }, ['Prize: ', createElement('strong', { textContent: data.prize })]),
-            createElement('p', { class: 'spinner-comp-cta-text', textContent: 'Enter the weekly draw to get bonus spin tokens instantly!' }),
+             createElement('h3', { class: 'hawk-card__title', textContent: "Weekly Token Draw" }),
+             createElement('p', { class: 'spinner-comp-prize' }, ['Prize: ', createElement('strong', { textContent: `£${compData.cashAlternative} Cash` })]),
+             createElement('p', { class: 'spinner-comp-cta-text', textContent: 'Enter the weekly draw to get bonus spin tokens instantly!' }),
             createElement('div', { class: 'hawk-card__footer' }, [
-                createElement('span', { class: 'hawk-card__price', textContent: 'From £4.50' }),
+                createElement('span', { class: 'hawk-card__price', textContent: `From £${price.toFixed(2)}` }),
                 createElement('span', { class: 'btn', textContent: 'Get Spins' })
             ])
         ])
@@ -249,14 +256,14 @@ function createSpinnerCompetitionCard(data) {
 }
 
 function startAllCountdowns() {
-    const timerElements = document.querySelectorAll('.hawk-card__timer, .hero-card-timer');
+    const timerElements = document.querySelectorAll('.hawk-card__timer[data-end-date], .hero-card-timer[data-end-date]');
     if (timerElements.length === 0) return;
 
     const updateTimers = () => {
         timerElements.forEach(timer => {
             const endDate = new Date(timer.dataset.endDate);
             const distance = endDate.getTime() - new Date().getTime();
-            timer.innerHTML = ''; // Clear previous content
+            timer.innerHTML = ''; 
 
             if (distance < 0) {
                 timer.append(createElement('strong', { textContent: "Competition Closed" }));

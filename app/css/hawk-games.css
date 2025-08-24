@@ -37,6 +37,14 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .placeholder { padding: 4rem; text-align: center; font-family: var(--font-heading); color: #888; }
 
 /* --- 3. Layout: Header & Footer --- */
+.dev-banner {
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
 .main-header { position: fixed; top: 0; left: 0; width: 100%; z-index: 100; padding: 1.5rem 0; background-color: transparent; border-bottom: 1px solid transparent; transition: background-color 0.3s ease, border-color 0.3s ease, padding 0.3s ease; }
 .main-header.scrolled { background-color: rgba(18, 18, 18, 0.8); backdrop-filter: blur(10px); border-color: var(--border-color); padding: 1rem 0; }
 .main-header .container, .main-footer .container { display: flex; justify-content: space-between; align-items: center; }
@@ -69,6 +77,12 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .mobile-nav-links .instant-win-nav-item { flex-direction: column; gap: 1rem; }
 .mobile-nav-links .token-indicator { font-size: 1.2rem; }
 .mobile-nav-links .credit-balance { margin-bottom: 1rem; padding: 0.75rem 1.5rem; }
+
+body.noscroll {
+  position: fixed;
+  left: 0;
+  width: 100%;
+}
 
 body.mobile-nav-open .mobile-nav-overlay { transform: translateX(0); }
 body.mobile-nav-open .hamburger-btn span:nth-child(1) { transform: rotate(45deg) translate(2px, -1px); }
@@ -364,6 +378,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 @media (max-width: 768px) {
+    .main-comp-layout {
+        flex-direction: column;
+    }
     .main-nav-desktop { display: none; }
     .hero-home { background-image: url('../assets/hero-bg-mobile.png'); }
     .hero-card-title { font-size: 2rem; }
@@ -389,4 +406,882 @@ input:checked + .slider:before { transform: translateX(26px); }
 @media (min-width: 992px) {
     .hamburger-btn, .mobile-nav-overlay, .admin-hamburger { display: none; }
     .main-nav-desktop { display: flex; }
+}
+
+
+/* --- 20. Instant Win Celebration Animations --- */
+.spin-result-container.is-winner {
+    animation: glow-gold 1.5s ease-out forwards;
+}
+
+@keyframes glow-gold {
+    0% { box-shadow: 0 0 0px rgba(224, 169, 74, 0); }
+    50% { box-shadow: 0 0 40px 10px rgba(224, 169, 74, 0.7); }
+    100% { box-shadow: 0 0 0px rgba(224, 169, 74, 0); }
+}
+
+.prize-pop-in {
+    animation: pop-in 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+    transform: scale(0);
+}
+
+@keyframes pop-in {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.confetti-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.confetti {
+    position: absolute;
+    width: 8px;
+    height: 16px;
+    background-color: var(--primary-gold);
+    top: -20px;
+    opacity: 0;
+    animation: confetti-fall 4s ease-out infinite;
+}
+
+.confetti:nth-child(odd) {
+    background-color: var(--light-white);
+}
+
+@keyframes confetti-fall {
+    0% {
+        transform: translateY(0) rotateZ(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotateZ(720deg);
+        opacity: 0;
+    }
+}
+
+/* --- 21. Win Celebration Modal Animations --- */
+.win-celebration-modal .modal-content {
+    background: radial-gradient(circle, #2a2a2a 0%, var(--card-bg) 100%);
+    border: 2px solid var(--primary-gold);
+    box-shadow: 0 0 50px 10px rgba(224, 169, 74, 0.4);
+    transform: scale(0);
+    animation: scale-in-bounce 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+}
+
+.win-celebration-modal.closing .modal-content {
+    animation: scale-out 0.3s ease-in forwards;
+}
+
+@keyframes scale-in-bounce {
+    0% { transform: scale(0); }
+    70% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes scale-out {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.7); opacity: 0; }
+}
+
+.win-modal-icon {
+    font-size: 5rem;
+    line-height: 1;
+    margin-bottom: 1rem;
+    filter: drop-shadow(0 0 15px var(--primary-gold));
+    animation: trophy-shine 2s infinite;
+}
+
+@keyframes trophy-shine {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+.win-modal-heading {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    font-size: 1.5rem;
+    color: #ccc;
+    letter-spacing: 2px;
+}
+
+.win-modal-prize-value {
+    font-family: var(--font-heading);
+    font-size: clamp(3rem, 15vw, 6rem);
+    font-weight: 700;
+    color: var(--primary-gold);
+    line-height: 1.1;
+    margin: 0.5rem 0;
+    text-shadow: 0 0 20px rgba(224, 169, 74, 0.8);
+}
+
+.win-modal-prize-type {
+    font-family: var(--font-body);
+    font-size: 1.2rem;
+    color: #fff;
+    font-weight: bold;
+    margin-bottom: 2rem;
+}
+
+.win-modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+}
+
+.win-modal-actions .btn {
+    width: 100%;
+    max-width: 300px;
+    padding: 1rem;
+    font-size: 1.2rem;
+}
+
+.win-modal-actions .btn-secondary {
+    background: none;
+    border: none;
+    color: #888;
+    text-decoration: underline;
+    font-size: 1rem;
+}
+
+.win-modal-actions .btn-secondary:hover {
+    color: var(--light-white);
+}
+
+.win-modal-token-info {
+    font-size: 0.9rem;
+    color: #aaa;
+    min-height: 1.2em;
+}
+
+/* --- 22. ReCAPTCHA Badge Hiding --- */
+/* This rule is required by Google's ToS when displaying your own compliance text. */
+.grecaptcha-badge {
+    visibility: hidden !important;
+}
+
+/* --- 23. New Footer Design (Refined) --- */
+.main-footer {
+    background-color: #0a0a0a;
+    border-top: 2px solid var(--border-color);
+    padding: 4rem 0 0 0; /* More top padding, no bottom padding */
+    margin-top: 5rem;
+    font-size: 0.95rem;
+}
+
+.main-footer .container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 3rem; /* Increased gap for better spacing */
+    padding-bottom: 4rem;
+}
+
+.footer-column {
+    flex: 1;
+    min-width: 240px;
+}
+
+/* Column 1: Brand */
+.footer-brand .logo {
+    max-width: 160px;
+    margin-bottom: 1.5rem;
+}
+
+.footer-brand .tagline {
+    color: #aaa;
+    max-width: 280px;
+    line-height: 1.7;
+}
+
+/* Columns 2 & 3: Links & Social */
+.footer-column h4 {
+    font-family: var(--font-heading);
+    color: var(--primary-gold);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.footer-links ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-links li {
+    margin-bottom: 1rem;
+}
+
+.footer-links a {
+    color: #ccc;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer-links a:hover {
+    color: var(--primary-gold);
+}
+
+.footer-social-icons {
+    display: flex;
+    gap: 1.25rem;
+}
+
+.footer-social-icons a {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: #888;
+    transition: all 0.3s ease;
+}
+
+.footer-social-icons a:hover {
+    color: var(--primary-gold);
+    border-color: var(--primary-gold);
+    transform: translateY(-3px);
+    background-color: rgba(224, 169, 74, 0.1);
+}
+
+.footer-social-icons svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* Bottom Bar for Copyright & Compliance */
+.footer-bottom-bar {
+    background-color: #000;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.footer-bottom-bar .container {
+    padding-bottom: 0;
+    gap: 1rem;
+    align-items: center;
+}
+
+.footer-copyright,
+.recaptcha-notice {
+    font-size: 0.8rem;
+    color: #777;
+    flex-grow: 1;
+}
+
+.recaptcha-notice {
+    text-align: right;
+}
+
+.recaptcha-notice a {
+    color: #aaa;
+    text-decoration: none;
+}
+
+.recaptcha-notice a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .main-footer .container {
+        flex-direction: column;
+        text-align: center;
+    }
+    .footer-brand .tagline {
+        margin: 0 auto;
+    }
+    .footer-social-icons {
+        justify-content: center;
+    }
+    .footer-bottom-bar .container {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    .footer-copyright,
+    .recaptcha-notice {
+        text-align: center;
+    }
+}
+/* =================================================== */
+/* ==       SECTION 24: INSTANT GAMES HUB           == */
+/* =================================================== */
+
+.game-tabs {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 3rem;
+}
+
+.game-tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 4px solid transparent;
+    position: relative;
+    top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.game-tab-btn:hover {
+    color: var(--light-white);
+}
+
+.game-tab-btn.active {
+    color: var(--primary-gold);
+    border-bottom-color: var(--primary-gold);
+}
+
+/*.plinko-icon {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background-color: #4a69e0;
+    border-radius: 50%;
+}*/
+
+.game-panel, .game-controls-panel {
+    display: none;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.game-panel.active, .game-controls-panel.active {
+    display: block;
+}
+
+/* --- Layout Switching Logic --- */
+.instant-win-layout.spinner-active {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 3rem;
+    align-items: flex-start;
+}
+
+/*.instant-win-layout.plinko-active {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+}
+
+.balance-row .btn-buy-plinko-tokens {
+    font-size: 1.8rem;
+    line-height: 1;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    background-color: #222;
+    color: #888;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.balance-row .btn-buy-plinko-tokens:hover {
+    background-color: #333;
+    color: var(--light-white);
+}
+
+/* NEW: Plinko Controls Panel */
+/*.plinko-controls-panel {
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    align-items: center;
+}
+
+.plinko-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.plinko-actions .btn {
+    flex-grow: 1;
+    padding: 1.2rem;
+    font-size: 1.2rem;
+}
+
+.plinko-balance h3 {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}*/
+
+@media(max-width: 768px) {
+    .instant-win-layout.spinner-active {
+        grid-template-columns: 1fr;
+    }
+    .plinko-controls-panel {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =================================================== */
+/* ==     SECTION 25: IMPROVED PURCHASE MODAL       == */
+/* =================================================== */
+
+.purchase-modal-content {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; /* Ensure modal doesn't overflow viewport height */
+}
+
+#purchase-modal-body {
+    padding: 2rem;
+    overflow-y: auto; /* Enable scrolling for content */
+}
+
+#purchase-modal-body h2 {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    text-transform: uppercase;
+    color: var(--primary-gold);
+}
+
+#purchase-modal-body p {
+    color: #aaa;
+    margin: 0.5rem 0 2rem 0;
+}
+
+.modal-form .skill-question-box,
+.modal-form .ticket-selector-box {
+    text-align: left;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--dark-bg);
+    border-radius: 4px;
+}
+
+.modal-form .question-text {
+    font-size: 1.1rem;
+    color: var(--light-white);
+    margin-bottom: 1rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    background-color: #111;
+}
+
+/* =================================================== */
+/* ==          SECTION 26: PLINKO STYLES            == */
+/* == (Migrated from plinko-mvp.html for integration)== */
+/* =================================================== */
+/*
+.plinko-game-panel.card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, .0));
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+    position: relative;
+    overflow: hidden;
+}
+
+.plinko-game-panel.card .hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 0 16px;
+}
+
+.plinko-game-panel.card .bd {
+    padding: 14px 16px 16px 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.plinko-game-panel.card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 16px;
+    background: radial-gradient(800px 200px at 50% -10%, rgba(224, 169, 74, .14), transparent 60%);
+    mix-blend-mode: screen;
+    opacity: .4;
+}
+
+.plinko-game-panel h1 {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    margin: 8px 0;
+}
+
+/* Plinko Board */
+.plinko-game-panel .board {
+    margin: 10px 0 18px 0;
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+    background: #0f1013;
+    border: 1px solid #181920;
+    box-shadow: inset 0 -30px 120px rgba(0, 0, 0, .55), inset 0 2px 0 rgba(255, 255, 255, .02);
+    max-width: 800px;
+    width: 100%;
+}
+
+.plinko-game-panel .board::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(600px 280px at 50% 0%, rgba(224, 169, 74, .12), transparent 65%), radial-gradient(300px 160px at 48% 20%, rgba(224, 169, 74, .06), transparent 60%);
+    opacity: .6;
+}
+
+.plinko-game-panel .dropzone {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 14px;
+    color: #bfbfbf;
+    font-size: 12px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .8);
+    animation: dz 2.4s ease-in-out infinite;
+    user-select: none;
+    pointer-events: none;
+}
+
+@keyframes dz {
+    0%, 100% { opacity: .85; transform: translateX(-50%) translateY(0); }
+    50% { opacity: .55; transform: translateX(-50%) translateY(1px); }
+}
+
+.plinko-game-panel svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.plinko-game-panel .peg {
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .8));
+    fill: url(#goldGrad); 
+    stroke: #d09832;
+    stroke-width: .75;
+}
+
+.plinko-game-panel .pocket {
+    fill: #14151b;
+    stroke: #262832;
+    rx: 10;
+}
+
+/* FIX: Improved prize label styling */
+.plinko-game-panel .payoutLabel {
+    fill: var(--primary-gold);
+    font-family: var(--font-heading); /* Oswald font */
+    font-weight: 700;
+    font-size: 1.2rem;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    opacity: 0.8;
+}
+
+.plinko-game-panel .slotLabel {
+    fill: #bfbfbf;
+    font-size: 12px;
+}
+
+/* Plinko Controls (from MVP) */
+.plinko-actions .btn-primary {
+    background: linear-gradient(180deg, #f4d488, var(--primary-gold));
+    color: #1a1a1a;
+    box-shadow: 0 8px 30px rgba(224, 169, 74, .25), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+.plinko-actions .btn-ghost { background:#1a1b21; border-color: #333; color: var(--light-white); }
+.plinko-actions .btn:active { transform: translateY(1px) scale(.99); }
+.plinko-actions .btn-primary:hover { filter:brightness(1.03); }
+.plinko-actions .btn-ghost:hover { border-color:#444; background-color: #222; }
+
+.plinko-game-panel .chips {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.plinko-game-panel .chip {
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: #bfbfbf;
+    font-size: 12px;
+    background: #101117;
+}
+
+.plinko-confetti {
+    position: fixed;
+    width: 6px;
+    height: 10px;
+    background: var(--primary-gold);
+    left: 50%;
+    top: 40%;
+    opacity: .95;
+    transform: translateX(-50%);
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(224, 169, 74, .6);
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .plinko-game-panel .dropzone, .plinko-confetti { animation: none; transition: none }
+}
+*/
+
+/* =================================================== */
+/* ==   SECTION 28: COMPETITION PAGE 3D VIEWER      == */
+/* =================================================== */
+
+.view-toggle-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+.views-container {
+    position: relative;
+}
+
+.view-panel {
+    display: none;
+}
+
+.view-panel.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out; /* Re-use existing fadeIn animation */
+}
+
+.spline-view {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background-color: #000; /* Black background for the container */
+    border-radius: 5px;
+    overflow: hidden; /* Hide anything that might spill out */
+}
+
+.spline-view spline-viewer {
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
+}
+
+/* Showcase Page Styles */
+body[data-page="showcase"] {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    margin: 0;
+}
+
+body[data-page="showcase"] .main-header {
+    flex-shrink: 0;
+    position: static; /* Override sticky/fixed header for this page */
+}
+
+body[data-page="showcase"] .main-footer {
+    flex-shrink: 0;
+}
+
+main.showcase-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+/* =================================================== */
+/* ==      SECTION 27: MULTI-SPIN & PRIZE REVEAL    == */
+/* =================================================== */
+
+.spin-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+}
+
+.btn-spin {
+    flex-grow: 1;
+    max-width: 150px;
+    padding: 1rem;
+    font-size: 1.1rem;
+}
+
+#spin-prize-reveal {
+    position: relative;
+    min-height: 50px;
+    width: 100%;
+    max-width: 400px;
+    margin: 1rem auto;
+    border: 2px dashed var(--border-color);
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 1rem;
+}
+
+#spin-prize-reveal:hover {
+    border-color: var(--primary-gold);
+    background-color: rgba(224, 169, 74, 0.05);
+}
+
+#spin-prize-reveal::before {
+    content: 'Click to reveal prize';
+    font-family: var(--font-heading);
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 1rem;
+    position: absolute;
+    transition: opacity 0.3s ease;
+}
+
+#spin-prize-reveal .spin-result-container {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#spin-prize-reveal.revealed {
+    border-style: solid;
+    border-color: transparent;
+    background-color: transparent;
+    cursor: default;
+}
+
+#spin-prize-reveal.revealed::before {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#spin-prize-reveal.revealed .spin-result-container {
+    opacity: 1;
+}
+
+#spin-prize-reveal.is-spinning {
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.5;
+}
+
+#spin-prize-reveal.is-spinning::before {
+    content: 'Spinning...';
+}
+
+.multi-win-modal .modal-content {
+    max-width: 500px;
+}
+
+.multi-win-results-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.multi-win-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--dark-bg);
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateX(-20px);
+    animation: fadeInSlideIn 0.5s ease-out forwards;
+}
+
+.multi-win-item.is-cash {
+    border-left: 4px solid var(--success-green);
+}
+
+.multi-win-item.is-credit {
+    border-left: 4px solid var(--primary-gold);
+}
+
+.multi-win-prize-type {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.multi-win-prize-value {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--primary-gold);
+}
+
+.multi-win-total {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    text-align: right;
+}
+
+.multi-win-total h3 {
+    font-family: var(--font-heading);
+    font-size: 1.8rem;
+    color: var(--primary-gold);
+}
+
+@keyframes fadeInSlideIn {
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+main.showcase-container spline-viewer {
+    flex-grow: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
 }

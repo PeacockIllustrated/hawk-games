@@ -241,10 +241,30 @@ async function handleMultiSpin(spinCount) {
     const finalAngle = baseSpins + randomAdditionalRotation;
     const spinDuration = 2 + spinCount * 0.5; // Longer duration
 
+    // Animate token count
+    const initialTokenCount = userTokens.length;
+    const endTokenCount = initialTokenCount - spinCount;
+    const countdownDuration = spinDuration * 1000; // ms
+    const tickDuration = countdownDuration / spinCount;
+
+    let displayTokenCount = initialTokenCount;
+
+    const countdownInterval = setInterval(() => {
+        displayTokenCount--;
+        if (displayTokenCount >= endTokenCount) {
+            tokenCountElement.textContent = displayTokenCount;
+        }
+        if (displayTokenCount < endTokenCount) {
+             clearInterval(countdownInterval);
+        }
+    }, tickDuration);
+
+
     wheel.style.transition = `transform ${spinDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
     wheel.style.transform = `rotate(${finalAngle}deg)`;
 
     setTimeout(() => {
+        clearInterval(countdownInterval); // Ensure interval is cleared
         const wins = spinResults.filter(r => r.won);
         if (wins.length > 1) {
             showMultiWinModal(wins);

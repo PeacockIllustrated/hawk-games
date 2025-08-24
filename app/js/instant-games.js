@@ -242,20 +242,14 @@ async function handleMultiSpin(spinCount) {
     const spinDuration = 2 + spinCount * 0.5; // Longer duration
 
     // Animate token count
-    const initialTokenCount = userTokens.length;
-    const endTokenCount = initialTokenCount - spinCount;
-    const countdownDuration = spinDuration * 1000; // ms
-    const tickDuration = countdownDuration / spinCount;
-
-    let displayTokenCount = initialTokenCount;
-
+    const tickDuration = 200; // ms
+    let ticks = spinCount;
     const countdownInterval = setInterval(() => {
-        displayTokenCount--;
-        if (displayTokenCount >= endTokenCount) {
-            tokenCountElement.textContent = displayTokenCount;
-        }
-        if (displayTokenCount < endTokenCount) {
-             clearInterval(countdownInterval);
+        if (ticks > 0) {
+            tokenCountElement.textContent = parseInt(tokenCountElement.textContent) - 1;
+            ticks--;
+        } else {
+            clearInterval(countdownInterval);
         }
     }, tickDuration);
 

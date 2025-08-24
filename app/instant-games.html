@@ -39,11 +39,17 @@
                             <div class="wheel-container">
                                 <div class="wheel-pointer"></div>
                                 <div id="wheel" class="wheel"></div>
-                                <button id="spin-button" class="btn-spin-center" disabled>SPIN</button>
                             </div>
                         </div>
                         <div class="spin-panel-footer">
-                            <div id="spin-result" class="spin-result-container"></div>
+                            <div class="spin-actions">
+                                <button id="spin-button" class="btn-spin" data-spin-amount="1" disabled>Spin x1</button>
+                                <button id="spin-x3-button" class="btn-spin" data-spin-amount="3" disabled>Spin x3</button>
+                                <button id="spin-x5-button" class="btn-spin" data-spin-amount="5" disabled>Spin x5</button>
+                            </div>
+                            <div id="spin-prize-reveal">
+                                <div id="spin-result" class="spin-result-container"></div>
+                            </div>
                             <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
                         </div>
                     </div>

@@ -33,6 +33,9 @@ const winCelebrationModal = document.getElementById('win-celebration-modal');
 // Spinner Elements
 const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
+const spinX3Button = document.getElementById('spin-x3-button');
+const spinX5Button = document.getElementById('spin-x5-button');
+const spinPrizeReveal = document.getElementById('spin-prize-reveal');
 const spinResultContainer = document.getElementById('spin-result');
 const showPrizesBtn = document.getElementById('show-prizes-btn');
 const prizesModal = document.getElementById('prizes-modal');
@@ -117,15 +120,13 @@ async function loadAllGameSettings() {
 
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
-    // plinkoTokenCountElement.textContent = userPlinkoTokens.length;
-    // plinkoBalanceDisplay.textContent = userPlinkoTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
-    
-    // const canPlayPlinko = userPlinkoTokens.length > 0 && plinkoActiveBalls < MAX_PLINKO_BALLS;
-    // plinkoDrop1Btn.disabled = !canPlayPlinko;
-    // plinkoDrop3Btn.disabled = !(canPlayPlinko && userPlinkoTokens.length >= 3);
-    
-    spinButton.disabled = userTokens.length === 0 || isSpinning;
+
+    const tokensAvailable = userTokens.length;
+    spinButton.disabled = tokensAvailable < 1 || isSpinning;
+    spinX3Button.disabled = tokensAvailable < 3 || isSpinning;
+    spinX5Button.disabled = tokensAvailable < 5 || isSpinning;
+
     renderTokenAccordion();
 }
 
@@ -177,25 +178,8 @@ function renderPrizesTable(prizes) {
 function showWinCelebrationModal(prizeType, value, game = 'spinner') {
     const prizeValueText = `£${value.toFixed(2)}`;
     const prizeTypeText = prizeType === 'credit' ? "SITE CREDIT" : "CASH";
-    const remainingTokens = userTokens.length;
 
-    const playAgainBtn = createElement('button', { class: 'btn', textContent: `Play Spinner Again` });
-    const tokenInfo = createElement('p', { class: 'win-modal-token-info' });
-
-    if (remainingTokens > 0) {
-        tokenInfo.textContent = `You have ${remainingTokens} token${remainingTokens > 1 ? 's' : ''} left.`;
-        playAgainBtn.disabled = false;
-    } else {
-        tokenInfo.textContent = 'No tokens remaining.';
-        playAgainBtn.disabled = true;
-    }
-    
-    playAgainBtn.addEventListener('click', () => {
-        closeWinCelebrationModal();
-        setTimeout(handleSpin, 400);
-    }, { once: true });
-
-    const closeBtn = createElement('button', { class: 'btn btn-secondary', textContent: 'Close' });
+    const closeBtn = createElement('button', { class: 'btn', textContent: 'Close' });
     closeBtn.addEventListener('click', closeWinCelebrationModal, { once: true });
 
     const modalContent = createElement('div', { class: 'modal-content' }, [
@@ -203,7 +187,7 @@ function showWinCelebrationModal(prizeType, value, game = 'spinner') {
         createElement('p', { class: 'win-modal-heading', textContent: 'YOU WON!' }),
         createElement('h2', { class: 'win-modal-prize-value', textContent: prizeValueText }),
         createElement('p', { class: 'win-modal-prize-type', textContent: prizeTypeText }),
-        createElement('div', { class: 'win-modal-actions' }, [playAgainBtn, tokenInfo, closeBtn])
+        createElement('div', { class: 'win-modal-actions' }, [closeBtn])
     ]);
     
     const confettiContainer = createElement('div', { class: 'confetti-container' });
@@ -225,44 +209,99 @@ function closeWinCelebrationModal() {
     }, 300);
 }
 
-async function handleSpin() {
-    if (userTokens.length === 0 || isSpinning) return;
+async function handleMultiSpin(spinCount) {
+    if (userTokens.length < spinCount || isSpinning) return;
+
     isSpinning = true;
-    spinButton.disabled = true;
-    spinButton.textContent = '...';
+    updateUI();
+    spinPrizeReveal.classList.remove('revealed');
+    spinPrizeReveal.classList.add('is-spinning');
     spinResultContainer.innerHTML = '';
+
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
     void wheel.offsetWidth;
-    const tokenToSpend = userTokens[0];
+
+    const spinResults = [];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
-    try {
-        const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
-        const { won, prizeType, value } = result.data;
-        const baseSpins = 360 * 3;
-        const randomAdditionalRotation = Math.random() * 360;
-        const finalAngle = baseSpins + randomAdditionalRotation;
-        wheel.style.transition = 'transform 3s cubic-bezier(0.25, 0.1, 0.25, 1)';
-        wheel.style.transform = `rotate(${finalAngle}deg)`;
-        setTimeout(() => {
-            if (won) {
-                showWinCelebrationModal(prizeType, value, 'spinner');
-            } else {
-                spinResultContainer.append(createElement('p', { textContent: 'Better luck next time!' }));
-            }
-            isSpinning = false;
-            spinButton.textContent = 'SPIN';
-            updateUI();
-        }, 3500);
-    } catch (error) {
-        console.error("Error spending token:", error);
-        spinResultContainer.innerHTML = `<p class="spin-error">Error: ${error.message}</p>`;
-        isSpinning = false;
-        spinButton.textContent = 'SPIN';
-        updateUI();
+
+    for (let i = 0; i < spinCount; i++) {
+        const tokenToSpend = userTokens[i];
+        try {
+            const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
+            spinResults.push(result.data);
+        } catch (error) {
+            console.error(`Error on spin ${i + 1}:`, error);
+            spinResults.push({ won: false, error: error.message });
+        }
     }
+
+    const baseSpins = 360 * (2 + spinCount); // Longer spin for more items
+    const randomAdditionalRotation = Math.random() * 360;
+    const finalAngle = baseSpins + randomAdditionalRotation;
+    const spinDuration = 2 + spinCount * 0.5; // Longer duration
+
+    wheel.style.transition = `transform ${spinDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+    wheel.style.transform = `rotate(${finalAngle}deg)`;
+
+    setTimeout(() => {
+        const wins = spinResults.filter(r => r.won);
+        if (wins.length > 1) {
+            showMultiWinModal(wins);
+        } else if (wins.length === 1) {
+            showWinCelebrationModal(wins[0].prizeType, wins[0].value, 'spinner');
+        } else {
+            spinResultContainer.innerHTML = '';
+            spinResultContainer.append(createElement('p', { textContent: 'Better luck next time!' }));
+        }
+
+        isSpinning = false;
+        spinPrizeReveal.classList.remove('is-spinning');
+        updateUI();
+    }, spinDuration * 1000 + 500);
 }
-spinButton.addEventListener('click', handleSpin);
+
+function showMultiWinModal(wins) {
+    const totalCredit = wins.filter(w => w.prizeType === 'credit').reduce((acc, w) => acc + w.value, 0);
+    const totalCash = wins.filter(w => w.prizeType === 'cash').reduce((acc, w) => acc + w.value, 0);
+
+    const resultsList = createElement('div', { class: 'multi-win-results-list' });
+    wins.forEach((win, index) => {
+        const prizeItem = createElement('div', { class: ['multi-win-item', `is-${win.prizeType}`], style: { animationDelay: `${index * 0.2}s` } }, [
+            createElement('span', { class: 'multi-win-prize-type', textContent: `${win.prizeType === 'credit' ? 'Site Credit' : 'Cash'}` }),
+            createElement('span', { class: 'multi-win-prize-value', textContent: `£${win.value.toFixed(2)}` })
+        ]);
+        resultsList.append(prizeItem);
+    });
+
+    const totalSection = createElement('div', { class: 'multi-win-total' }, [
+        createElement('h3', { textContent: `Total Won: £${(totalCredit + totalCash).toFixed(2)}` })
+    ]);
+
+    const closeBtn = createElement('button', { class: 'btn', textContent: 'Awesome!' });
+    closeBtn.addEventListener('click', closeWinCelebrationModal, { once: true });
+
+    const modalContent = createElement('div', { class: 'modal-content' }, [
+        createElement('div', { class: 'win-modal-icon', textContent: '🎉' }),
+        createElement('p', { class: 'win-modal-heading', textContent: 'MULTIPLE WINS!' }),
+        resultsList,
+        totalSection,
+        createElement('div', { class: 'win-modal-actions' }, [closeBtn])
+    ]);
+
+    winCelebrationModal.innerHTML = '';
+    winCelebrationModal.append(modalContent);
+    winCelebrationModal.classList.add('show', 'multi-win-modal');
+}
+
+spinButton.addEventListener('click', () => handleMultiSpin(1));
+spinX3Button.addEventListener('click', () => handleMultiSpin(3));
+spinX5Button.addEventListener('click', () => handleMultiSpin(5));
+
+spinPrizeReveal.addEventListener('click', () => {
+    if (isSpinning || spinPrizeReveal.classList.contains('revealed')) return;
+    spinPrizeReveal.classList.add('revealed');
+});
 
 
 // --- Plinko Logic ---

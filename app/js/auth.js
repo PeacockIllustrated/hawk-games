@@ -127,6 +127,12 @@ function renderHeader(user) {
     if (!headerEl) return;
     headerEl.innerHTML = '';
 
+    // Remove previous overlay if it exists to prevent duplicates on re-render
+    const existingOverlay = document.getElementById('mobile-nav-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+
     const devBanner = createElement('div', {
         class: 'dev-banner',
         textContent: 'Currently under development. Any tickets acquired or prizes won will not be valid or redeemable, even after full launch.'
@@ -173,10 +179,25 @@ function renderHeader(user) {
     const mobileNav = createElement('nav', { class: 'mobile-nav-links' }, createNavLinks(true));
     const mobileOverlay = createElement('div', { id: 'mobile-nav-overlay', class: 'mobile-nav-overlay' }, [mobileNav]);
 
-    headerEl.append(container, mobileOverlay);
+    headerEl.append(container);
+    document.body.append(mobileOverlay);
 
     hamburgerBtn.addEventListener('click', () => {
-        document.body.classList.toggle('mobile-nav-open');
+        const body = document.body;
+        const isOpen = body.classList.contains('mobile-nav-open');
+
+        if (isOpen) {
+            body.classList.remove('mobile-nav-open');
+            body.classList.remove('noscroll');
+            const scrollY = body.style.top;
+            body.style.top = '';
+            window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        } else {
+            const scrollY = window.scrollY;
+            body.style.top = `-${scrollY}px`;
+            body.classList.add('noscroll');
+            body.classList.add('mobile-nav-open');
+        }
     });
 
     mobileNav.addEventListener('click', (e) => {

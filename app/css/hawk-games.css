@@ -78,6 +78,12 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .mobile-nav-links .token-indicator { font-size: 1.2rem; }
 .mobile-nav-links .credit-balance { margin-bottom: 1rem; padding: 0.75rem 1.5rem; }
 
+body.noscroll {
+  position: fixed;
+  left: 0;
+  width: 100%;
+}
+
 body.mobile-nav-open .mobile-nav-overlay { transform: translateX(0); }
 body.mobile-nav-open .hamburger-btn span:nth-child(1) { transform: rotate(45deg) translate(2px, -1px); }
 body.mobile-nav-open .hamburger-btn span:nth-child(2) { opacity: 0; transform: translateX(20px); }

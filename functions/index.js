@@ -9,6 +9,14 @@ const { logger } = require("firebase-functions");
 initializeApp();
 const db = getFirestore();
 
+// --- CONFIGURATION ---
+// TODO: Move this to a document in /admin_settings/
+const PAYMENT_CONFIG = {
+    processor: "Stripe",
+    feePct: 0.02,
+    feeFixed: 0.20 // Assuming GBP, so £0.20
+};
+
 // --- Internal Helper for Reusable Draw Logic ---
 const performDraw = async (compId) => {
     const compRef = db.collection('competitions').doc(compId);
@@ -41,6 +49,8 @@ const performDraw = async (compId) => {
         const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
         const winnerDisplayName = winnerData.userDisplayName;
 
+        const now = FieldValue.serverTimestamp();
+
         transaction.update(compRef, { 
             status: 'drawn', 
             winnerId, 
@@ -57,7 +67,21 @@ const performDraw = async (compId) => {
             winnerDisplayName, 
             winnerPhotoURL, 
             winningTicketNumber, 
-            drawDate: FieldValue.serverTimestamp() 
+            drawDate: now
+        });
+
+        // V2 Analytics: Create prize_ledger entry for the main prize
+        const prizeLedgerRef = db.collection('prize_ledger').doc();
+        transaction.set(prizeLedgerRef, {
+            userId: winnerId,
+            createdAt: now,
+            type: "cash", // Assuming main prizes are cash, could be 'physical'
+            status: "pending",
+            cashAmount: compDataForCheck.cashAlternative,
+            cogsAmount: 0, // COGS would be for physical prizes
+            shippingCost: 0,
+            gameType: compDataForCheck.competitionType,
+            refId: compId,
         });
 
         return { success: true, winnerDisplayName, winningTicketNumber };
@@ -136,32 +160,94 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError('failed-precondition', `Not enough tickets available.`);
         const ticketStartNumber = ticketsSoldBefore;
 
+        // LEGACY: Update old entryCount fields
         transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsBought) });
         transaction.update(userRef, { [`entryCount.${compId}`]: FieldValue.increment(ticketsBought) });
         
-        const entryRef = compRef.collection('entries').doc();
-        transaction.set(entryRef, {
-            userId: uid, userDisplayName: userData.displayName || "N/A",
-            ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
-            enteredAt: FieldValue.serverTimestamp(), 
-            entryType: entryType,
+        // --- V2 Analytics Event Sourcing ---
+        const now = FieldValue.serverTimestamp();
+
+        // 1. Create Entry Ledger document
+        const newEntryRef = db.collection('entries').doc();
+        transaction.set(newEntryRef, {
+            userId: uid,
+            createdAt: now,
+            compId: compId,
+            compType: compData.competitionType,
+            price: expectedPrice,
+            fundedBy: paymentMethod === 'card' ? 'cash' : 'site_credit',
+            qty: ticketsBought,
+            status: 'confirmed' // Assuming confirmed upon successful transaction
         });
+
+        // 2. Create Payment or Site Credit Ledger document
+        if (paymentMethod === 'card') {
+            const paymentId = `pm_${newEntryRef.id}`; // Link payment to entry
+            const paymentRef = db.collection('payments').doc(paymentId);
+            const feeAmount = Math.round(expectedPrice * PAYMENT_CONFIG.feePct + PAYMENT_CONFIG.feeFixed * 100) / 100;
+            transaction.set(paymentRef, {
+                userId: uid,
+                createdAt: now,
+                source: compData.competitionType,
+                itemId: compId,
+                currency: "gbp",
+                amountGross: expectedPrice,
+                feePct: PAYMENT_CONFIG.feePct,
+                feeFixed: PAYMENT_CONFIG.feeFixed,
+                amountFee: feeAmount,
+                amountNet: expectedPrice - feeAmount,
+                status: "captured",
+                processor: PAYMENT_CONFIG.processor,
+                meta: {
+                    entryId: newEntryRef.id,
+                    userDisplayName: userData.displayName || "N/A"
+                }
+            });
+        } else { // 'credit'
+            const creditLedgerRef = db.collection('site_credit_ledger').doc();
+            transaction.set(creditLedgerRef, {
+                userId: uid,
+                createdAt: now,
+                delta: -expectedPrice,
+                reason: "redeem_entry",
+                refType: "entry",
+                refId: newEntryRef.id
+            });
+        }
         
         let awardedTokens = [];
         if (compData.instantWinsConfig?.enabled === true) {
-            const newTokens = [];
+            const newTokensForUser = [];
             const earnedAt = new Date();
+            const pricePerSpin = (paymentMethod === 'card') ? (expectedPrice / ticketsBought) : 0;
+
             for (let i = 0; i < ticketsBought; i++) {
-                newTokens.push({
-                    tokenId: crypto.randomBytes(16).toString('hex'),
+                const spinRef = db.collection('spins').doc();
+                const spinTokenId = crypto.randomBytes(16).toString('hex');
+
+                transaction.set(spinRef, {
+                    userId: uid,
+                    createdAt: now,
+                    configId: "default", // Assuming a single spinner config for now
+                    priceCash: pricePerSpin,
+                    resultType: null,
+                    resultAmount: null,
+                    evCash: 0.15, // TODO: Pull from admin_settings/spinner/{configId}
+                    evCredit: 0.52, // TODO: Pull from admin_settings/spinner/{configId}
+                    sessionId: null // Not implemented in this version
+                });
+
+                newTokensForUser.push({
+                    tokenId: spinTokenId,
+                    spinId: spinRef.id, // Link token to spin document
                     compId: compId,
                     compTitle: compData.title,
                     earnedAt: earnedAt
                 });
             }
             // Defaulting to 'spinTokens' as per README; plinko token logic is unclear.
-            transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
-            awardedTokens = newTokens;
+            transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokensForUser) });
+            awardedTokens = newTokensForUser;
         }
         
         return { success: true, ticketsBought, awardedTokens };
@@ -183,14 +269,23 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     return db.runTransaction(async (transaction) => {
         const userDoc = await transaction.get(userRef);
         if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
+
         const userData = userDoc.data();
         const userTokens = userData.spinTokens || [];
-        const tokenIndex = userTokens.findIndex(t => t.tokenId === tokenId);
-        if (tokenIndex === -1) {
+        const tokenToSpend = userTokens.find(t => t.tokenId === tokenId);
+
+        if (!tokenToSpend) {
             throw new HttpsError('not-found', 'Spin token not found or already spent.');
         }
+        if (!tokenToSpend.spinId) {
+            throw new HttpsError('internal', 'Token is missing a link to its spin record.');
+        }
+
+        // Remove token from user's array
         const updatedTokens = userTokens.filter(t => t.tokenId !== tokenId);
         transaction.update(userRef, { spinTokens: updatedTokens });
+
+        // Determine prize
         const settingsRef = db.collection('admin_settings').doc('spinnerPrizes');
         const settingsDoc = await settingsRef.get();
         if (!settingsDoc.exists) {
@@ -211,19 +306,43 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
                 break;
             }
         }
+
+        const now = FieldValue.serverTimestamp();
+
+        // Update the spin document with the result
+        const spinRef = db.collection('spins').doc(tokenToSpend.spinId);
+        transaction.update(spinRef, {
+            resultType: finalPrize.prizeType,
+            resultAmount: finalPrize.value
+        });
+
+        // Create ledger entries for the prize
         if (finalPrize.won) {
-            const winLogRef = db.collection('spin_wins').doc();
-            transaction.set(winLogRef, {
-                userId: uid,
-                prizeType: finalPrize.prizeType,
-                prizeValue: finalPrize.value,
-                wonAt: FieldValue.serverTimestamp(),
-                tokenIdUsed: tokenId,
-            });
             if (finalPrize.prizeType === 'credit') {
                 transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+                const creditLedgerRef = db.collection('site_credit_ledger').doc();
+                transaction.set(creditLedgerRef, {
+                    userId: uid,
+                    createdAt: now,
+                    delta: finalPrize.value,
+                    reason: "spinner_award",
+                    refType: "spin",
+                    refId: tokenToSpend.spinId
+                });
             } else if (finalPrize.prizeType === 'cash') {
-                transaction.update(userRef, { cashBalance: FieldValue.increment(finalPrize.value) });
+                // Cash balance is NOT updated automatically. It must be paid out.
+                const prizeLedgerRef = db.collection('prize_ledger').doc();
+                transaction.set(prizeLedgerRef, {
+                    userId: uid,
+                    createdAt: now,
+                    type: "cash",
+                    status: "pending",
+                    cashAmount: finalPrize.value,
+                    cogsAmount: 0,
+                    shippingCost: 0,
+                    gameType: "spinner",
+                    refId: tokenToSpend.spinId,
+                });
             }
         }
         return finalPrize;
@@ -391,103 +510,16 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- getRevenueAnalytics ---
-exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
-    await assertIsAdmin(request);
 
-    try {
-        // 1. Calculate Spinner Costs (Cash vs. Credit)
-        const spinWinsSnapshot = await db.collection('spin_wins').get();
-        let totalCashCost = 0;
-        let totalSiteCreditAwarded = 0;
-        spinWinsSnapshot.docs.forEach(doc => {
-            const prize = doc.data();
-            if (prize.prizeType === 'cash') {
-                totalCashCost += prize.prizeValue || 0;
-            } else if (prize.prizeType === 'credit') {
-                totalSiteCreditAwarded += prize.prizeValue || 0;
-            }
-        });
 
-        // 2. Calculate Revenue from all competitions, categorized by type and payment method
-        const competitionsSnapshot = await db.collection('competitions').get();
-        const revenueBySource = { main: 0, instant: 0, hero: 0, token: 0, other: 0 };
-        let revenueFromSiteCredit = 0;
-
-        for (const compDoc of competitionsSnapshot.docs) {
-            const compData = compDoc.data();
-            const ticketTiersMap = new Map(compData.ticketTiers.map(tier => [tier.amount, tier.price]));
-            const compType = compData.competitionType || 'other';
-
-            const entriesSnapshot = await db.collection('competitions').doc(compDoc.id).collection('entries').get();
-            for (const entryDoc of entriesSnapshot.docs) {
-                const entryData = entryDoc.data();
-                if (ticketTiersMap.has(entryData.ticketsBought)) {
-                    const price = ticketTiersMap.get(entryData.ticketsBought);
-                    if (entryData.entryType === 'paid') {
-                        if (revenueBySource.hasOwnProperty(compType)) {
-                            revenueBySource[compType] += price;
-                        } else {
-                            revenueBySource.other += price;
-                        }
-                    } else if (entryData.entryType === 'credit') {
-                        revenueFromSiteCredit += price;
-                    }
-                }
-            }
-        }
-
-        // 3. Calculate Spinner-specific revenue and profit
-        const spinnerTokenRevenue = (revenueBySource.instant || 0) + (revenueBySource.hero || 0) + (revenueBySource.token || 0);
-        const netProfit = spinnerTokenRevenue - totalCashCost;
-
-        return {
-            success: true,
-            revenueBySource,
-            revenueFromSiteCredit,
-            spinnerTokenRevenue,
-            totalCashCost,
-            totalSiteCreditAwarded,
-            netProfit
-        };
-
-    } catch (error) {
-        logger.error("Error calculating revenue analytics:", error);
-        throw new HttpsError('internal', 'An unexpected error occurred while calculating analytics.');
-    }
-});
-
-// --- resetSpinnerStats ---
-exports.resetSpinnerStats = onCall(functionOptions, async (request) => {
-    await assertIsAdmin(request);
-
-    const collectionRef = db.collection('spin_wins');
-    const batchSize = 100;
-
-    try {
-        let query = collectionRef.orderBy('__name__').limit(batchSize);
-        let snapshot = await query.get();
-
-        while (snapshot.size > 0) {
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => {
-                batch.delete(doc.ref);
-            });
-            await batch.commit();
-
-            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
-            query = collectionRef.orderBy('__name__').startAfter(lastDoc).limit(batchSize);
-            snapshot = await query.get();
-        }
-
-        logger.log("Successfully deleted all documents from 'spin_wins' collection.");
-        return { success: true, message: "Spinner stats have been reset." };
-
-    } catch (error) {
-        logger.error("Error resetting spinner stats:", error);
-        throw new HttpsError('internal', 'Could not reset spinner stats.');
-    }
-});
+// --- V2 Analytics ---
+const analytics = require("./analytics.js");
+exports.onPaymentCreateV2 = analytics.onPaymentCreate;
+exports.onSiteCreditLedgerCreateV2 = analytics.onSiteCreditLedgerCreate;
+exports.onPrizeLedgerCreateV2 = analytics.onPrizeLedgerCreate;
+exports.onSpinCreateV2 = analytics.onSpinCreate;
+exports.backfillAnalyticsV2 = analytics.backfillAnalytics;
+exports.getRevenueAnalytics = analytics.getRevenueAnalytics;
 
 
 // --- drawWinner ---

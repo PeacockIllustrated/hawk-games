@@ -339,21 +339,21 @@ function renderPlinkoStatsView() {
 async function renderRevenueAnalyticsView() {
     const panel = createElement('div', { class: 'content-panel' });
     const title = createElement('h2', { textContent: 'Revenue Analytics' });
-
+    const dateRangeContainer = createElement('div', { class: 'admin-date-picker' });
     const tabContainer = createElement('div', { class: 'admin-tabs' });
     const tabContentContainer = createElement('div', { class: 'admin-tab-content' });
 
-    panel.append(title, tabContainer, tabContentContainer);
+    panel.append(title, dateRangeContainer, tabContainer, tabContentContainer);
     mainContentContainer.append(panel);
 
-    tabContentContainer.innerHTML = '<p>Loading analytics data...</p>';
+    const renderData = async (dateRange = 'lifetime') => {
+        tabContentContainer.innerHTML = '<p>Loading analytics data...</p>';
+        try {
+            const getRevenueAnalytics = httpsCallable(functions, 'getRevenueAnalytics');
+            const result = await getRevenueAnalytics({ dateRange }); // Pass dateRange to backend
+            if (!result.data.success) throw new Error(result.data.message || 'The function reported an error.');
 
-    try {
-        const getRevenueAnalytics = httpsCallable(functions, 'getRevenueAnalytics');
-        const result = await getRevenueAnalytics();
-        if (!result.data.success) throw new Error(result.data.message || 'The function reported an error.');
-
-        const data = result.data;
+            const data = result.data;
         const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
         // -- Tab Setup --
@@ -379,11 +379,30 @@ async function renderRevenueAnalyticsView() {
             });
         });
 
-    } catch (error) {
-        console.error("Error fetching revenue analytics:", error);
-        tabContentContainer.innerHTML = '';
-        tabContentContainer.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
-    }
+        } catch (error) {
+            console.error("Error fetching revenue analytics:", error);
+            tabContentContainer.innerHTML = '';
+            tabContentContainer.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
+        }
+    };
+
+    // --- Date Range Buttons ---
+    dateRangeContainer.innerHTML = '';
+    const dateRanges = [
+        { label: 'Lifetime', range: 'lifetime' },
+        { label: 'Last 30 Days', range: '30d' },
+        { label: 'Last 7 Days', range: '7d' },
+        { label: 'Today', range: 'today' },
+    ];
+
+    dateRanges.forEach(({label, range}) => {
+        const btn = createElement('button', { class: 'btn btn-small btn-secondary', textContent: label });
+        btn.addEventListener('click', () => renderData(range));
+        dateRangeContainer.append(btn);
+    });
+
+    // Initial render
+    renderData('lifetime');
 }
 
 function renderSpinnerProfitabilityTab(data, formatter) {
@@ -413,23 +432,23 @@ function renderSpinnerProfitabilityTab(data, formatter) {
     container.append(revenueCard, costCard, creditCard, profitCard);
 
     const actionsContainer = createElement('div', { class: 'stats-actions' });
-    const resetBtn = createElement('button', { id: 'reset-spinner-stats-btn', class: ['btn', 'btn-danger'], textContent: 'Reset Spinner Stats' });
+    const resetBtn = createElement('button', { id: 'reset-analytics-btn', class: ['btn', 'btn-danger'], textContent: 'Reset Analytics' });
     actionsContainer.append(resetBtn);
 
     resetBtn.addEventListener('click', async () => {
-        if (confirm("Are you sure you want to reset all spinner stats? This will delete all recorded spinner wins and cannot be undone.")) {
+        if (confirm("Are you sure you want to reset all analytics data? This will clear the global totals and cannot be undone.")) {
             resetBtn.disabled = true;
             resetBtn.textContent = 'Resetting...';
             try {
-                const resetSpinnerStats = httpsCallable(functions, 'resetSpinnerStats');
-                await resetSpinnerStats();
-                alert('Spinner stats have been successfully reset.');
+                const resetAnalyticsData = httpsCallable(functions, 'resetAnalyticsData');
+                await resetAnalyticsData();
+                alert('Global analytics have been successfully reset.');
                 renderRevenueAnalyticsView(); // Re-render the whole view
             } catch (error) {
-                console.error("Error resetting spinner stats:", error);
-                alert(`Failed to reset stats: ${error.message}`);
+                console.error("Error resetting analytics:", error);
+                alert(`Failed to reset analytics: ${error.message}`);
                 resetBtn.disabled = false;
-                resetBtn.textContent = 'Reset Spinner Stats';
+                resetBtn.textContent = 'Reset Analytics';
             }
         }
     });
@@ -659,6 +678,8 @@ function initializeSpinnerSettingsListeners() {
     };
     addPrizeBtn.addEventListener('click', () => addPrizeTier());
     const loadSettings = async () => { 
+        // This view is now simplified as the full config is not part of this task.
+        // We are just keeping the prize setup part.
         const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(defaultsRef);
         prizesContainer.innerHTML = '';

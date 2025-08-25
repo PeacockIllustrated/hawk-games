@@ -295,6 +295,14 @@ input:checked + .slider:before { transform: translateX(26px); }
 .admin-nav a.active { color: var(--primary-gold); border-bottom-color: var(--primary-gold); }
 .content-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; }
 .content-panel > h2 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; padding: 1.5rem; background-color: #111; border-bottom: 1px solid var(--border-color); margin: 0; }
+.admin-date-picker {
+    padding: 1rem 1.5rem;
+    background-color: #111;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
 .admin-tabs {
     display: flex;
     padding: 0 1.5rem;

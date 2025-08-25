@@ -302,6 +302,7 @@ exports.onSpinCreate = onDocumentCreated("spins/{spinId}", async (event) => {
 });
 
 exports.backfillAnalytics = onCall({memory: "1GiB"}, async (request) => {
+  await assertIsAdmin(request);
   logger.log("Starting analytics backfill process...");
 
   const totalsRef = db.collection("analytics_totals").doc("global");

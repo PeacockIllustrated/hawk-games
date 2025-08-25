@@ -74,6 +74,35 @@ function initializeAdminPage() {
     document.getElementById('admin-menu-toggle').addEventListener('click', () => {
         document.querySelector('.admin-layout').classList.toggle('nav-open');
     });
+
+    const backfillBtn = document.getElementById('backfill-analytics-btn');
+    if (backfillBtn) {
+        backfillBtn.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to run the analytics backfill? This is a long-running and expensive operation.')) {
+                return;
+            }
+
+            backfillBtn.disabled = true;
+            backfillBtn.textContent = 'Backfilling...';
+            alert('Starting analytics backfill. This may take several minutes. You will be alerted when it is complete.');
+
+            try {
+                const backfillAnalytics = httpsCallable(functions, 'backfillAnalytics');
+                const result = await backfillAnalytics();
+                if (result.data.success) {
+                    alert('Analytics backfill completed successfully!');
+                } else {
+                    throw new Error(result.data.message || 'The backfill failed for an unknown reason.');
+                }
+            } catch (error) {
+                console.error("Error running backfill:", error);
+                alert(`Backfill failed: ${error.message}`);
+            } finally {
+                backfillBtn.disabled = false;
+                backfillBtn.innerHTML = 'Backfill Analytics (Temp)';
+            }
+        });
+    }
 }
 
 // --- Navigation & View Rendering ---

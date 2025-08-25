@@ -52,12 +52,16 @@ function processAnalyticsData(data) {
 }
 
 /**
- * Asserts that the user is an administrator by checking custom claims.
+ * Asserts that the user is an administrator by checking the Firestore user doc.
  * @param {object} request The request object from the callable function.
  * @throws {HttpsError} If the user is not an admin.
  */
-const assertIsAdmin = (request) => {
-  if (request.auth?.token?.isAdmin !== true) {
+const assertIsAdmin = async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const userDoc = await db.collection("users").doc(request.auth.uid).get();
+  if (!userDoc.exists() || !userDoc.data().isAdmin) {
     throw new HttpsError(
         "permission-denied",
         "You must be an administrator to perform this action.",

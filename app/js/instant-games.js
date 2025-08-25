@@ -248,7 +248,9 @@ async function handleMultiSpin(spinCount) {
     const finalAngle = baseSpins + randomAdditionalRotation;
     const spinDuration = 2 + spinCount * 0.5; // Longer duration
 
-    tokenCountElement.textContent = userTokens.length - spinCount;
+    // This optimistic update is removed. The UI will now only update when the
+    // onSnapshot listener receives the new token count from the server,
+    // which is the source of truth. This prevents visual glitches.
 
     wheel.style.transition = `transform ${spinDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
     wheel.style.transform = `rotate(${finalAngle}deg)`;
@@ -303,9 +305,28 @@ function showMultiWinModal(wins) {
     winCelebrationModal.classList.add('show', 'multi-win-modal');
 }
 
-spinButton.addEventListener('click', () => handleMultiSpin(1));
-spinX3Button.addEventListener('click', () => handleMultiSpin(3));
-spinX5Button.addEventListener('click', () => handleMultiSpin(5));
+const allSpinButtons = [spinButton, spinX3Button, spinX5Button];
+
+const createSpinHandler = (spinCount) => {
+    return () => {
+        // First, check if a spin is already in progress. This is the primary guard.
+        if (isSpinning) {
+            console.warn("Spin attempt ignored: already spinning.");
+            return;
+        }
+
+        // Immediately disable all buttons to prevent double-clicks or race conditions
+        // before the async handleMultiSpin function sets its own isSpinning flag.
+        allSpinButtons.forEach(btn => btn.disabled = true);
+
+        // Now, call the main logic
+        handleMultiSpin(spinCount);
+    };
+};
+
+spinButton.addEventListener('click', createSpinHandler(1));
+spinX3Button.addEventListener('click', createSpinHandler(3));
+spinX5Button.addEventListener('click', createSpinHandler(5));
 
 spinPrizeReveal.addEventListener('click', () => {
     if (isSpinning || spinPrizeReveal.classList.contains('revealed')) return;

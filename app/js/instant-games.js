@@ -225,13 +225,20 @@ async function handleMultiSpin(spinCount) {
     const spinResults = [];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
 
-    for (let i = 0; i < spinCount; i++) {
-        const tokenToSpend = userTokens[i];
+    // --- BUG FIX ---
+    // Create a static copy of the tokens to be spent. This prevents a race condition
+    // where the onSnapshot listener modifies the userTokens array while this loop is running.
+    const tokensToSpend = userTokens.slice(0, spinCount);
+
+    for (const tokenToSpend of tokensToSpend) {
         try {
+            // Pass the tokenId from our static 'tokensToSpend' array
             const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
             spinResults.push(result.data);
         } catch (error) {
-            console.error(`Error on spin ${i + 1}:`, error);
+            console.error(`Error on spin for token ${tokenToSpend.tokenId}:`, error);
+            // If a spin fails, we push a non-winning result. The user's token is not
+            // consumed by the backend in this case, so it will reappear on the next UI update.
             spinResults.push({ won: false, error: error.message });
         }
     }

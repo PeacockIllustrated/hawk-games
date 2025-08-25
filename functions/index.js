@@ -1,6 +1,12 @@
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore");
+const {
+  getFirestore,
+  FieldValue,
+  Timestamp,
+  query,
+  where,
+} = require("firebase-admin/firestore");
 const {initializeApp} = require("firebase-admin/app");
 const crypto = require("crypto");
 const {z} = require("zod");
@@ -23,22 +29,45 @@ const performDraw = async (compId) => {
   const entriesRef = compRef.collection("entries");
 
   const compDocForCheck = await compRef.get();
-  if (!compDocForCheck.exists) throw new Error(`Competition ${compId} not found for drawing.`);
+  if (!compDocForCheck.exists) {
+    throw new Error(`Competition ${compId} not found for drawing.`);
+  }
 
   const compDataForCheck = compDocForCheck.data();
-  if (compDataForCheck.status !== "ended") throw new Error(`Competition ${compId} must be in 'ended' status to be drawn.`);
-  if (compDataForCheck.winnerId) throw new Error(`Winner already drawn for competition ${compId}.`);
+  if (compDataForCheck.status !== "ended") {
+    throw new Error(
+        `Competition ${compId} must be in 'ended' status to be drawn.`,
+    );
+  }
+  if (compDataForCheck.winnerId) {
+    throw new Error(`Winner already drawn for competition ${compId}.`);
+  }
   if (!compDataForCheck.ticketsSold || compDataForCheck.ticketsSold === 0) {
-    await compRef.update({status: "drawn", drawnAt: FieldValue.serverTimestamp(), winnerDisplayName: "No entries"});
+    await compRef.update({
+      status: "drawn",
+      drawnAt: FieldValue.serverTimestamp(),
+      winnerDisplayName: "No entries",
+    });
     logger.warn(`Competition ${compId} had no entries. Marked as drawn.`);
-    return {success: true, winnerDisplayName: "No entries", winningTicketNumber: -1};
+    return {
+      success: true,
+      winnerDisplayName: "No entries",
+      winningTicketNumber: -1,
+    };
   }
 
   const winningTicketNumber = crypto.randomInt(0, compDataForCheck.ticketsSold);
-  const winnerQuery = entriesRef.where("ticketStart", "<=", winningTicketNumber).orderBy("ticketStart", "desc").limit(1);
+  const winnerQuery = entriesRef
+      .where("ticketStart", "<=", winningTicketNumber)
+      .orderBy("ticketStart", "desc")
+      .limit(1);
   const winnerSnapshot = await winnerQuery.get();
 
-  if (winnerSnapshot.empty) throw new Error(`Could not find an entry for winning ticket number ${winningTicketNumber} in competition ${compId}.`);
+  if (winnerSnapshot.empty) {
+    throw new Error(
+        `Could not find an entry for winning ticket number ${winningTicketNumber} in competition ${compId}.`,
+    );
+  }
 
   const winnerEntryDoc = winnerSnapshot.docs[0];
   const winnerData = winnerEntryDoc.data();
@@ -46,7 +75,9 @@ const performDraw = async (compId) => {
 
   return await db.runTransaction(async (transaction) => {
     const winnerUserDocSnap = await db.collection("users").doc(winnerId).get();
-    const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
+    const winnerPhotoURL = winnerUserDocSnap.exists ?
+      winnerUserDocSnap.data().photoURL :
+      null;
     const winnerDisplayName = winnerData.userDisplayName;
 
     const now = FieldValue.serverTimestamp();
@@ -91,168 +122,211 @@ const performDraw = async (compId) => {
 
 // --- Helpers ---
 const assertIsAdmin = async (context) => {
-  if (!context.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
+  if (!context.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
   const userDoc = await db.collection("users").doc(context.auth.uid).get();
-  if (!userDoc.exists || !userDoc.data().isAdmin) throw new HttpsError("permission-denied", "Admin privileges required.");
+  if (!userDoc.exists || !userDoc.data().isAdmin) {
+    throw new HttpsError("permission-denied", "Admin privileges required.");
+  }
 };
 const assertIsAuthenticated = (context) => {
-  if (!context.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
+  if (!context.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
 };
 
 // --- SECURITY: Enforce App Check on all callable functions ---
 const functionOptions = {
   region: "us-central1",
   enforceAppCheck: true,
-  cors: ["https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000"],
+  cors: [
+    "https://the-hawk-games-64239.web.app",
+    "https://the-hawk-games.co.uk",
+    /the-hawk-games\.co\.uk$/,
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+  ],
 };
 
 // --- allocateTicketsAndAwardTokens ---
-exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
-  const schema = z.object({
-    compId: z.string().min(1),
-    ticketsBought: z.number().int().positive(),
-    expectedPrice: z.number().positive(),
-    paymentMethod: z.enum(["card", "credit"]).default("card"),
-  });
+exports.allocateTicketsAndAwardTokens = onCall(functionOptions,
+    async (request) => {
+      const schema = z.object({
+        compId: z.string().min(1),
+        ticketsBought: z.number().int().positive(),
+        expectedPrice: z.number().positive(),
+        paymentMethod: z.enum(["card", "credit"]).default("card"),
+      });
 
-  const validation = schema.safeParse(request.data);
-  if (!validation.success) {
-    throw new HttpsError("invalid-argument", "Invalid or malformed request data.");
-  }
-  const {compId, ticketsBought, expectedPrice, paymentMethod} = validation.data;
-
-  assertIsAuthenticated(request);
-  const uid = request.auth.uid;
-  const compRef = db.collection("competitions").doc(compId);
-  const userRef = db.collection("users").doc(uid);
-
-  return await db.runTransaction(async (transaction) => {
-    const compDoc = await transaction.get(compRef);
-    const userDoc = await transaction.get(userRef);
-    if (!compDoc.exists) throw new HttpsError("not-found", "Competition not found.");
-    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-    const compData = compDoc.data();
-    const userData = userDoc.data();
-
-    const tier = compData.ticketTiers.find((t) => t.amount === ticketsBought);
-    if (!tier) {
-      throw new HttpsError("invalid-argument", "Selected ticket bundle is not valid for this competition.");
-    }
-    if (tier.price !== expectedPrice) {
-      throw new HttpsError("invalid-argument", "Price mismatch. Please refresh and try again.");
-    }
-
-    let entryType = "paid";
-    if (paymentMethod === "credit") {
-      entryType = "credit";
-      const userCredit = userData.creditBalance || 0;
-      if (userCredit < expectedPrice) {
-        throw new HttpsError("failed-precondition", "Insufficient credit balance.");
+      const validation = schema.safeParse(request.data);
+      if (!validation.success) {
+        throw new HttpsError("invalid-argument",
+            "Invalid or malformed request data.");
       }
-      transaction.update(userRef, {creditBalance: FieldValue.increment(-expectedPrice)});
-    }
+      const {
+        compId,
+        ticketsBought,
+        expectedPrice,
+        paymentMethod,
+      } = validation.data;
 
-    if (compData.status !== "live") throw new HttpsError("failed-precondition", "Competition is not live.");
-    const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
-    const limit = compData.userEntryLimit || 75;
-    if (userEntryCount + ticketsBought > limit) throw new HttpsError("failed-precondition", `Entry limit exceeded.`);
-    const ticketsSoldBefore = compData.ticketsSold || 0;
-    if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError("failed-precondition", `Not enough tickets available.`);
-    const ticketStartNumber = ticketsSoldBefore;
+      assertIsAuthenticated(request);
+      const uid = request.auth.uid;
+      const compRef = db.collection("competitions").doc(compId);
+      const userRef = db.collection("users").doc(uid);
 
-    // LEGACY: Update old entryCount fields
-    transaction.update(compRef, {ticketsSold: FieldValue.increment(ticketsBought)});
-    transaction.update(userRef, {[`entryCount.${compId}`]: FieldValue.increment(ticketsBought)});
+      return await db.runTransaction(async (transaction) => {
+        const compDoc = await transaction.get(compRef);
+        const userDoc = await transaction.get(userRef);
+        if (!compDoc.exists) {
+          throw new HttpsError("not-found", "Competition not found.");
+        }
+        if (!userDoc.exists) {
+          throw new HttpsError("not-found", "User profile not found.");
+        }
+        const compData = compDoc.data();
+        const userData = userDoc.data();
 
-    // --- V2 Analytics Event Sourcing ---
-    const now = FieldValue.serverTimestamp();
+        const tier = compData.ticketTiers.find((t) => t.amount === ticketsBought);
+        if (!tier) {
+          throw new HttpsError("invalid-argument",
+              "Selected ticket bundle is not valid for this competition.");
+        }
+        if (tier.price !== expectedPrice) {
+          throw new HttpsError("invalid-argument",
+              "Price mismatch. Please refresh and try again.");
+        }
 
-    // 1. Create Entry Ledger document
-    const newEntryRef = db.collection("entries").doc();
-    transaction.set(newEntryRef, {
-      userId: uid,
-      createdAt: now,
-      compId: compId,
-      compType: compData.competitionType,
-      price: expectedPrice,
-      fundedBy: paymentMethod === "card" ? "cash" : "site_credit",
-      qty: ticketsBought,
-      status: "confirmed", // Assuming confirmed upon successful transaction
-    });
+        if (paymentMethod === "credit") {
+          const userCredit = userData.creditBalance || 0;
+          if (userCredit < expectedPrice) {
+            throw new HttpsError("failed-precondition",
+                "Insufficient credit balance.");
+          }
+          transaction.update(userRef,
+              {creditBalance: FieldValue.increment(-expectedPrice)});
+        }
 
-    // 2. Create Payment or Site Credit Ledger document
-    if (paymentMethod === "card") {
-      const paymentId = `pm_${newEntryRef.id}`; // Link payment to entry
-      const paymentRef = db.collection("payments").doc(paymentId);
-      const feeAmount = Math.round(expectedPrice * PAYMENT_CONFIG.feePct + PAYMENT_CONFIG.feeFixed * 100) / 100;
-      transaction.set(paymentRef, {
-        userId: uid,
-        createdAt: now,
-        source: compData.competitionType,
-        itemId: compId,
-        currency: "gbp",
-        amountGross: expectedPrice,
-        feePct: PAYMENT_CONFIG.feePct,
-        feeFixed: PAYMENT_CONFIG.feeFixed,
-        amountFee: feeAmount,
-        amountNet: expectedPrice - feeAmount,
-        status: "captured",
-        processor: PAYMENT_CONFIG.processor,
-        meta: {
-          entryId: newEntryRef.id,
-          userDisplayName: userData.displayName || "N/A",
-        },
-      });
-    } else { // 'credit'
-      const creditLedgerRef = db.collection("site_credit_ledger").doc();
-      transaction.set(creditLedgerRef, {
-        userId: uid,
-        createdAt: now,
-        delta: -expectedPrice,
-        reason: "redeem_entry",
-        refType: "entry",
-        refId: newEntryRef.id,
-      });
-    }
+        if (compData.status !== "live") {
+          throw new HttpsError("failed-precondition", "Competition is not live.");
+        }
+        const userEntryCount = (userData.entryCount &&
+        userData.entryCount[compId]) ?
+        userData.entryCount[compId] :
+        0;
+        const limit = compData.userEntryLimit || 75;
+        if (userEntryCount + ticketsBought > limit) {
+          throw new HttpsError("failed-precondition", "Entry limit exceeded.");
+        }
+        const ticketsSoldBefore = compData.ticketsSold || 0;
+        if (ticketsSoldBefore + ticketsBought > compData.totalTickets) {
+          throw new HttpsError("failed-precondition",
+              "Not enough tickets available.");
+        }
 
-    let awardedTokens = [];
-    if (compData.instantWinsConfig?.enabled === true) {
-      const newTokensForUser = [];
-      const earnedAt = new Date();
-      const pricePerSpin = (paymentMethod === "card") ? (expectedPrice / ticketsBought) : 0;
+        // LEGACY: Update old entryCount fields
+        transaction.update(compRef,
+            {ticketsSold: FieldValue.increment(ticketsBought)});
+        transaction.update(userRef,
+            {[`entryCount.${compId}`]: FieldValue.increment(ticketsBought)});
 
-      for (let i = 0; i < ticketsBought; i++) {
-        const spinRef = db.collection("spins").doc();
-        const spinTokenId = crypto.randomBytes(16).toString("hex");
+        // --- V2 Analytics Event Sourcing ---
+        const now = FieldValue.serverTimestamp();
 
-        transaction.set(spinRef, {
+        // 1. Create Entry Ledger document
+        const newEntryRef = db.collection("entries").doc();
+        transaction.set(newEntryRef, {
           userId: uid,
           createdAt: now,
-          configId: "default", // Assuming a single spinner config for now
-          priceCash: pricePerSpin,
-          resultType: null,
-          resultAmount: null,
-          evCash: 0.15, // TODO: Pull from admin_settings/spinner/{configId}
-          evCredit: 0.52, // TODO: Pull from admin_settings/spinner/{configId}
-          sessionId: null, // Not implemented in this version
-        });
-
-        newTokensForUser.push({
-          tokenId: spinTokenId,
-          spinId: spinRef.id, // Link token to spin document
           compId: compId,
-          compTitle: compData.title,
-          earnedAt: earnedAt,
+          compType: compData.competitionType,
+          price: expectedPrice,
+          fundedBy: paymentMethod === "card" ? "cash" : "site_credit",
+          qty: ticketsBought,
+          status: "confirmed", // Assuming confirmed upon successful transaction
         });
-      }
-      // Defaulting to 'spinTokens' as per README; plinko token logic is unclear.
-      transaction.update(userRef, {spinTokens: FieldValue.arrayUnion(...newTokensForUser)});
-      awardedTokens = newTokensForUser;
-    }
 
-    return {success: true, ticketsBought, awardedTokens};
-  });
-});
+        // 2. Create Payment or Site Credit Ledger document
+        if (paymentMethod === "card") {
+          const paymentId = `pm_${newEntryRef.id}`; // Link payment to entry
+          const paymentRef = db.collection("payments").doc(paymentId);
+          const feeAmount = Math.round(
+              expectedPrice * PAYMENT_CONFIG.feePct +
+            PAYMENT_CONFIG.feeFixed * 100,
+          ) / 100;
+          transaction.set(paymentRef, {
+            userId: uid,
+            createdAt: now,
+            source: compData.competitionType,
+            itemId: compId,
+            currency: "gbp",
+            amountGross: expectedPrice,
+            feePct: PAYMENT_CONFIG.feePct,
+            feeFixed: PAYMENT_CONFIG.feeFixed,
+            amountFee: feeAmount,
+            amountNet: expectedPrice - feeAmount,
+            status: "captured",
+            processor: PAYMENT_CONFIG.processor,
+            meta: {
+              entryId: newEntryRef.id,
+              userDisplayName: userData.displayName || "N/A",
+            },
+          });
+        } else { // 'credit'
+          const creditLedgerRef = db.collection("site_credit_ledger").doc();
+          transaction.set(creditLedgerRef, {
+            userId: uid,
+            createdAt: now,
+            delta: -expectedPrice,
+            reason: "redeem_entry",
+            refType: "entry",
+            refId: newEntryRef.id,
+          });
+        }
+
+        let awardedTokens = [];
+        if (compData.instantWinsConfig?.enabled === true) {
+          const newTokensForUser = [];
+          const earnedAt = new Date();
+          const pricePerSpin = (paymentMethod === "card") ?
+          (expectedPrice / ticketsBought) :
+          0;
+
+          for (let i = 0; i < ticketsBought; i++) {
+            const spinRef = db.collection("spins").doc();
+            const spinTokenId = crypto.randomBytes(16).toString("hex");
+
+            transaction.set(spinRef, {
+              userId: uid,
+              createdAt: now,
+              configId: "default", // Assuming a single spinner config
+              priceCash: pricePerSpin,
+              resultType: null,
+              resultAmount: null,
+              evCash: 0.15, // TODO: Pull from admin_settings/spinner/{configId}
+              evCredit: 0.52, // TODO: Pull from admin_settings/spinner/{configId}
+              sessionId: null, // Not implemented in this version
+            });
+
+            newTokensForUser.push({
+              tokenId: spinTokenId,
+              spinId: spinRef.id, // Link token to spin document
+              compId: compId,
+              compTitle: compData.title,
+              earnedAt: earnedAt,
+            });
+          }
+          // Defaulting to 'spinTokens' as per README; plinko token logic is
+          // unclear.
+          transaction.update(userRef,
+              {spinTokens: FieldValue.arrayUnion(...newTokensForUser)});
+          awardedTokens = newTokensForUser;
+        }
+
+        return {success: true, ticketsBought, awardedTokens};
+      });
+    });
 
 // --- spendSpinToken ---
 exports.spendSpinToken = onCall(functionOptions, async (request) => {
@@ -268,17 +342,21 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
+    if (!userDoc.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
 
     const userData = userDoc.data();
     const userTokens = userData.spinTokens || [];
     const tokenToSpend = userTokens.find((t) => t.tokenId === tokenId);
 
     if (!tokenToSpend) {
-      throw new HttpsError("not-found", "Spin token not found or already spent.");
+      throw new HttpsError("not-found",
+          "Spin token not found or already spent.");
     }
     if (!tokenToSpend.spinId) {
-      throw new HttpsError("internal", "Token is missing a link to its spin record.");
+      throw new HttpsError("internal",
+          "Token is missing a link to its spin record.");
     }
 
     // Remove token from user's array
@@ -289,7 +367,8 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     const settingsRef = db.collection("admin_settings").doc("spinnerPrizes");
     const settingsDoc = await settingsRef.get();
     if (!settingsDoc.exists) {
-      throw new HttpsError("internal", "Spinner prize configuration is not available.");
+      throw new HttpsError("internal",
+          "Spinner prize configuration is not available.");
     }
     const prizes = settingsDoc.data().prizes;
     const cumulativeProbabilities = [];
@@ -319,7 +398,8 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
     // Create ledger entries for the prize
     if (finalPrize.won) {
       if (finalPrize.prizeType === "credit") {
-        transaction.update(userRef, {creditBalance: FieldValue.increment(finalPrize.value)});
+        transaction.update(userRef,
+            {creditBalance: FieldValue.increment(finalPrize.value)});
         const creditLedgerRef = db.collection("site_credit_ledger").doc();
         transaction.set(creditLedgerRef, {
           userId: uid,
@@ -357,7 +437,8 @@ exports.transferCashToCredit = onCall(functionOptions, async (request) => {
 
   const validation = schema.safeParse(request.data);
   if (!validation.success) {
-    throw new HttpsError("invalid-argument", validation.error.errors[0].message);
+    throw new HttpsError("invalid-argument",
+        validation.error.errors[0].message);
   }
   const {amount} = validation.data;
 
@@ -375,7 +456,8 @@ exports.transferCashToCredit = onCall(functionOptions, async (request) => {
     const userCashBalance = userData.cashBalance || 0;
 
     if (userCashBalance < amount) {
-      throw new HttpsError("failed-precondition", "Insufficient cash balance.");
+      throw new HttpsError("failed-precondition",
+          "Insufficient cash balance.");
     }
 
     const creditToAdd = amount * 1.5;
@@ -385,7 +467,10 @@ exports.transferCashToCredit = onCall(functionOptions, async (request) => {
       creditBalance: FieldValue.increment(creditToAdd),
     });
 
-    return {success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd};
+    return {
+      success: true,
+      newCreditBalance: (userData.creditBalance || 0) + creditToAdd,
+    };
   });
 });
 
@@ -397,7 +482,8 @@ exports.requestCashPayout = onCall(functionOptions, async (request) => {
 
   const validation = schema.safeParse(request.data);
   if (!validation.success) {
-    throw new HttpsError("invalid-argument", validation.error.errors[0].message);
+    throw new HttpsError("invalid-argument",
+        validation.error.errors[0].message);
   }
   const {amount} = validation.data;
 
@@ -415,7 +501,8 @@ exports.requestCashPayout = onCall(functionOptions, async (request) => {
     const userCashBalance = userData.cashBalance || 0;
 
     if (userCashBalance < amount) {
-      throw new HttpsError("failed-precondition", "Insufficient cash balance.");
+      throw new HttpsError("failed-precondition",
+          "Insufficient cash balance.");
     }
 
     transaction.update(userRef, {
@@ -450,10 +537,18 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
 
   return db.runTransaction(async (transaction) => {
     const settingsRef = db.collection("admin_settings").doc("plinkoPrizes");
-    const [userDoc, settingsDoc] = await Promise.all([transaction.get(userRef), transaction.get(settingsRef)]);
+    const [userDoc, settingsDoc] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(settingsRef),
+    ]);
 
-    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-    if (!settingsDoc.exists) throw new HttpsError("internal", "Plinko prize configuration is not available.");
+    if (!userDoc.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+    if (!settingsDoc.exists) {
+      throw new HttpsError("internal",
+          "Plinko prize configuration is not available.");
+    }
 
     const userData = userDoc.data();
     const settings = settingsDoc.data();
@@ -464,7 +559,8 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
     const userTokens = userData.plinkoTokens || [];
     const tokenIndex = userTokens.findIndex((t) => t.tokenId === tokenId);
     if (tokenIndex === -1) {
-      throw new HttpsError("not-found", "Plinko token not found or already spent.");
+      throw new HttpsError("not-found",
+          "Plinko token not found or already spent.");
     }
     const updatedTokens = userTokens.filter((t) => t.tokenId !== tokenId);
     transaction.update(userRef, {plinkoTokens: updatedTokens});
@@ -480,7 +576,9 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
         step = Math.random() < 0.5 ? -1 : 1;
       }
       steps.push(step);
-      if (step === 1) rights++;
+      if (step === 1) {
+        rights++;
+      }
     }
     const finalSlotIndex = rights;
 
@@ -502,7 +600,8 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
         tokenIdUsed: tokenId,
       });
       if (finalPrize.type === "credit") {
-        transaction.update(userRef, {creditBalance: FieldValue.increment(finalPrize.value)});
+        transaction.update(userRef,
+            {creditBalance: FieldValue.increment(finalPrize.value)});
       }
     }
 
@@ -535,7 +634,8 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
   const compRef = db.collection("competitions").doc(compId);
   const compDoc = await compRef.get();
   if (!compDoc.exists || compDoc.data().status !== "ended") {
-    throw new HttpsError("failed-precondition", "Competition must be in \"ended\" status to be drawn manually.");
+    throw new HttpsError("failed-precondition",
+        "Competition must be in \"ended\" status to be drawn manually.");
   }
 
   try {
@@ -543,7 +643,8 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     return {success: true, ...result};
   } catch (error) {
     logger.error(`Manual draw failed for compId: ${compId}`, error);
-    throw new HttpsError("internal", error.message || "An internal error occurred during the draw.");
+    throw new HttpsError("internal",
+        error.message || "An internal error occurred during the draw.");
   }
 });
 
@@ -585,10 +686,13 @@ exports.weeklyTokenCompMaintenance = onSchedule({
     }
   }
 
-  const liveTokenQuery = query(compsRef, where("competitionType", "==", "token"), where("status", "==", "live"));
+  const liveTokenQuery = query(compsRef,
+      where("competitionType", "==", "token"),
+      where("status", "==", "live"));
   const liveTokenSnapshot = await liveTokenQuery.get();
   if (liveTokenSnapshot.size < 3) {
-    logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
+    logger.warn("CRITICAL: The pool of live token competitions is low " +
+      `(${liveTokenSnapshot.size}). Admin should create more.`);
   }
 
   return null;

@@ -99,6 +99,7 @@ function renderView(viewName) {
         case 'spinner-settings': renderSpinnerSettingsView(); break;
         case 'plinko-settings': renderPlinkoSettingsView(); break;
         case 'plinko-stats': renderPlinkoStatsView(); break;
+        case 'spinner-stats': renderSpinnerStatsView(); break;
     }
 }
 
@@ -332,6 +333,54 @@ function renderPlinkoStatsView() {
         createElement('p', { style: {padding: '2rem'}, textContent: 'Statistics for the Plinko game will be displayed here. (Coming Soon)'})
     ]);
     mainContentContainer.append(panel);
+}
+
+// --- VIEW: Spinner Stats ---
+async function renderSpinnerStatsView() {
+    const panel = createElement('div', { class: 'content-panel' });
+    const title = createElement('h2', { textContent: 'Instant Spinner Statistics' });
+    const container = createElement('div', { class: 'stats-container' });
+
+    panel.append(title, container);
+    mainContentContainer.append(panel);
+
+    container.innerHTML = '<p>Loading spinner financial data...</p>';
+
+    try {
+        const getSpinnerFinancials = httpsCallable(functions, 'getSpinnerFinancials');
+        const result = await getSpinnerFinancials();
+
+        if (!result.data.success) {
+            throw new Error(result.data.message || 'The function reported an error.');
+        }
+
+        const { totalRevenue, totalCost, netProfit } = result.data;
+
+        const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+        const revenueCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Total Revenue' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalRevenue) })
+        ]);
+
+        const costCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Total Cost (Prizes)' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalCost) })
+        ]);
+
+        const profitCard = createElement('div', { class: ['stat-card', netProfit >= 0 ? 'profit' : 'loss'] }, [
+            createElement('h3', { textContent: 'Net Profit' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(netProfit) })
+        ]);
+
+        container.innerHTML = '';
+        container.append(revenueCard, costCard, profitCard);
+
+    } catch (error) {
+        console.error("Error fetching spinner financials:", error);
+        container.innerHTML = '';
+        container.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
+    }
 }
 
 // --- Reusable Assignment Panel ---

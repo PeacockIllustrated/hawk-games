@@ -391,6 +391,52 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
     });
 });
 
+// --- getSpinnerFinancials ---
+exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
+    await assertIsAdmin(request);
+
+    try {
+        // 1. Calculate Total Cost
+        const spinWinsSnapshot = await db.collection('spin_wins').get();
+        const totalCost = spinWinsSnapshot.docs.reduce((sum, doc) => {
+            return sum + (doc.data().prizeValue || 0);
+        }, 0);
+
+        // 2. Calculate Total Revenue
+        const competitionsSnapshot = await db.collection('competitions').where('instantWinsConfig.enabled', '==', true).get();
+        let totalRevenue = 0;
+
+        for (const compDoc of competitionsSnapshot.docs) {
+            const compData = compDoc.data();
+            const ticketTiersMap = new Map(compData.ticketTiers.map(tier => [tier.amount, tier.price]));
+
+            const entriesSnapshot = await db.collection('competitions').doc(compDoc.id).collection('entries').get();
+            for (const entryDoc of entriesSnapshot.docs) {
+                const entryData = entryDoc.data();
+                if (entryData.entryType === 'paid' || entryData.entryType === 'credit') {
+                     if (ticketTiersMap.has(entryData.ticketsBought)) {
+                        totalRevenue += ticketTiersMap.get(entryData.ticketsBought);
+                    }
+                }
+            }
+        }
+
+        // 3. Calculate Net Profit
+        const netProfit = totalRevenue - totalCost;
+
+        return {
+            success: true,
+            totalRevenue: totalRevenue,
+            totalCost: totalCost,
+            netProfit: netProfit
+        };
+
+    } catch (error) {
+        logger.error("Error calculating spinner financials:", error);
+        throw new HttpsError('internal', 'An unexpected error occurred while calculating financials.');
+    }
+});
+
 // --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {
     const schema = z.object({ compId: z.string().min(1) });

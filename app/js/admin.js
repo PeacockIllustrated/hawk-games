@@ -364,28 +364,32 @@ async function renderLoyaltySettingsView() {
                         createElement('span', { class: 'label-text', textContent: 'Enable Tech Loyalty Feature' })
                     ])
                 ]),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'loyalty-threshold', textContent: 'Unlock Threshold (Tech Comps)' }),
-                    createElement('input', { type: 'number', id: 'loyalty-threshold', value: settings.threshold, required: true })
-                ]),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'loyalty-target-comp', textContent: 'Target Loyalty Competition ID' }),
-                    createElement('input', { type: 'text', id: 'loyalty-target-comp', value: settings.targetCompId, placeholder: 'Enter the comp ID for the loyalty draw' })
+                createElement('div', { class: 'form-group-inline' }, [
+                    createElement('div', { class: 'form-group' }, [
+                        createElement('label', { for: 'loyalty-threshold', textContent: 'Unlock Threshold (Tech Comps)' }),
+                        createElement('input', { type: 'number', id: 'loyalty-threshold', value: settings.threshold, required: true })
+                    ]),
+                    createElement('div', { class: 'form-group' }, [
+                        createElement('label', { for: 'loyalty-target-comp', textContent: 'Target Loyalty Competition ID' }),
+                        createElement('input', { type: 'text', id: 'loyalty-target-comp', value: settings.targetCompId, placeholder: 'Enter the comp ID for the loyalty draw' })
+                    ])
                 ])
             ]),
             createElement('fieldset', {}, [
                 createElement('legend', { textContent: 'Time Window' }),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'loyalty-window-strategy', textContent: 'Window Strategy' }),
-                    createElement('select', { id: 'loyalty-window-strategy' }, [
-                        createElement('option', { value: 'monthly', textContent: 'Monthly' }),
-                        createElement('option', { value: 'weekly', textContent: 'Weekly' }),
-                        createElement('option', { value: 'rolling', textContent: 'Rolling' })
+                createElement('div', { class: 'form-group-inline' }, [
+                    createElement('div', { class: 'form-group' }, [
+                        createElement('label', { for: 'loyalty-window-strategy', textContent: 'Window Strategy' }),
+                        createElement('select', { id: 'loyalty-window-strategy' }, [
+                            createElement('option', { value: 'monthly', textContent: 'Monthly' }),
+                            createElement('option', { value: 'weekly', textContent: 'Weekly' }),
+                            createElement('option', { value: 'rolling', textContent: 'Rolling' })
+                        ])
+                    ]),
+                    createElement('div', { class: 'form-group' }, [
+                        createElement('label', { for: 'loyalty-window-id', textContent: 'Current Window ID (e.g., 2025-08)' }),
+                        createElement('input', { type: 'text', id: 'loyalty-window-id', value: settings.windowId, required: true })
                     ])
-                ]),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'loyalty-window-id', textContent: 'Current Window ID (e.g., 2025-08)' }),
-                    createElement('input', { type: 'text', id: 'loyalty-window-id', value: settings.windowId, required: true })
                 ])
             ]),
             createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Save Loyalty Settings'])
@@ -502,57 +506,63 @@ function createCompetitionForm({ type, title }) {
         ]),
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Category & Labels' }),
-            createElement('div', { class: 'form-group' }, [
-                createElement('label', { for: 'category', textContent: 'Category' }),
-                createElement('select', { id: 'category' }, [
-                    createElement('option', { value: 'tech', textContent: 'Tech' }),
-                    createElement('option', { value: 'auto', textContent: 'Auto' }),
-                    createElement('option', { value: 'lifestyle', textContent: 'Lifestyle' }),
-                    createElement('option', { value: 'cash', textContent: 'Cash' }),
-                    createElement('option', { value: 'other', textContent: 'Other', selected: true })
+            createElement('div', { class: 'form-group-inline' }, [
+                createElement('div', { class: 'form-group' }, [
+                    createElement('label', { for: 'category', textContent: 'Category' }),
+                    createElement('select', { id: 'category' }, [
+                        createElement('option', { value: 'tech', textContent: 'Tech' }),
+                        createElement('option', { value: 'auto', textContent: 'Auto' }),
+                        createElement('option', { value: 'lifestyle', textContent: 'Lifestyle' }),
+                        createElement('option', { value: 'cash', textContent: 'Cash' }),
+                        createElement('option', { value: 'other', textContent: 'Other', selected: true })
+                    ])
+                ]),
+                createElement('div', { class: 'form-group' }, [
+                    createElement('label', { for: 'labels', textContent: 'Labels (comma-separated)' }),
+                    createElement('input', { type: 'text', id: 'labels', placeholder: 'e.g. gaming, console, new' })
                 ])
-            ]),
-            createElement('div', { class: 'form-group' }, [
-                createElement('label', { for: 'labels', textContent: 'Labels (comma-separated)' }),
-                createElement('input', { type: 'text', id: 'labels', placeholder: 'e.g. gaming, console, new' })
             ])
         ]),
         !isToken && createElement('fieldset', { id: 'loyalty-fields' }, [
             createElement('legend', { textContent: 'Loyalty Settings' }),
-            createElement('div', { class: 'form-group' }, [
-                createElement('label', { class: 'toggle-switch' }, [
-                    createElement('input', { type: 'checkbox', id: 'eligibleForTechUnlock' }),
-                    createElement('span', { class: 'slider' }),
-                    createElement('span', { class: 'label-text', textContent: 'Eligible for Tech Unlock' })
-                ])
-            ]),
-            createElement('div', { class: 'form-group' }, [
-                createElement('label', { class: 'toggle-switch' }, [
-                    createElement('input', { type: 'checkbox', id: 'isLoyaltyComp' }),
-                    createElement('span', { class: 'slider' }),
-                    createElement('span', { class: 'label-text', textContent: 'Is the Loyalty Draw Prize' })
-                ])
-            ]),
-             createElement('div', { class: 'form-group' }, [
-                createElement('label', { class: 'toggle-switch' }, [
-                    createElement('input', { type: 'checkbox', id: 'requiresUnlock' }),
-                    createElement('span', { class: 'slider' }),
-                    createElement('span', { class: 'label-text', textContent: 'Requires Unlock to Enter' })
-                ])
-            ]),
+            createElement('div', { class: 'form-group-inline' }, [
+                createElement('div', { class: 'form-group' }, [
+                    createElement('label', { class: 'toggle-switch' }, [
+                        createElement('input', { type: 'checkbox', id: 'eligibleForTechUnlock' }),
+                        createElement('span', { class: 'slider' }),
+                        createElement('span', { class: 'label-text', textContent: 'Eligible for Tech Unlock' })
+                    ])
+                ]),
+                createElement('div', { class: 'form-group' }, [
+                    createElement('label', { class: 'toggle-switch' }, [
+                        createElement('input', { type: 'checkbox', id: 'isLoyaltyComp' }),
+                        createElement('span', { class: 'slider' }),
+                        createElement('span', { class: 'label-text', textContent: 'Is the Loyalty Draw Prize' })
+                    ])
+                ]),
+                 createElement('div', { class: 'form-group' }, [
+                    createElement('label', { class: 'toggle-switch' }, [
+                        createElement('input', { type: 'checkbox', id: 'requiresUnlock' }),
+                        createElement('span', { class: 'slider' }),
+                        createElement('span', { class: 'label-text', textContent: 'Requires Unlock to Enter' })
+                    ])
+                ]),
+            ])
         ]),
         createElement('fieldset', {}, [
             createElement('legend', { textContent: 'Free Entry Route' }),
-             createElement('div', { class: 'form-group' }, [
-                createElement('label', { class: 'toggle-switch' }, [
-                    createElement('input', { type: 'checkbox', id: 'postalEnabled', checked: true }),
-                    createElement('span', { class: 'slider' }),
-                    createElement('span', { class: 'label-text', textContent: 'Enable Postal Route' })
+            createElement('div', { class: 'form-group-inline' }, [
+                 createElement('div', { class: 'form-group' }, [
+                    createElement('label', { class: 'toggle-switch' }, [
+                        createElement('input', { type: 'checkbox', id: 'postalEnabled', checked: true }),
+                        createElement('span', { class: 'slider' }),
+                        createElement('span', { class: 'label-text', textContent: 'Enable Postal Route' })
+                    ])
+                ]),
+                createElement('div', { class: 'form-group' }, [
+                    createElement('label', { for: 'postalLimitPerUser', textContent: 'Postal Entries Per User' }),
+                    createElement('input', { type: 'number', id: 'postalLimitPerUser', value: '1', required: true })
                 ])
-            ]),
-            createElement('div', { class: 'form-group' }, [
-                createElement('label', { for: 'postalLimitPerUser', textContent: 'Postal Entries Per User' }),
-                createElement('input', { type: 'number', id: 'postalLimitPerUser', value: '1', required: true })
             ])
         ]),
         createElement('fieldset', {}, [createElement('legend', { textContent: 'Ticket Pricing' }), tiersContainer, addTierBtn]),

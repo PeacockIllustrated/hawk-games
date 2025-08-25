@@ -1,62 +1,80 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is an admin
+    // --- Helpers ---
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
     function isAdmin() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      return signedIn() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
     }
 
-    // Helper function to check if the write is coming from a Cloud Function (or admin)
-    // A simple check is to see if they are trying to write a protected field.
-    // A more robust way would involve custom claims, but this is a good start.
-    function isBackendOrAdmin() {
-        return isAdmin(); // For now, we assume admin actions and backend are one and the same for these fields
-    }
-
-    match /users/{userId} {
-      // Users can read their own data and update some fields
-      allow read, update: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId;
-
-      // Disallow client-side updates to the loyalty field
-      allow update: if request.auth.uid == userId && !('loyalty' in request.resource.data);
-    }
-
-    match /competitions/{compId} {
-      // Anyone can read competitions
+    // --- ADMIN SETTINGS ---
+    match /admin_settings/{setting} {
       allow read: if true;
-
-      // Only admins can create or delete competitions
-      allow create, delete: if isAdmin();
-
-      // Admins can update any field, but clients cannot update the loyalty or freeRoute fields
-      allow update: if isAdmin();
-      allow update: if !('loyalty' in request.resource.data) && !('freeRoute' in request.resource.data);
+      allow write: if isAdmin();
     }
 
-    match /competitions/{compId}/entries/{entryId} {
-        // Users can read entries for a competition
-        allow read: if true;
+    // --- GLOBAL LOYALTY SETTINGS ---
+    match /settings/{docId} {
+        allow read: if true; // All users can read settings
+        allow write: if isAdmin(); // Only admins can change them
+    }
 
-        // Entries can only be created by Cloud Functions (implicitly enforced by callable function authentication)
-        // We will deny all direct client writes to be safe.
+    // --- USERS ---
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      // Users can update their own doc, but cannot make themselves admin or change their loyalty status.
+      allow update: if (isOwner(userId) &&
+                      request.resource.data.isAdmin == resource.data.isAdmin &&
+                      request.resource.data.loyalty == resource.data.loyalty)
+                   || isAdmin();
+      allow create: if isOwner(userId) && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+    }
+
+    // --- COMPETITIONS & SPINNER COMPS ---
+    // This simple rule is safest: only admins can create, update, or delete competitions.
+    // All client interaction (like buying tickets) goes through Cloud Functions.
+    match /competitions/{compId} {
+      allow list, get: if true;
+      allow write: if isAdmin();
+    }
+
+    match /spinner_competitions/{compId} {
+      allow list, get: if true;
+      allow write: if isAdmin();
+    }
+
+    // --- ENTRIES (Recursive rule for all entry subcollections) ---
+    match /{path=**}/entries/{entryId} {
+      // Allows collectionGroup queries from the client, which are then filtered by UID in the code.
+      allow list: if signedIn();
+
+      // Allows reading a single entry if you are the owner or an admin.
+      allow get: if isAdmin() || (signedIn() && request.auth.uid == resource.data.userId);
+
+      // All writes (new entries) MUST go through verified Cloud Functions.
+      allow create, update, delete: if false;
+    }
+
+    // --- AUDIT LOGS (Write-only for backend, read-only for admin) ---
+    match /audits/{auditId} {
+        allow read: if isAdmin();
+        // This denies all client-side writes. Audits must be created by Cloud Functions.
         allow write: if false;
     }
 
-    match /settings/{docId} {
-        // Anyone can read settings
-        allow read: if true;
-        // Only admins can write settings
-        allow write: if isAdmin();
-    }
-
-    match /audits/{auditId} {
-        // Only backend can write audit logs
-        allow write: if isBackendOrAdmin();
-        // Only admins can read audit logs
-        allow read: if isAdmin();
-    }
+    // --- SERVER-ONLY & PUBLIC COLLECTIONS ---
+    match /spin_wins/{winId} { allow read, write: if false; }
+    match /pastWinners/{winnerId} { allow read: if true; allow write: if false; }
   }
 }

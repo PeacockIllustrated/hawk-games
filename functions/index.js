@@ -391,12 +391,12 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
     });
 });
 
-// --- getSpinnerFinancials ---
-exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
+// --- getRevenueAnalytics ---
+exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
     await assertIsAdmin(request);
 
     try {
-        // 1. Calculate Costs (Cash vs. Credit)
+        // 1. Calculate Spinner Costs (Cash vs. Credit)
         const spinWinsSnapshot = await db.collection('spin_wins').get();
         let totalCashCost = 0;
         let totalSiteCreditAwarded = 0;
@@ -409,10 +409,10 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
             }
         });
 
-        // 2. Calculate Total and By-Source Revenue
-        const competitionsSnapshot = await db.collection('competitions').where('instantWinsConfig.enabled', '==', true).get();
-        let totalRevenue = 0;
+        // 2. Calculate Revenue from all competitions, categorized by type
+        const competitionsSnapshot = await db.collection('competitions').get();
         const revenueBySource = {
+            main: 0,
             instant: 0,
             hero: 0,
             token: 0,
@@ -430,7 +430,6 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
                 if (entryData.entryType === 'paid' || entryData.entryType === 'credit') {
                      if (ticketTiersMap.has(entryData.ticketsBought)) {
                         const price = ticketTiersMap.get(entryData.ticketsBought);
-                        totalRevenue += price;
                         if (revenueBySource.hasOwnProperty(compType)) {
                             revenueBySource[compType] += price;
                         } else {
@@ -441,21 +440,22 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
             }
         }
 
-        // 3. Calculate Net Profit (based on cash cost)
-        const netProfit = totalRevenue - totalCashCost;
+        // 3. Calculate Spinner-specific revenue and profit
+        const spinnerTokenRevenue = (revenueBySource.instant || 0) + (revenueBySource.hero || 0) + (revenueBySource.token || 0);
+        const netProfit = spinnerTokenRevenue - totalCashCost;
 
         return {
             success: true,
-            totalRevenue,
             revenueBySource,
+            spinnerTokenRevenue,
             totalCashCost,
             totalSiteCreditAwarded,
             netProfit
         };
 
     } catch (error) {
-        logger.error("Error calculating spinner financials:", error);
-        throw new HttpsError('internal', 'An unexpected error occurred while calculating financials.');
+        logger.error("Error calculating revenue analytics:", error);
+        throw new HttpsError('internal', 'An unexpected error occurred while calculating analytics.');
     }
 });
 

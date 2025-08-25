@@ -99,7 +99,7 @@ function renderView(viewName) {
         case 'spinner-settings': renderSpinnerSettingsView(); break;
         case 'plinko-settings': renderPlinkoSettingsView(); break;
         case 'plinko-stats': renderPlinkoStatsView(); break;
-        case 'spinner-stats': renderSpinnerStatsView(); break;
+        case 'revenue-analytics': renderRevenueAnalyticsView(); break;
     }
 }
 
@@ -335,90 +335,119 @@ function renderPlinkoStatsView() {
     mainContentContainer.append(panel);
 }
 
-// --- VIEW: Spinner Stats ---
-async function renderSpinnerStatsView() {
+// --- VIEW: Revenue Analytics ---
+async function renderRevenueAnalyticsView() {
     const panel = createElement('div', { class: 'content-panel' });
-    const title = createElement('h2', { textContent: 'Instant Spinner Statistics' });
-    const container = createElement('div', { class: 'stats-container' });
-    const actionsContainer = createElement('div', { class: 'stats-actions' });
+    const title = createElement('h2', { textContent: 'Revenue Analytics' });
 
-    panel.append(title, container, actionsContainer);
+    const tabContainer = createElement('div', { class: 'admin-tabs' });
+    const tabContentContainer = createElement('div', { class: 'admin-tab-content' });
+
+    panel.append(title, tabContainer, tabContentContainer);
     mainContentContainer.append(panel);
 
-    container.innerHTML = '<p>Loading spinner financial data...</p>';
+    tabContentContainer.innerHTML = '<p>Loading analytics data...</p>';
 
     try {
-        const getSpinnerFinancials = httpsCallable(functions, 'getSpinnerFinancials');
-        const result = await getSpinnerFinancials();
+        const getRevenueAnalytics = httpsCallable(functions, 'getRevenueAnalytics');
+        const result = await getRevenueAnalytics();
+        if (!result.data.success) throw new Error(result.data.message || 'The function reported an error.');
 
-        if (!result.data.success) {
-            throw new Error(result.data.message || 'The function reported an error.');
-        }
-
-        const { totalRevenue, revenueBySource, totalCashCost, totalSiteCreditAwarded, netProfit } = result.data;
-
+        const data = result.data;
         const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
-        const revenueBreakdown = Object.entries(revenueBySource)
-            .filter(([key, value]) => key !== 'instant' && value > 0)
-            .map(([key, value]) => `${key.charAt(0).toUpperCase() + key.slice(1)}: ${currencyFormatter.format(value)}`)
-            .join(' | ');
+        // -- Tab Setup --
+        const tabs = {
+            spinner: { button: createElement('button', { class: ['tab-btn', 'active'], textContent: 'Spinner Game Profitability' }), content: renderSpinnerProfitabilityTab(data, currencyFormatter) },
+            revenue: { button: createElement('button', { class: 'tab-btn', textContent: 'Revenue by Comp Type' }), content: renderRevenueByTypeTab(data, currencyFormatter) }
+        };
 
-        const revenueCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Revenue (Instant Comps)' }),
-            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(revenueBySource.instant || 0) }),
-            revenueBreakdown && createElement('p', { class: 'stat-breakdown', textContent: `Other Sources: ${revenueBreakdown}` })
-        ].filter(Boolean));
+        tabContainer.append(tabs.spinner.button, tabs.revenue.button);
+        tabContentContainer.innerHTML = '';
+        tabContentContainer.append(tabs.spinner.content);
 
-        const costCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Total Cash Cost (Prizes)' }),
-            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalCashCost) })
-        ]);
-
-        const creditCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Total Site Credit Awarded' }),
-            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalSiteCreditAwarded) })
-        ]);
-
-        const profitCard = createElement('div', { class: ['stat-card', netProfit >= 0 ? 'profit' : 'loss'] }, [
-            createElement('h3', { textContent: 'Net Profit (Cash)' }),
-            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(netProfit) })
-        ]);
-
-        container.innerHTML = '';
-        container.append(revenueCard, costCard, creditCard, profitCard);
-
-        const resetBtn = createElement('button', {
-            id: 'reset-spinner-stats-btn',
-            class: ['btn', 'btn-danger'],
-            textContent: 'Reset Spinner Stats'
-        });
-        actionsContainer.innerHTML = '';
-        actionsContainer.append(resetBtn);
-
-        resetBtn.addEventListener('click', async () => {
-            if (confirm("Are you sure you want to reset all spinner stats? This will delete all recorded spinner wins and cannot be undone.")) {
-                resetBtn.disabled = true;
-                resetBtn.textContent = 'Resetting...';
-                try {
-                    const resetSpinnerStats = httpsCallable(functions, 'resetSpinnerStats');
-                    await resetSpinnerStats();
-                    alert('Spinner stats have been successfully reset.');
-                    renderSpinnerStatsView(); // Re-render the view
-                } catch (error) {
-                    console.error("Error resetting spinner stats:", error);
-                    alert(`Failed to reset stats: ${error.message}`);
-                    resetBtn.disabled = false;
-                    resetBtn.textContent = 'Reset Spinner Stats';
-                }
-            }
+        Object.values(tabs).forEach(tab => {
+            tab.button.addEventListener('click', () => {
+                Object.values(tabs).forEach(t => {
+                    t.button.classList.remove('active');
+                    t.content.classList.remove('active');
+                });
+                tab.button.classList.add('active');
+                tab.content.classList.add('active');
+                tabContentContainer.innerHTML = '';
+                tabContentContainer.append(tab.content);
+            });
         });
 
     } catch (error) {
-        console.error("Error fetching spinner financials:", error);
-        container.innerHTML = '';
-        container.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
+        console.error("Error fetching revenue analytics:", error);
+        tabContentContainer.innerHTML = '';
+        tabContentContainer.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
     }
+}
+
+function renderSpinnerProfitabilityTab(data, formatter) {
+    const { spinnerTokenRevenue, totalCashCost, totalSiteCreditAwarded, netProfit } = data;
+    const container = createElement('div', { class: ['stats-container', 'active'] });
+
+    const revenueCard = createElement('div', { class: 'stat-card' }, [
+        createElement('h3', { textContent: 'Total Revenue (Token Comps)' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(spinnerTokenRevenue || 0) })
+    ]);
+    const costCard = createElement('div', { class: 'stat-card' }, [
+        createElement('h3', { textContent: 'Total Cash Cost (Prizes)' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(totalCashCost || 0) })
+    ]);
+    const creditCard = createElement('div', { class: 'stat-card' }, [
+        createElement('h3', { textContent: 'Total Site Credit Awarded' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(totalSiteCreditAwarded || 0) })
+    ]);
+    const profitCard = createElement('div', { class: ['stat-card', netProfit >= 0 ? 'profit' : 'loss'] }, [
+        createElement('h3', { textContent: 'Net Profit (Cash)' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(netProfit || 0) })
+    ]);
+    container.append(revenueCard, costCard, creditCard, profitCard);
+
+    const actionsContainer = createElement('div', { class: 'stats-actions' });
+    const resetBtn = createElement('button', { id: 'reset-spinner-stats-btn', class: ['btn', 'btn-danger'], textContent: 'Reset Spinner Stats' });
+    actionsContainer.append(resetBtn);
+
+    resetBtn.addEventListener('click', async () => {
+        if (confirm("Are you sure you want to reset all spinner stats? This will delete all recorded spinner wins and cannot be undone.")) {
+            resetBtn.disabled = true;
+            resetBtn.textContent = 'Resetting...';
+            try {
+                const resetSpinnerStats = httpsCallable(functions, 'resetSpinnerStats');
+                await resetSpinnerStats();
+                alert('Spinner stats have been successfully reset.');
+                renderRevenueAnalyticsView(); // Re-render the whole view
+            } catch (error) {
+                console.error("Error resetting spinner stats:", error);
+                alert(`Failed to reset stats: ${error.message}`);
+                resetBtn.disabled = false;
+                resetBtn.textContent = 'Reset Spinner Stats';
+            }
+        }
+    });
+
+    return createElement('div', {}, [container, actionsContainer]);
+}
+
+function renderRevenueByTypeTab(data, formatter) {
+    const { revenueBySource } = data;
+    const container = createElement('div', { class: 'stats-container' });
+
+    const types = ['main', 'instant', 'hero', 'token'];
+    types.forEach(type => {
+        const title = `${type.charAt(0).toUpperCase() + type.slice(1)} Comps`;
+        const card = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: `Revenue (${title})` }),
+            createElement('p', { class: 'stat-value', textContent: formatter.format(revenueBySource[type] || 0) })
+        ]);
+        container.append(card);
+    });
+
+    return container;
 }
 
 // --- Reusable Assignment Panel ---

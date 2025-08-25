@@ -222,9 +222,98 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
             });
             if (finalPrize.prizeType === 'credit') {
                 transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            } else if (finalPrize.prizeType === 'cash') {
+                transaction.update(userRef, { cashBalance: FieldValue.increment(finalPrize.value) });
             }
         }
         return finalPrize;
+    });
+});
+
+// --- transferCashToCredit ---
+exports.transferCashToCredit = onCall(functionOptions, async (request) => {
+    const schema = z.object({
+        amount: z.number().positive("Amount must be a positive number."),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+        throw new HttpsError('invalid-argument', validation.error.errors[0].message);
+    }
+    const { amount } = validation.data;
+
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+            throw new HttpsError('not-found', 'User profile not found.');
+        }
+
+        const userData = userDoc.data();
+        const userCashBalance = userData.cashBalance || 0;
+
+        if (userCashBalance < amount) {
+            throw new HttpsError('failed-precondition', 'Insufficient cash balance.');
+        }
+
+        const creditToAdd = amount * 1.5;
+
+        transaction.update(userRef, {
+            cashBalance: FieldValue.increment(-amount),
+            creditBalance: FieldValue.increment(creditToAdd)
+        });
+
+        return { success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd };
+    });
+});
+
+// --- requestCashPayout ---
+exports.requestCashPayout = onCall(functionOptions, async (request) => {
+    const schema = z.object({
+        amount: z.number().positive("Amount must be a positive number."),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+        throw new HttpsError('invalid-argument', validation.error.errors[0].message);
+    }
+    const { amount } = validation.data;
+
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+            throw new HttpsError('not-found', 'User profile not found.');
+        }
+
+        const userData = userDoc.data();
+        const userCashBalance = userData.cashBalance || 0;
+
+        if (userCashBalance < amount) {
+            throw new HttpsError('failed-precondition', 'Insufficient cash balance.');
+        }
+
+        transaction.update(userRef, {
+            cashBalance: FieldValue.increment(-amount)
+        });
+
+        const payoutRequestRef = db.collection('payoutRequests').doc();
+        transaction.set(payoutRequestRef, {
+            userId: uid,
+            amount: amount,
+            status: 'pending',
+            requestedAt: FieldValue.serverTimestamp(),
+            userDisplayName: userData.displayName || 'N/A',
+            userEmail: userData.email || 'N/A'
+        });
+
+        return { success: true, message: "Payout request submitted successfully." };
     });
 });
 

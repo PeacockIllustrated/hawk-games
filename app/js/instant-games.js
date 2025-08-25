@@ -13,6 +13,7 @@ let userTokens = []; // Spinner tokens
 // let userPlinkoTokens = []; // Plinko tokens
 let userProfile = {};
 let userCreditBalance = 0;
+let userCashBalance = 0;
 let spinnerPrizes = [];
 // let plinkoConfig = {};
 let isSpinning = false;
@@ -23,6 +24,7 @@ let activeTokenCompetition = null;
 const tokenCountElement = document.getElementById('token-count');
 // const plinkoTokenCountElement = document.getElementById('plinko-token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
+const cashBalanceElement = document.getElementById('cash-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
 const buySpinnerBtn = document.getElementById('buy-spinner-tokens-btn');
 // const buyPlinkoBtn = document.getElementById('buy-plinko-tokens-btn');
@@ -74,6 +76,7 @@ auth.onAuthStateChanged((user) => {
             if (docSnap.exists()) {
                 userProfile = docSnap.data();
                 userCreditBalance = userProfile.creditBalance || 0;
+                userCashBalance = userProfile.cashBalance || 0;
                 userTokens = (userProfile.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
                 // userPlinkoTokens = (userProfile.plinkoTokens || []);
                 if (!isSpinning) {
@@ -121,6 +124,7 @@ async function loadAllGameSettings() {
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
+    cashBalanceElement.textContent = `£${userCashBalance.toFixed(2)}`;
 
     const tokensAvailable = userTokens.length;
     spinButton.disabled = tokensAvailable < 1 || isSpinning;

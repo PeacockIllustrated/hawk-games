@@ -354,7 +354,7 @@ async function renderSpinnerStatsView() {
             throw new Error(result.data.message || 'The function reported an error.');
         }
 
-        const { totalRevenue, totalCost, netProfit } = result.data;
+        const { totalRevenue, totalCashCost, totalSiteCreditAwarded, netProfit } = result.data;
 
         const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
@@ -364,17 +364,22 @@ async function renderSpinnerStatsView() {
         ]);
 
         const costCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Total Cost (Prizes)' }),
-            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalCost) })
+            createElement('h3', { textContent: 'Total Cash Cost (Prizes)' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalCashCost) })
+        ]);
+
+        const creditCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Total Site Credit Awarded' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalSiteCreditAwarded) })
         ]);
 
         const profitCard = createElement('div', { class: ['stat-card', netProfit >= 0 ? 'profit' : 'loss'] }, [
-            createElement('h3', { textContent: 'Net Profit' }),
+            createElement('h3', { textContent: 'Net Profit (Cash)' }),
             createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(netProfit) })
         ]);
 
         container.innerHTML = '';
-        container.append(revenueCard, costCard, profitCard);
+        container.append(revenueCard, costCard, creditCard, profitCard);
 
     } catch (error) {
         console.error("Error fetching spinner financials:", error);

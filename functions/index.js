@@ -396,11 +396,18 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
     await assertIsAdmin(request);
 
     try {
-        // 1. Calculate Total Cost
+        // 1. Calculate Costs (Cash vs. Credit)
         const spinWinsSnapshot = await db.collection('spin_wins').get();
-        const totalCost = spinWinsSnapshot.docs.reduce((sum, doc) => {
-            return sum + (doc.data().prizeValue || 0);
-        }, 0);
+        let totalCashCost = 0;
+        let totalSiteCreditAwarded = 0;
+        spinWinsSnapshot.docs.forEach(doc => {
+            const prize = doc.data();
+            if (prize.prizeType === 'cash') {
+                totalCashCost += prize.prizeValue || 0;
+            } else if (prize.prizeType === 'credit') {
+                totalSiteCreditAwarded += prize.prizeValue || 0;
+            }
+        });
 
         // 2. Calculate Total Revenue
         const competitionsSnapshot = await db.collection('competitions').where('instantWinsConfig.enabled', '==', true).get();
@@ -421,13 +428,14 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
             }
         }
 
-        // 3. Calculate Net Profit
-        const netProfit = totalRevenue - totalCost;
+        // 3. Calculate Net Profit (based on cash cost)
+        const netProfit = totalRevenue - totalCashCost;
 
         return {
             success: true,
             totalRevenue: totalRevenue,
-            totalCost: totalCost,
+            totalCashCost: totalCashCost,
+            totalSiteCreditAwarded: totalSiteCreditAwarded,
             netProfit: netProfit
         };
 

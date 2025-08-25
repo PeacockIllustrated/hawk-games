@@ -1171,6 +1171,23 @@ main.showcase-container {
     color: #e74c3c;
 }
 
+.stats-actions {
+    padding: 0 1.5rem 1.5rem 1.5rem;
+    text-align: right;
+}
+
+.btn-danger {
+    background-color: #c0392b;
+    border-color: #c0392b;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #e74c3c;
+    border-color: #e74c3c;
+    color: white;
+}
+
 /* --- 29. New Balance Styles --- */
 
 /* Icon for cash balance on instant win page */

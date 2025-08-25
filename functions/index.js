@@ -445,6 +445,39 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
     }
 });
 
+// --- resetSpinnerStats ---
+exports.resetSpinnerStats = onCall(functionOptions, async (request) => {
+    await assertIsAdmin(request);
+
+    const collectionRef = db.collection('spin_wins');
+    const batchSize = 100;
+
+    try {
+        let query = collectionRef.orderBy('__name__').limit(batchSize);
+        let snapshot = await query.get();
+
+        while (snapshot.size > 0) {
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+
+            const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+            query = collectionRef.orderBy('__name__').startAfter(lastDoc).limit(batchSize);
+            snapshot = await query.get();
+        }
+
+        logger.log("Successfully deleted all documents from 'spin_wins' collection.");
+        return { success: true, message: "Spinner stats have been reset." };
+
+    } catch (error) {
+        logger.error("Error resetting spinner stats:", error);
+        throw new HttpsError('internal', 'Could not reset spinner stats.');
+    }
+});
+
+
 // --- drawWinner ---
 exports.drawWinner = onCall(functionOptions, async (request) => {
     const schema = z.object({ compId: z.string().min(1) });

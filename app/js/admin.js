@@ -340,8 +340,9 @@ async function renderSpinnerStatsView() {
     const panel = createElement('div', { class: 'content-panel' });
     const title = createElement('h2', { textContent: 'Instant Spinner Statistics' });
     const container = createElement('div', { class: 'stats-container' });
+    const actionsContainer = createElement('div', { class: 'stats-actions' });
 
-    panel.append(title, container);
+    panel.append(title, container, actionsContainer);
     mainContentContainer.append(panel);
 
     container.innerHTML = '<p>Loading spinner financial data...</p>';
@@ -380,6 +381,32 @@ async function renderSpinnerStatsView() {
 
         container.innerHTML = '';
         container.append(revenueCard, costCard, creditCard, profitCard);
+
+        const resetBtn = createElement('button', {
+            id: 'reset-spinner-stats-btn',
+            class: ['btn', 'btn-danger'],
+            textContent: 'Reset Spinner Stats'
+        });
+        actionsContainer.innerHTML = '';
+        actionsContainer.append(resetBtn);
+
+        resetBtn.addEventListener('click', async () => {
+            if (confirm("Are you sure you want to reset all spinner stats? This will delete all recorded spinner wins and cannot be undone.")) {
+                resetBtn.disabled = true;
+                resetBtn.textContent = 'Resetting...';
+                try {
+                    const resetSpinnerStats = httpsCallable(functions, 'resetSpinnerStats');
+                    await resetSpinnerStats();
+                    alert('Spinner stats have been successfully reset.');
+                    renderSpinnerStatsView(); // Re-render the view
+                } catch (error) {
+                    console.error("Error resetting spinner stats:", error);
+                    alert(`Failed to reset stats: ${error.message}`);
+                    resetBtn.disabled = false;
+                    resetBtn.textContent = 'Reset Spinner Stats';
+                }
+            }
+        });
 
     } catch (error) {
         console.error("Error fetching spinner financials:", error);

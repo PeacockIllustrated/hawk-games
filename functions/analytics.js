@@ -36,7 +36,8 @@ function processAnalyticsData(data) {
   };
 
   const spinnerTokenRevenue = (revenueBySource.instant) +
-    (revenueBySource.hero) + (revenueBySource.token);
+    (revenueBySource.hero) + (revenueBySource.token) +
+    (data.spinnerCashSales || 0);
   const totalCashCost = data.spinnerCashPrizes || 0;
   const netProfit = spinnerTokenRevenue - totalCashCost;
 
@@ -51,11 +52,17 @@ function processAnalyticsData(data) {
 }
 
 /**
- * Asserts that the user is an administrator.
- * @param {object} request The request object.
+ * Asserts that the user is an administrator by checking custom claims.
+ * @param {object} request The request object from the callable function.
+ * @throws {HttpsError} If the user is not an admin.
  */
-const assertIsAdmin = async (request) => {
-  // This is a simplified check for demonstration.
+const assertIsAdmin = (request) => {
+  if (request.auth?.token?.isAdmin !== true) {
+    throw new HttpsError(
+        "permission-denied",
+        "You must be an administrator to perform this action.",
+    );
+  }
 };
 
 exports.getRevenueAnalytics = onCall({
@@ -108,32 +115,37 @@ exports.getRevenueAnalytics = onCall({
       return {success: true, ...processAnalyticsData({})};
     }
 
-    const aggregatedData = {};
+    const aggregatedData = {
+      byGameType: {
+        main: {gmv: 0, gmvCashFunded: 0},
+        instant: {gmv: 0, gmvCashFunded: 0},
+        hero: {gmv: 0, gmvCashFunded: 0},
+        token: {gmv: 0, gmvCashFunded: 0},
+        other: {gmv: 0, gmvCashFunded: 0},
+      },
+    };
+    const topLevelKeys = [
+      "grossCashIn", "fees", "netCashIn", "creditIssued", "creditRedeemed",
+      "gmvCreditFunded", "entriesCountCredit", "cashPrizesPaid", "cogs",
+      "shipping", "spinnerCashPrizes", "spinsSoldCash", "spinnerCashSales",
+    ];
     dailySnapshots.forEach((doc) => {
       const dailyData = doc.data();
-      for (const key in dailyData) {
-        if (Object.prototype.hasOwnProperty.call(dailyData, key)) {
-          if (typeof dailyData[key] === "number") {
-            aggregatedData[key] = (aggregatedData[key] || 0) + dailyData[key];
-          } else if (typeof dailyData[key] === "object") {
-            if (!aggregatedData[key]) {
-              aggregatedData[key] = {};
+      for (const key of topLevelKeys) {
+        if (typeof dailyData[key] === "number") {
+          aggregatedData[key] = (aggregatedData[key] || 0) + dailyData[key];
+        }
+      }
+      if (dailyData.byGameType) {
+        for (const gameType in aggregatedData.byGameType) {
+          if (dailyData.byGameType[gameType]) {
+            const dailySource = dailyData.byGameType[gameType];
+            const aggregatedSource = aggregatedData.byGameType[gameType];
+            if (typeof dailySource.gmv === "number") {
+              aggregatedSource.gmv += dailySource.gmv;
             }
-            for (const subKey in dailyData[key]) {
-              if (Object.prototype.hasOwnProperty.call(
-                  dailyData[key], subKey)) {
-                if (!aggregatedData[key][subKey]) {
-                  aggregatedData[key][subKey] = {};
-                }
-                for (const nestedKey in dailyData[key][subKey]) {
-                  if (Object.prototype.hasOwnProperty.call(
-                      dailyData[key][subKey], nestedKey)) {
-                    aggregatedData[key][subKey][nestedKey] =
-                      (aggregatedData[key][subKey][nestedKey] || 0) +
-                      dailyData[key][subKey][nestedKey];
-                  }
-                }
-              }
+            if (typeof dailySource.gmvCashFunded === "number") {
+              aggregatedSource.gmvCashFunded += dailySource.gmvCashFunded;
             }
           }
         }

@@ -409,15 +409,10 @@ exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
             }
         });
 
-        // 2. Calculate Revenue from all competitions, categorized by type
+        // 2. Calculate Revenue from all competitions, categorized by type and payment method
         const competitionsSnapshot = await db.collection('competitions').get();
-        const revenueBySource = {
-            main: 0,
-            instant: 0,
-            hero: 0,
-            token: 0,
-            other: 0
-        };
+        const revenueBySource = { main: 0, instant: 0, hero: 0, token: 0, other: 0 };
+        let revenueFromSiteCredit = 0;
 
         for (const compDoc of competitionsSnapshot.docs) {
             const compData = compDoc.data();
@@ -427,14 +422,16 @@ exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
             const entriesSnapshot = await db.collection('competitions').doc(compDoc.id).collection('entries').get();
             for (const entryDoc of entriesSnapshot.docs) {
                 const entryData = entryDoc.data();
-                if (entryData.entryType === 'paid' || entryData.entryType === 'credit') {
-                     if (ticketTiersMap.has(entryData.ticketsBought)) {
-                        const price = ticketTiersMap.get(entryData.ticketsBought);
+                if (ticketTiersMap.has(entryData.ticketsBought)) {
+                    const price = ticketTiersMap.get(entryData.ticketsBought);
+                    if (entryData.entryType === 'paid') {
                         if (revenueBySource.hasOwnProperty(compType)) {
                             revenueBySource[compType] += price;
                         } else {
                             revenueBySource.other += price;
                         }
+                    } else if (entryData.entryType === 'credit') {
+                        revenueFromSiteCredit += price;
                     }
                 }
             }
@@ -447,6 +444,7 @@ exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
         return {
             success: true,
             revenueBySource,
+            revenueFromSiteCredit,
             spinnerTokenRevenue,
             totalCashCost,
             totalSiteCreditAwarded,

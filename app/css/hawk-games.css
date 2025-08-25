@@ -1202,6 +1202,13 @@ main.showcase-container {
     color: #e74c3c;
 }
 
+.stat-annotation {
+    font-size: 0.8rem;
+    color: #95a5a6;
+    margin-top: 0.75rem;
+    font-style: italic;
+}
+
 .stat-card .stat-breakdown {
     margin-top: 0.75rem;
     font-size: 0.85rem;

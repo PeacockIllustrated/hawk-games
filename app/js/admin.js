@@ -391,20 +391,24 @@ function renderSpinnerProfitabilityTab(data, formatter) {
     const container = createElement('div', { class: ['stats-container', 'active'] });
 
     const revenueCard = createElement('div', { class: 'stat-card' }, [
-        createElement('h3', { textContent: 'Total Revenue (Token Comps)' }),
-        createElement('p', { class: 'stat-value', textContent: formatter.format(spinnerTokenRevenue || 0) })
+        createElement('h3', { textContent: 'Spinner-Related Revenue' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(spinnerTokenRevenue || 0) }),
+        createElement('p', { class: 'stat-annotation', textContent: 'Cash sales from Instant, Hero, and Token competitions.' })
     ]);
     const costCard = createElement('div', { class: 'stat-card' }, [
         createElement('h3', { textContent: 'Total Cash Cost (Prizes)' }),
-        createElement('p', { class: 'stat-value', textContent: formatter.format(totalCashCost || 0) })
+        createElement('p', { class: 'stat-value', textContent: formatter.format(totalCashCost || 0) }),
+        createElement('p', { class: 'stat-annotation', textContent: 'The value of all cash prizes won from the spinner.' })
     ]);
     const creditCard = createElement('div', { class: 'stat-card' }, [
         createElement('h3', { textContent: 'Total Site Credit Awarded' }),
-        createElement('p', { class: 'stat-value', textContent: formatter.format(totalSiteCreditAwarded || 0) })
+        createElement('p', { class: 'stat-value', textContent: formatter.format(totalSiteCreditAwarded || 0) }),
+        createElement('p', { class: 'stat-annotation', textContent: 'The value of all site credit prizes won from the spinner.' })
     ]);
     const profitCard = createElement('div', { class: ['stat-card', netProfit >= 0 ? 'profit' : 'loss'] }, [
         createElement('h3', { textContent: 'Net Profit (Cash)' }),
-        createElement('p', { class: 'stat-value', textContent: formatter.format(netProfit || 0) })
+        createElement('p', { class: 'stat-value', textContent: formatter.format(netProfit || 0) }),
+        createElement('p', { class: 'stat-annotation', textContent: 'Spinner Revenue - Cash Cost.' })
     ]);
     container.append(revenueCard, costCard, creditCard, profitCard);
 
@@ -434,18 +438,39 @@ function renderSpinnerProfitabilityTab(data, formatter) {
 }
 
 function renderRevenueByTypeTab(data, formatter) {
-    const { revenueBySource } = data;
+    const { revenueBySource, revenueFromSiteCredit } = data;
     const container = createElement('div', { class: 'stats-container' });
 
     const types = ['main', 'instant', 'hero', 'token'];
+    let totalCashRevenue = 0;
+
     types.forEach(type => {
+        const revenue = revenueBySource[type] || 0;
+        totalCashRevenue += revenue;
         const title = `${type.charAt(0).toUpperCase() + type.slice(1)} Comps`;
         const card = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: `Revenue (${title})` }),
-            createElement('p', { class: 'stat-value', textContent: formatter.format(revenueBySource[type] || 0) })
+            createElement('h3', { textContent: `Cash Revenue (${title})` }),
+            createElement('p', { class: 'stat-value', textContent: formatter.format(revenue) }),
+            createElement('p', { class: 'stat-annotation', textContent: 'Revenue from "paid" entry types only.' })
         ]);
         container.append(card);
     });
+
+    const totalCashCard = createElement('div', { class: 'stat-card' }, [
+        createElement('h3', { textContent: 'Total Cash Revenue' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(totalCashRevenue) }),
+        createElement('p', { class: 'stat-annotation', textContent: 'Sum of all cash revenue across all competition types.' })
+    ]);
+
+    const creditPurchaseCard = createElement('div', { class: 'stat-card' }, [
+        createElement('h3', { textContent: 'Purchases via Site Credit' }),
+        createElement('p', { class: 'stat-value', textContent: formatter.format(revenueFromSiteCredit || 0) }),
+        createElement('p', { class: 'stat-annotation', textContent: 'Value of entries purchased using site credit balance.' })
+    ]);
+
+    // Prepend total cards for prominence
+    container.prepend(creditPurchaseCard);
+    container.prepend(totalCashCard);
 
     return container;
 }

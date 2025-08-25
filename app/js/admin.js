@@ -355,14 +355,20 @@ async function renderSpinnerStatsView() {
             throw new Error(result.data.message || 'The function reported an error.');
         }
 
-        const { totalRevenue, totalCashCost, totalSiteCreditAwarded, netProfit } = result.data;
+        const { totalRevenue, revenueBySource, totalCashCost, totalSiteCreditAwarded, netProfit } = result.data;
 
         const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
+        const revenueBreakdown = Object.entries(revenueBySource)
+            .filter(([key, value]) => key !== 'instant' && value > 0)
+            .map(([key, value]) => `${key.charAt(0).toUpperCase() + key.slice(1)}: ${currencyFormatter.format(value)}`)
+            .join(' | ');
+
         const revenueCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Total Revenue' }),
-            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(totalRevenue) })
-        ]);
+            createElement('h3', { textContent: 'Revenue (Instant Comps)' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(revenueBySource.instant || 0) }),
+            revenueBreakdown && createElement('p', { class: 'stat-breakdown', textContent: `Other Sources: ${revenueBreakdown}` })
+        ].filter(Boolean));
 
         const costCard = createElement('div', { class: 'stat-card' }, [
             createElement('h3', { textContent: 'Total Cash Cost (Prizes)' }),

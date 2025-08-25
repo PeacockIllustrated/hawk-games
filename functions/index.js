@@ -409,20 +409,33 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
             }
         });
 
-        // 2. Calculate Total Revenue
+        // 2. Calculate Total and By-Source Revenue
         const competitionsSnapshot = await db.collection('competitions').where('instantWinsConfig.enabled', '==', true).get();
         let totalRevenue = 0;
+        const revenueBySource = {
+            instant: 0,
+            hero: 0,
+            token: 0,
+            other: 0
+        };
 
         for (const compDoc of competitionsSnapshot.docs) {
             const compData = compDoc.data();
             const ticketTiersMap = new Map(compData.ticketTiers.map(tier => [tier.amount, tier.price]));
+            const compType = compData.competitionType || 'other';
 
             const entriesSnapshot = await db.collection('competitions').doc(compDoc.id).collection('entries').get();
             for (const entryDoc of entriesSnapshot.docs) {
                 const entryData = entryDoc.data();
                 if (entryData.entryType === 'paid' || entryData.entryType === 'credit') {
                      if (ticketTiersMap.has(entryData.ticketsBought)) {
-                        totalRevenue += ticketTiersMap.get(entryData.ticketsBought);
+                        const price = ticketTiersMap.get(entryData.ticketsBought);
+                        totalRevenue += price;
+                        if (revenueBySource.hasOwnProperty(compType)) {
+                            revenueBySource[compType] += price;
+                        } else {
+                            revenueBySource.other += price;
+                        }
                     }
                 }
             }
@@ -433,10 +446,11 @@ exports.getSpinnerFinancials = onCall(functionOptions, async (request) => {
 
         return {
             success: true,
-            totalRevenue: totalRevenue,
-            totalCashCost: totalCashCost,
-            totalSiteCreditAwarded: totalSiteCreditAwarded,
-            netProfit: netProfit
+            totalRevenue,
+            revenueBySource,
+            totalCashCost,
+            totalSiteCreditAwarded,
+            netProfit
         };
 
     } catch (error) {

@@ -1171,6 +1171,14 @@ main.showcase-container {
     color: #e74c3c;
 }
 
+.stat-card .stat-breakdown {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #aaa;
+    border-top: 1px solid #333;
+    padding-top: 0.5rem;
+}
+
 .stats-actions {
     padding: 0 1.5rem 1.5rem 1.5rem;
     text-align: right;

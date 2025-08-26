@@ -187,9 +187,11 @@ exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
       // For now, we'll assume a fixed price per ticket.
       // We need to find the price from the competition's ticketTiers.
       const competitionData = doc.data();
-      const tier = competitionData.ticketTiers.find(t => t.amount === entryData.ticketsBought);
-      if (tier) {
-        competitionRevenue += tier.price;
+      if (competitionData.ticketTiers && Array.isArray(competitionData.ticketTiers)) {
+        const tier = competitionData.ticketTiers.find(t => t.amount === entryData.ticketsBought);
+        if (tier && tier.price) {
+          competitionRevenue += tier.price;
+        }
       }
     });
     totalRevenue += competitionRevenue;
@@ -215,9 +217,11 @@ exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
       const entryData = doc.data();
       const compDoc = await db.collection("competitions").doc(doc.ref.parent.parent.id).get();
       const competitionData = compDoc.data();
-      const tier = competitionData.ticketTiers.find(t => t.amount === entryData.ticketsBought);
-      if (tier) {
-        totalSiteCreditSpent += tier.price;
+      if (competitionData && competitionData.ticketTiers && Array.isArray(competitionData.ticketTiers)) {
+        const tier = competitionData.ticketTiers.find(t => t.amount === entryData.ticketsBought);
+        if (tier && tier.price) {
+            totalSiteCreditSpent += tier.price;
+        }
       }
   }
 

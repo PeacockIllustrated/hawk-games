@@ -295,45 +295,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 .admin-nav a.active { color: var(--primary-gold); border-bottom-color: var(--primary-gold); }
 .content-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; }
 .content-panel > h2 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; padding: 1.5rem; background-color: #111; border-bottom: 1px solid var(--border-color); margin: 0; }
-.admin-date-picker {
-    padding: 1rem 1.5rem;
-    background-color: #111;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-}
-.admin-tabs {
-    display: flex;
-    padding: 0 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    background-color: #111;
-}
-.tab-btn {
-    background: none;
-    border: none;
-    color: #888;
-    font-family: var(--font-body);
-    font-weight: bold;
-    font-size: 1rem;
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease;
-}
-.tab-btn:hover {
-    color: var(--light-white);
-}
-.tab-btn.active {
-    color: var(--primary-gold);
-    border-bottom-color: var(--primary-gold);
-}
-.admin-tab-content .stats-container {
-    display: none;
-}
-.admin-tab-content .stats-container.active {
-    display: grid;
-}
 .admin-form { padding: 1.5rem; }
 .competition-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); gap: 1.5rem; }
 .competition-row:last-child { border-bottom: none; }
@@ -1170,76 +1131,6 @@ main.showcase-container {
     flex-direction: column;
     width: 100%;
     height: 100%;
-}
-
-/* Stats View */
-.stats-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1.5rem;
-    padding: 1.5rem;
-}
-
-.stat-card {
-    background-color: #1f2a38;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border-left: 5px solid #3498db;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.stat-card h3 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.2rem;
-    color: #ecf0f1;
-    font-family: 'Chakra Petch', sans-serif;
-}
-
-.stat-card .stat-value {
-    margin: 0;
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #ffffff;
-}
-
-.stat-card.profit .stat-value {
-    color: #2ecc71;
-}
-
-.stat-card.loss .stat-value {
-    color: #e74c3c;
-}
-
-.stat-annotation {
-    font-size: 0.8rem;
-    color: #95a5a6;
-    margin-top: 0.75rem;
-    font-style: italic;
-}
-
-.stat-card .stat-breakdown {
-    margin-top: 0.75rem;
-    font-size: 0.85rem;
-    color: #aaa;
-    border-top: 1px solid #333;
-    padding-top: 0.5rem;
-}
-
-.stats-actions {
-    padding: 0 1.5rem 1.5rem 1.5rem;
-    text-align: right;
-}
-
-.btn-danger {
-    background-color: #c0392b;
-    border-color: #c0392b;
-    color: white;
-}
-
-.btn-danger:hover {
-    background-color: #e74c3c;
-    border-color: #e74c3c;
-    color: white;
 }
 
 /* --- 29. New Balance Styles --- */

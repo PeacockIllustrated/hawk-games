@@ -301,80 +301,88 @@ exports.onSpinCreate = onDocumentCreated("spins/{spinId}", async (event) => {
   return null;
 });
 
-exports.backfillAnalytics = onCall({memory: "1GiB"}, async (request) => {
+exports.backfillAnalytics = onCall({memory: "1GiB", timeoutSeconds: 540}, async (request) => {
   await assertIsAdmin(request);
   logger.log("Starting analytics backfill process...");
 
   const totalsRef = db.collection("analytics_totals").doc("global");
 
-  await totalsRef.set({});
+  const payload = {
+    grossCashIn: 0,
+    fees: 0,
+    netCashIn: 0,
+    byGameType: {
+      main: {gmv: 0, gmvCashFunded: 0},
+      instant: {gmv: 0, gmvCashFunded: 0},
+      hero: {gmv: 0, gmvCashFunded: 0},
+      token: {gmv: 0, gmvCashFunded: 0},
+      other: {gmv: 0, gmvCashFunded: 0},
+    },
+    creditIssued: 0,
+    creditRedeemed: 0,
+    gmvCreditFunded: 0,
+    entriesCountCredit: 0,
+    cashPrizesPaid: 0,
+    cogs: 0,
+    shipping: 0,
+    spinnerCashPrizes: 0,
+    spinsSoldCash: 0,
+    spinnerCashSales: 0,
+  };
 
-  const paymentsSnapshot = await db.collection("payments")
-      .where("status", "==", "captured").get();
-  for (const doc of paymentsSnapshot.docs) {
-    const paymentData = doc.data();
-    const incrementPayload = {
-      grossCashIn: FieldValue.increment(paymentData.amountGross),
-      fees: FieldValue.increment(paymentData.amountFee),
-      netCashIn: FieldValue.increment(paymentData.amountNet),
-      [`byGameType.${paymentData.source}.gmv`]:
-        FieldValue.increment(paymentData.amountGross),
-      [`byGameType.${paymentData.source}.gmvCashFunded`]:
-        FieldValue.increment(paymentData.amountGross),
-    };
-    await totalsRef.set(incrementPayload, {merge: true});
-  }
-  logger.log(`Backfilled ${paymentsSnapshot.size} payments.`);
+  const paymentsSnapshot = await db.collection("payments").where("status", "==", "captured").get();
+  paymentsSnapshot.forEach((doc) => {
+    const data = doc.data();
+    payload.grossCashIn += data.amountGross || 0;
+    payload.fees += data.amountFee || 0;
+    payload.netCashIn += data.amountNet || 0;
+    const source = data.source || "other";
+    if (payload.byGameType[source]) {
+      payload.byGameType[source].gmv += data.amountGross || 0;
+      payload.byGameType[source].gmvCashFunded += data.amountGross || 0;
+    }
+  });
+  logger.log(`Aggregated ${paymentsSnapshot.size} payments.`);
 
-  const creditLedgerSnapshot =
-    await db.collection("site_credit_ledger").get();
-  for (const doc of creditLedgerSnapshot.docs) {
-    const ledgerEntry = doc.data();
-    const incrementPayload = {};
-    if (ledgerEntry.delta > 0) {
-      incrementPayload.creditIssued = FieldValue.increment(ledgerEntry.delta);
+  const creditLedgerSnapshot = await db.collection("site_credit_ledger").get();
+  creditLedgerSnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (data.delta > 0) {
+      payload.creditIssued += data.delta;
     } else {
-      incrementPayload.creditRedeemed =
-        FieldValue.increment(Math.abs(ledgerEntry.delta));
+      payload.creditRedeemed += Math.abs(data.delta || 0);
     }
-    if (ledgerEntry.reason === "redeem_entry") {
-      incrementPayload.gmvCreditFunded =
-        FieldValue.increment(Math.abs(ledgerEntry.delta));
-      incrementPayload.entriesCountCredit = FieldValue.increment(1);
+    if (data.reason === "redeem_entry") {
+      payload.gmvCreditFunded += Math.abs(data.delta || 0);
+      payload.entriesCountCredit += 1;
     }
-    if (Object.keys(incrementPayload).length > 0) {
-      await totalsRef.set(incrementPayload, {merge: true});
-    }
-  }
-  logger.log(`Backfilled ${creditLedgerSnapshot.size} site credit entries.`);
+  });
+  logger.log(`Aggregated ${creditLedgerSnapshot.size} site credit entries.`);
 
   const prizeLedgerSnapshot = await db.collection("prize_ledger").get();
-  for (const doc of prizeLedgerSnapshot.docs) {
-    const prizeData = doc.data();
-    const incrementPayload = {
-      cashPrizesPaid: FieldValue.increment(prizeData.cashAmount || 0),
-      cogs: FieldValue.increment(prizeData.cogsAmount || 0),
-      shipping: FieldValue.increment(prizeData.shippingCost || 0),
-    };
-    if (prizeData.gameType === "spinner" && prizeData.type === "cash") {
-      incrementPayload.spinnerCashPrizes =
-        FieldValue.increment(prizeData.cashAmount || 0);
+  prizeLedgerSnapshot.forEach((doc) => {
+    const data = doc.data();
+    payload.cashPrizesPaid += data.cashAmount || 0;
+    payload.cogs += data.cogsAmount || 0;
+    payload.shipping += data.shippingCost || 0;
+    if (data.gameType === "spinner" && data.type === "cash") {
+      payload.spinnerCashPrizes += data.cashAmount || 0;
     }
-    await totalsRef.set(incrementPayload, {merge: true});
-  }
-  logger.log(`Backfilled ${prizeLedgerSnapshot.size} prize entries.`);
+  });
+  logger.log(`Aggregated ${prizeLedgerSnapshot.size} prize entries.`);
 
   const spinsSnapshot = await db.collection("spins").get();
-  for (const doc of spinsSnapshot.docs) {
-    const spinData = doc.data();
-    const incrementPayload = {
-      spinsSoldCash: FieldValue.increment(spinData.priceCash > 0 ? 1 : 0),
-      spinnerCashSales: FieldValue.increment(spinData.priceCash || 0),
-    };
-    await totalsRef.set(incrementPayload, {merge: true});
-  }
-  logger.log(`Backfilled ${spinsSnapshot.size} spin entries.`);
+  spinsSnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (data.priceCash > 0) {
+      payload.spinsSoldCash += 1;
+      payload.spinnerCashSales += data.priceCash;
+    }
+  });
+  logger.log(`Aggregated ${spinsSnapshot.size} spin entries.`);
 
-  return {success: true,
-    message: "Global analytics totals have been backfilled."};
+  await totalsRef.set(payload);
+  logger.log("Successfully wrote aggregated totals to Firestore.");
+
+  return {success: true, message: "Global analytics totals have been backfilled."};
 });

@@ -78,13 +78,14 @@ function initializeAdminPage() {
     // Add the new nav link dynamically
     const plinkoStatsLink = document.querySelector('a[data-view="plinko-stats"]');
     if (plinkoStatsLink) {
+        const newNavItem = createElement('li', { class: 'admin-nav-item' });
         const revenueAnalyticsLink = createElement('a', {
             href: '#',
             class: 'admin-nav-link',
             'data-view': 'revenue-analytics',
             textContent: 'Revenue Analytics'
         });
-        const newNavItem = createElement('li', {}, [revenueAnalyticsLink]);
+        newNavItem.appendChild(revenueAnalyticsLink);
         plinkoStatsLink.parentElement.insertAdjacentElement('afterend', newNavItem);
     }
 }
@@ -364,6 +365,7 @@ async function renderRevenueAnalyticsView() {
         if (!result.data.success) throw new Error(result.data.message || 'The function reported an error.');
 
         const data = result.data;
+        console.log("Revenue analytics data:", data);
         const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
         const revenueCard = createElement('div', { class: 'stat-card' }, [

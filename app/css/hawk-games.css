@@ -599,6 +599,18 @@ input:checked + .slider:before { transform: translateX(26px); }
     .comp-row-status { flex-direction: row; justify-content: space-between; align-items: center; margin-top: 1rem; }
     .admin-form .form-group-inline { flex-direction: column; align-items: stretch; }
 
+    /* Button and Action Stacking */
+    .modal-actions,
+    .comp-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .promo-highlights {
+        flex-direction: column;
+    }
+
+
     /* Latest Winner Mobile */
     .latest-winner-card {
         grid-template-columns: 1fr;

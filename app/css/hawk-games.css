@@ -23,8 +23,9 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 /* --- 2. Universal Components --- */
 .section-title { font-family: var(--font-heading); font-size: 2.8rem; text-transform: uppercase; text-align: center; letter-spacing: 2px; margin-bottom: 3rem; padding-bottom: 1rem; position: relative; }
 .section-title::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 3px; background-color: var(--primary-gold); }
-.btn { display: inline-block; padding: 0.8rem 2.5rem; background-color: var(--primary-gold); color: var(--dark-bg); text-decoration: none; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 1.5px; border: 2px solid var(--primary-gold); border-radius: 4px; font-weight: 700; text-align: center; cursor: pointer; transition: background-color 0.3s ease, color 0.3s ease; }
-.btn:hover { background-color: transparent; color: var(--primary-gold); }
+.btn { display: inline-block; padding: 0.8rem 2.5rem; background-color: var(--primary-gold); color: var(--dark-bg); text-decoration: none; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 1.5px; border: 2px solid var(--primary-gold); border-radius: 4px; font-weight: 700; text-align: center; cursor: pointer; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.3s ease, color 0.3s ease; }
+.btn:hover { background-color: transparent; color: var(--primary-gold); transform: translateY(-3px); }
+.btn:active { transform: translateY(-1px); transition-duration: 0.1s; }
 .btn.active { background-color: transparent; color: var(--primary-gold); } /* Active state for CTA */
 .btn:disabled { background-color: #555; border-color: #555; color: #888; cursor: not-allowed; }
 .btn:disabled:hover { background-color: #555; color: #888; }
@@ -36,6 +37,17 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .btn-link { background: none; border: none; color: var(--primary-gold); text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
 .placeholder { padding: 4rem; text-align: center; font-family: var(--font-heading); color: #888; }
 .hidden { display: none !important; } /* Utility class to hide elements */
+
+.fade-in-section {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.fade-in-section.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
 
 /* --- 3. Layout: Header & Footer --- */
 .dev-banner {
@@ -92,9 +104,9 @@ body.mobile-nav-open .hamburger-btn span:nth-child(3) { transform: rotate(-45deg
 
 
 /* --- 4. Competition Card Component (Homepage) --- */
-.competition-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2.5rem; }
-.hawk-card { position: relative; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: var(--light-white); transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease; }
-.hawk-card:hover { transform: translateY(-5px); border-color: var(--primary-gold); box-shadow: 0 8px 25px rgba(0,0,0,0.5), 0 0 20px rgba(224, 169, 74, 0.4); }
+.competition-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2.5rem; perspective: 2000px; }
+.hawk-card { position: relative; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: var(--light-white); transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.4s ease, border-color 0.4s ease; }
+.hawk-card:hover { transform: translateY(-10px) rotateY(3deg); border-color: var(--primary-gold); box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(224, 169, 74, 0.3); }
 .hawk-card__instant-win-badge { position: absolute; top: 1rem; left: 1rem; background-color: var(--primary-gold); color: var(--dark-bg); padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-body); z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .hawk-card__image { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background-color: #333; }
 .hawk-card__content { padding: 1.5rem; display: flex; flex-direction: column; flex-grow: 1; }
@@ -257,8 +269,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 .hero-content p { font-size: 1.2rem; max-width: 600px; margin: 1.5rem auto 2.5rem; color: #ccc; line-height: 1.7; }
 
 /* --- 13. How It Works - Interactive Card --- */
-.how-it-works-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem; }
-.step-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2.5rem 2rem; text-align: center; cursor: pointer; perspective: 1000px; }
+.how-it-works-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-top: 3rem; perspective: 1500px; }
+.step-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2.5rem 2rem; text-align: center; cursor: pointer; perspective: 1000px; transition: transform 0.4s ease, box-shadow 0.4s ease; }
+.step-card:hover { transform: translateY(-5px) rotateX(7deg); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
 .step-content { position: relative; width: 100%; min-height: 100px; transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
 .step-icon { width: 60px; height: 60px; line-height: 60px; border-radius: 50%; background-color: var(--primary-gold); color: var(--dark-bg); font-family: var(--font-heading); font-size: 2rem; font-weight: 700; margin: 0 auto 1.5rem; border: 3px solid var(--primary-gold); position: relative; transform: translateZ(40px); transition: transform 0.3s ease; }
 .step-card:hover .step-icon { transform: translateZ(50px); }
@@ -383,10 +396,9 @@ input:checked + .slider:before { transform: translateX(26px); }
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    transform: translate(-50%, -50%);
     opacity: 0.1; /* Increased opacity */
     z-index: -1;
-    animation: spin 40s linear infinite, pulse-glow 3s infinite alternate; /* Combined animations */
+    animation: spin-and-center 40s linear infinite, pulse-glow 3s infinite alternate; /* Combined animations */
 }
 
 .instant-win-showcase-section .section-title {
@@ -432,7 +444,120 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 
-/* --- 19. RESPONSIVE FIXES --- */
+/* --- 19. WHY CHOOSE US SECTION --- */
+#why-choose-us-section {
+    padding: 5rem 0;
+    background-color: #0f0f0f; /* Slightly lighter than main BG for contrast */
+}
+
+.why-us-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2.5rem;
+    margin-top: 3rem;
+}
+
+.why-us-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.why-us-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+}
+
+.why-us-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+    line-height: 1;
+}
+
+.why-us-card h3 {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    color: var(--primary-gold);
+    margin-bottom: 1rem;
+}
+
+.why-us-card p {
+    color: #aaa;
+    line-height: 1.7;
+}
+
+/* --- 20. LATEST WINNER SECTION --- */
+#latest-winner-section {
+    padding: 3rem 0;
+}
+
+.latest-winner-card {
+    background: linear-gradient(45deg, var(--card-bg), #2c2c2c);
+    border: 1px solid var(--primary-gold);
+    box-shadow: 0 10px 40px rgba(224, 169, 74, 0.2);
+    border-radius: 10px;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    align-items: center;
+    gap: 3rem;
+    overflow: hidden;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.latest-winner-image {
+    position: relative;
+    height: 100%;
+}
+
+.latest-winner-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.latest-winner-tag {
+    position: absolute;
+    top: 1.5rem;
+    left: -40px;
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    padding: 0.5rem 2rem;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    text-transform: uppercase;
+    transform: rotate(-45deg);
+    font-size: 1rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.latest-winner-content {
+    padding: 2rem;
+}
+
+.latest-winner-content h3 {
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+}
+
+.latest-winner-content p {
+    font-size: 1.2rem;
+    color: #ccc;
+    margin-bottom: 2rem;
+}
+
+.latest-winner-content p strong {
+    color: var(--primary-gold);
+}
+
+
+/* --- 21. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {
     .account-layout { grid-template-columns: 1fr; }
     .hero-competition-card { grid-template-columns: 1fr; }
@@ -482,6 +607,11 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* --- 20. Instant Win Celebration Animations --- */
 .spin-result-container.is-winner {
     animation: glow-gold 1.5s ease-out forwards;
+}
+
+@keyframes spin-and-center {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 @keyframes glow-gold {

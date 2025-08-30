@@ -562,17 +562,38 @@ async function openPurchaseModal(tokenType) {
                  createElement('div', { class: 'ticket-options' }, bundlesHTML)
             ]),
             createElement('div', { id: 'credit-payment-option', style: { display: 'none', marginTop: '1rem' } }),
+            createElement('div', { id: 'terms-container', style: { marginTop: '1rem' } }),
             createElement('div', { class: 'modal-actions' }, [
                 createElement('button', { type: 'button', class: ['btn', 'btn-secondary'], 'data-close-modal': true }, ['Cancel']),
-                createElement('button', { type: 'submit', class: 'btn' }, ['Confirm & Pay'])
+                createElement('button', { type: 'submit', class: 'btn', disabled: true }, ['Confirm & Pay'])
             ])
         ]);
         
         modalBody.append(form);
 
+        const termsContainer = form.querySelector('#terms-container');
+        const submitBtn = form.querySelector('button[type="submit"]');
+
+        const termsCheckbox = createElement('input', { type: 'checkbox', id: 'modal-terms-checkbox', style: { marginRight: '0.75rem', accentColor: 'var(--primary-gold)', width: '18px', height: '18px', marginTop: '2px', flexShrink: '0' } });
+        const termsLabel = createElement('label', { for: 'modal-terms-checkbox', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#ccc', maxWidth: '380px', margin: '1rem auto 0 auto', textAlign: 'left', lineHeight: '1.5', cursor: 'pointer' } }, [
+            termsCheckbox,
+            createElement('span', {}, [
+                'I confirm I am 18+ and have read the ',
+                createElement('a', { href: 'terms-and-conditions.html', target: 'blank', style: { color: 'var(--primary-gold)' } }, ['Terms & Conditions.'])
+            ])
+        ]);
+
+        termsContainer.append(termsLabel);
+
+        termsCheckbox.addEventListener('change', () => {
+            submitBtn.disabled = !termsCheckbox.checked;
+        });
+
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleTokenCompEntry(form, tokenType, 'card');
+            if (termsCheckbox.checked) {
+                handleTokenCompEntry(form, tokenType, 'card');
+            }
         });
 
     } catch (error) {

@@ -147,12 +147,12 @@ function showConfirmationModal() {
     const price = parseFloat(selectedTicket.dataset.price);
 
     const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn', disabled: true }, ['Confirm & Pay']);
-    const termsCheckbox = createElement('input', { type: 'checkbox', id: 'modal-terms-checkbox' });
-    const termsLabel = createElement('label', { for: 'modal-terms-checkbox', style: { display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', color: '#ccc', marginTop: '1rem' } }, [
+    const termsCheckbox = createElement('input', { type: 'checkbox', id: 'modal-terms-checkbox', style: { marginRight: '0.75rem', accentColor: 'var(--primary-gold)', width: '18px', height: '18px', marginTop: '2px', flexShrink: '0' } });
+    const termsLabel = createElement('label', { for: 'modal-terms-checkbox', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#ccc', maxWidth: '380px', margin: '1rem auto 0 auto', textAlign: 'left', lineHeight: '1.5', cursor: 'pointer' } }, [
         termsCheckbox,
         createElement('span', {}, [
             'I confirm I am 18+ and have read the ',
-            createElement('a', { href: 'terms-and-conditions.html', target: '_blank', style: { color: 'var(--secondary-color)' } }, ['Terms & Conditions.'])
+            createElement('a', { href: 'terms-and-conditions.html', target: 'blank', style: { color: 'var(--primary-gold)' } }, ['Terms & Conditions.'])
         ])
     ]);
 

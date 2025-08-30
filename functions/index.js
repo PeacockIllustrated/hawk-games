@@ -275,6 +275,8 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
             });
             if (finalPrize.prizeType === 'credit') {
                 transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            } else if (finalPrize.prizeType === 'cash') {
+                transaction.update(userRef, { cashBalance: FieldValue.increment(finalPrize.value) });
             }
         }
         return finalPrize;

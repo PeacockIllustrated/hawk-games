@@ -164,7 +164,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             awardedTokens = newTokens;
         }
 
-        return { success: true, ticketsBought, awardedTokens };
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens };
     });
 });
 

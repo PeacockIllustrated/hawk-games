@@ -383,6 +383,8 @@ input:checked + .slider:before { transform: translateX(26px); }
     overflow: hidden;
     background: radial-gradient(circle at 50% 0%, rgba(224, 169, 74, 0.15) 0%, rgba(18,18,18,0) 40%);
     text-align: center;
+    border-top: 10px solid var(--primary-gold);
+    border-bottom: 10px solid var(--primary-gold);
 }
 
 .instant-win-showcase-section::before {
@@ -398,7 +400,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     background-position: center;
     opacity: 0.1; /* Increased opacity */
     z-index: -1;
-    animation: spin-and-center 40s linear infinite, pulse-glow 3s infinite alternate; /* Combined animations */
+    animation: spin-and-center 40s linear infinite; /* Removed pulse-glow */
 }
 
 .instant-win-showcase-section .section-title {
@@ -447,7 +449,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 /* --- 19. WHY CHOOSE US SECTION --- */
 #why-choose-us-section {
     padding: 5rem 0;
-    background-color: #0f0f0f; /* Slightly lighter than main BG for contrast */
 }
 
 .why-us-grid {
@@ -559,6 +560,13 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* --- 21. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {
+    .latest-winner-card {
+        grid-template-columns: 200px 1fr;
+        gap: 1.5rem;
+    }
+    .latest-winner-content h3 {
+        font-size: 2rem;
+    }
     .account-layout { grid-template-columns: 1fr; }
     .hero-competition-card { grid-template-columns: 1fr; }
     .hero-logo { width: clamp(150px, 60vw, 250px); }
@@ -590,6 +598,15 @@ input:checked + .slider:before { transform: translateX(26px); }
     .competition-row { flex-direction: column; align-items: stretch; }
     .comp-row-status { flex-direction: row; justify-content: space-between; align-items: center; margin-top: 1rem; }
     .admin-form .form-group-inline { flex-direction: column; align-items: stretch; }
+
+    /* Latest Winner Mobile */
+    .latest-winner-card {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+    .latest-winner-image img {
+        height: 250px;
+    }
 }
 
 @media (max-width: 480px) {

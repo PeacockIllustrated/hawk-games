@@ -17,7 +17,7 @@
     
     <main>
         <!-- HERO SECTION -->
-        <section class="hero-home">
+        <section class="hero-home hidden">
             <div class="hero-overlay"></div>
             <div class="hero-content">
                 <img src="assets/logo.png" alt="The Hawk Games Logo" class="hero-logo">
@@ -28,9 +28,22 @@
         </section>
 
         <!-- HERO COMPETITION SECTION -->
-        <section id="hero-competition-section" class="container">
+        <section id="hero-competition-section" class="container hidden">
             <!-- JS will inject the single Hero Competition card here -->
             <div class="placeholder">Loading featured prize...</div>
+        </section>
+
+        <!-- INSTANT WIN SHOWCASE SECTION -->
+        <section id="instant-win-showcase" class="instant-win-showcase-section">
+            <div class="container">
+                <h2 class="section-title">Instant Wins Are Here!</h2>
+                <p class="section-subtitle">
+                    Why wait? Win prizes the moment you enter! Get a Bonus Spin Token with every ticket and take a shot at immediate victory on our prize wheel.
+                </p>
+                <div id="instant-win-grid" class="competition-grid-container">
+                    <div class="hawk-card placeholder">Loading Instant Win competitions...</div>
+                </div>
+            </div>
         </section>
 
         <!-- HOW IT WORKS SECTION -->
@@ -70,17 +83,6 @@
             </div>
         </section>
         
-        <!-- INSTANT WIN COMPETITIONS SECTION -->
-        <section id="instant-win-section" class="container">
-            <h2 class="section-title">Instant Win Competitions</h2>
-            <p class="section-subtitle">
-                Win prizes the moment you enter! Buy a ticket for one of these main draws and you'll get a Bonus Spin Token to use on our spinner game.
-            </p>
-            <div id="instant-win-grid" class="competition-grid-container">
-                <div class="hawk-card placeholder">Loading Instant Win competitions...</div>
-            </div>
-        </section>
-
         <!-- SPINNER COMPETITIONS SECTION -->
         <section id="spinner-competition-section" class="container">
             <h2 class="section-title">Get More Spins</h2>

@@ -35,6 +35,7 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .btn-credit:hover { background-color: transparent; color: var(--success-green); }
 .btn-link { background: none; border: none; color: var(--primary-gold); text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
 .placeholder { padding: 4rem; text-align: center; font-family: var(--font-heading); color: #888; }
+.hidden { display: none !important; } /* Utility class to hide elements */
 
 /* --- 3. Layout: Header & Footer --- */
 .dev-banner {
@@ -361,6 +362,42 @@ input:checked + .slider:before { transform: translateX(26px); }
 .hero-comp-trust-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; text-align: center; margin-top: 5rem; padding-top: 3rem; border-top: 1px solid var(--border-color); }
 .trust-icon { font-size: 2.5rem; }
 .trust-badge h3 { font-family: var(--font-heading); font-size: 1.1rem; margin-top: 0.5rem; }
+
+/* --- 19. INSTANT WIN SHOWCASE --- */
+.instant-win-showcase-section {
+    padding: 6rem 0;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 0%, rgba(224, 169, 74, 0.15) 0%, rgba(18,18,18,0) 40%);
+}
+
+.instant-win-showcase-section::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 600px;
+    height: 600px;
+    background-image: url('../assets/spin-wheel-bg-empty.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    transform: translate(-50%, -50%);
+    opacity: 0.05;
+    z-index: -1;
+    animation: spin 60s linear infinite; /* Slow rotation for effect */
+}
+
+.instant-win-showcase-section .section-title {
+    font-size: 3.5rem;
+    color: var(--primary-gold);
+}
+
+.instant-win-showcase-section .section-subtitle {
+    font-size: 1.2rem;
+    max-width: 700px;
+}
+
 
 /* --- 19. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {

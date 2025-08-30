@@ -262,8 +262,19 @@ function renderFooter() {
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('google-login-btn');
-    if (loginBtn) {
+    const termsCheckbox = document.getElementById('terms-agree-checkbox');
+
+    if (loginBtn && termsCheckbox) {
+        termsCheckbox.addEventListener('change', () => {
+            loginBtn.disabled = !termsCheckbox.checked;
+        });
+
         loginBtn.addEventListener('click', async () => {
+            if (!termsCheckbox.checked) {
+                // This is a fallback, the button should be disabled anyway
+                alert("Please agree to the terms and confirm your age before proceeding.");
+                return;
+            }
             try {
                 await signInWithPopup(auth, new GoogleAuthProvider());
                 window.location.href = 'account.html';

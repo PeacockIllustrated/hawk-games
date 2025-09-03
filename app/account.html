@@ -29,6 +29,40 @@
 
             <div class="account-main-content">
                 <div class="content-panel">
+                    <h3>Your Balances</h3>
+                    <div class="account-balances">
+                        <div class="balance-display">
+                            <span>Site Credit</span>
+                            <strong id="account-credit-balance">£0.00</strong>
+                        </div>
+                        <div class="balance-display">
+                            <span>Cold Hard Cash</span>
+                            <strong id="account-cash-balance">£0.00</strong>
+                        </div>
+                    </div>
+                    <div class="balance-actions">
+                        <form id="transfer-form" class="balance-form">
+                            <h4>Transfer Cash to Credit</h4>
+                            <p>Get a 50% bonus when you transfer your cash to site credit!</p>
+                            <div class="form-field">
+                                <label for="transfer-amount">Amount (£)</label>
+                                <input type="number" id="transfer-amount" name="transfer-amount" min="0.01" step="0.01" placeholder="e.g., 10.00" required>
+                            </div>
+                            <button type="submit" class="btn btn-secondary">Transfer</button>
+                        </form>
+                        <form id="payout-form" class="balance-form">
+                            <h4>Request Payout</h4>
+                            <p>Request a payout of your cash balance.</p>
+                            <div class="form-field">
+                                <label for="payout-amount">Amount (£)</label>
+                                <input type="number" id="payout-amount" name="payout-amount" min="0.01" step="0.01" placeholder="e.g., 25.00" required>
+                            </div>
+                            <button type="submit" class="btn">Cash Out</button>
+                        </form>
+                    </div>
+                    <p id="balance-feedback" class="feedback-message"></p>
+                </div>
+                <div class="content-panel">
                     <h3>Communication Preferences</h3>
                     <div class="preference-row">
                         <label for="marketing-consent">I would like to receive marketing emails and updates from The Hawk Games.</label>

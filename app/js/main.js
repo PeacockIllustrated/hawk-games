@@ -32,7 +32,32 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeHeaderScroll();
     initializeHowItWorks();
     initializeSmoothScroll();
+    initializeScrollAnimations();
 });
+
+const initializeScrollAnimations = () => {
+    const sections = document.querySelectorAll('section[id]'); // Animate all sections with an ID
+
+    if (!('IntersectionObserver' in window)) {
+        // Fallback for older browsers
+        sections.forEach(section => section.classList.add('is-visible'));
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1 });
+
+    sections.forEach(section => {
+        section.classList.add('fade-in-section');
+        observer.observe(section);
+    });
+};
 
 const initializeSmoothScroll = () => {
     document.addEventListener('click', (e) => {
@@ -79,13 +104,19 @@ const loadAllCompetitions = async () => {
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            instantWinGrid.innerHTML = '';
-            mainGrid.innerHTML = '';
-            spinnerGrid.innerHTML = '';
-            instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
-            mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Main Prize competitions are live right now.'}));
-            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active.'}));
-            heroContainer.style.display = 'none';
+            if (instantWinGrid) {
+                instantWinGrid.innerHTML = '';
+                instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
+            }
+            if (mainGrid) {
+                mainGrid.innerHTML = '';
+                mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Main Prize competitions are live right now.'}));
+            }
+            if (spinnerGrid) {
+                spinnerGrid.innerHTML = '';
+                spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active.'}));
+            }
+            if (heroContainer) heroContainer.style.display = 'none';
             return;
         }
 
@@ -115,28 +146,36 @@ const loadAllCompetitions = async () => {
             }
         });
         
-        heroContainer.innerHTML = '';
-        if (heroComp) {
-            heroContainer.append(createHeroCompetitionCard(heroComp));
-            heroContainer.style.display = 'block';
-        } else {
-            heroContainer.style.display = 'none';
+        if (heroContainer) {
+            heroContainer.innerHTML = '';
+            if (heroComp) {
+                heroContainer.append(createHeroCompetitionCard(heroComp));
+                heroContainer.style.display = 'block';
+            } else {
+                heroContainer.style.display = 'none';
+            }
         }
 
-        mainGrid.innerHTML = '';
-        if (mainComps.length > 0) mainComps.forEach(comp => mainGrid.append(createCompetitionCard(comp)));
-        else mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No main prize competitions are live right now.'}));
+        if (mainGrid) {
+            mainGrid.innerHTML = '';
+            if (mainComps.length > 0) mainComps.forEach(comp => mainGrid.append(createCompetitionCard(comp)));
+            else mainGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No main prize competitions are live right now.'}));
+        }
 
-        instantWinGrid.innerHTML = '';
-        if (instantWinComps.length > 0) instantWinComps.forEach(comp => instantWinGrid.append(createCompetitionCard(comp)));
-        else instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
+        if (instantWinGrid) {
+            instantWinGrid.innerHTML = '';
+            if (instantWinComps.length > 0) instantWinComps.forEach(comp => instantWinGrid.append(createCompetitionCard(comp)));
+            else instantWinGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Instant Win competitions are live right now.'}));
+        }
         
-        spinnerGrid.innerHTML = '';
-        if (tokenComps.length > 0) {
-            // Render a single CTA card instead of all token comps
-             spinnerGrid.append(createTokenCompetitionCTA(tokenComps[0]));
-        } else {
-            spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active right now.'}));
+        if (spinnerGrid) {
+            spinnerGrid.innerHTML = '';
+            if (tokenComps.length > 0) {
+                // Render a single CTA card instead of all token comps
+                 spinnerGrid.append(createTokenCompetitionCTA(tokenComps[0]));
+            } else {
+                spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active right now.'}));
+            }
         }
 
         startAllCountdowns();

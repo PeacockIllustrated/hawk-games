@@ -136,23 +136,46 @@ function setupEntryLogic(correctAnswer) {
 function showConfirmationModal() {
     const selectedTicket = document.querySelector('.ticket-option.selected');
     if (!selectedTicket) {
-        openModal(createElement('div',{},[ createElement('h2', {textContent: 'Select Tickets'}), createElement('p', {textContent: 'Please choose a ticket bundle.'}), createElement('button', {'data-close-modal': true, class:'btn'},['OK']) ]));
+        openModal(createElement('div', {}, [
+            createElement('h2', { textContent: 'Select Tickets' }),
+            createElement('p', { textContent: 'Please choose a ticket bundle.' }),
+            createElement('button', { 'data-close-modal': true, class: 'btn' }, ['OK'])
+        ]));
         return;
     }
     const tickets = parseInt(selectedTicket.dataset.amount);
     const price = parseFloat(selectedTicket.dataset.price);
-    
-    const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn' }, ['Confirm & Pay']);
+
+    const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn', disabled: true }, ['Confirm & Pay']);
+    const termsCheckbox = createElement('input', { type: 'checkbox', id: 'modal-terms-checkbox', style: { marginRight: '0.75rem', accentColor: 'var(--primary-gold)', width: '18px', height: '18px', marginTop: '2px', flexShrink: '0' } });
+    const termsLabel = createElement('label', { for: 'modal-terms-checkbox', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#ccc', maxWidth: '380px', margin: '1rem auto 0 auto', textAlign: 'left', lineHeight: '1.5', cursor: 'pointer' } }, [
+        termsCheckbox,
+        createElement('span', {}, [
+            'I confirm I am 18+ and have read the ',
+            createElement('a', { href: 'terms-and-conditions.html', target: 'blank', style: { color: 'var(--primary-gold)' } }, ['Terms & Conditions.'])
+        ])
+    ]);
+
     const content = createElement('div', {}, [
         createElement('h2', { textContent: 'Confirm Your Entry' }),
         createElement('p', {}, [`You are about to purchase `, createElement('strong', { textContent: `${tickets}` }), ` entries for `, createElement('strong', { textContent: `£${price.toFixed(2)}` }), `.`]),
-        createElement('div', { class: 'modal-actions' }, [
+        termsLabel,
+        createElement('div', { class: 'modal-actions', style: { marginTop: '1.5rem' } }, [
             createElement('button', { 'data-close-modal': true, class: ['btn', 'btn-secondary'] }, ['Cancel']),
             confirmBtn
         ])
     ]);
+
     openModal(content);
-    // --- FIX: Pass both tickets and price to the handler ---
+
+    // Add event listener to the checkbox
+    const modalCheckbox = document.getElementById('modal-terms-checkbox');
+    if (modalCheckbox) {
+        modalCheckbox.addEventListener('change', () => {
+            confirmBtn.disabled = !modalCheckbox.checked;
+        });
+    }
+
     confirmBtn.addEventListener('click', () => handleEntry(tickets, price), { once: true });
 }
 

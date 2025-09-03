@@ -9,17 +9,6 @@ const { logger } = require("firebase-functions");
 initializeApp();
 const db = getFirestore();
 
-// --- Auditing Helper ---
-const logAuditEvent = (eventType, details) => {
-    // No need to get db again if it's already global
-    const auditRef = db.collection('audits').doc();
-    return auditRef.set({
-        timestamp: FieldValue.serverTimestamp(),
-        eventType,
-        details,
-    });
-};
-
 // --- Internal Helper for Reusable Draw Logic ---
 const performDraw = async (compId) => {
     const compRef = db.collection('competitions').doc(compId);
@@ -27,7 +16,7 @@ const performDraw = async (compId) => {
 
     const compDocForCheck = await compRef.get();
     if (!compDocForCheck.exists) throw new Error(`Competition ${compId} not found for drawing.`);
-    
+
     const compDataForCheck = compDocForCheck.data();
     if (compDataForCheck.status !== 'ended') throw new Error(`Competition ${compId} must be in 'ended' status to be drawn.`);
     if (compDataForCheck.winnerId) throw new Error(`Winner already drawn for competition ${compId}.`);
@@ -52,23 +41,23 @@ const performDraw = async (compId) => {
         const winnerPhotoURL = winnerUserDocSnap.exists ? winnerUserDocSnap.data().photoURL : null;
         const winnerDisplayName = winnerData.userDisplayName;
 
-        transaction.update(compRef, { 
-            status: 'drawn', 
-            winnerId, 
-            winnerDisplayName, 
-            winningTicketNumber, 
-            drawnAt: FieldValue.serverTimestamp() 
+        transaction.update(compRef, {
+            status: 'drawn',
+            winnerId,
+            winnerDisplayName,
+            winningTicketNumber,
+            drawnAt: FieldValue.serverTimestamp()
         });
 
         const pastWinnerRef = db.collection('pastWinners').doc(compId);
-        transaction.set(pastWinnerRef, { 
-            prizeTitle: compDataForCheck.title, 
-            prizeImage: compDataForCheck.prizeImage, 
-            winnerId, 
-            winnerDisplayName, 
-            winnerPhotoURL, 
-            winningTicketNumber, 
-            drawDate: FieldValue.serverTimestamp() 
+        transaction.set(pastWinnerRef, {
+            prizeTitle: compDataForCheck.title,
+            prizeImage: compDataForCheck.prizeImage,
+            winnerId,
+            winnerDisplayName,
+            winnerPhotoURL,
+            winningTicketNumber,
+            drawDate: FieldValue.serverTimestamp()
         });
 
         return { success: true, winnerDisplayName, winningTicketNumber };
@@ -112,7 +101,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
     const uid = request.auth.uid;
     const compRef = db.collection('competitions').doc(compId);
     const userRef = db.collection('users').doc(uid);
-    
+
     return await db.runTransaction(async (transaction) => {
         const compDoc = await transaction.get(compRef);
         const userDoc = await transaction.get(userRef);
@@ -121,27 +110,6 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         const compData = compDoc.data();
         const userData = userDoc.data();
 
-        // --- Loyalty Unlock Gate ---
-        if (compData.loyalty?.requiresUnlock) {
-            const loyaltySettingsDoc = await db.collection('settings').doc('loyaltyTechDraw').get();
-            if (!loyaltySettingsDoc.exists() || !loyaltySettingsDoc.data().enabled) {
-                throw new HttpsError('failed-precondition', 'The loyalty program is not currently active.');
-            }
-            const loyaltySettings = loyaltySettingsDoc.data();
-            const windowId = loyaltySettings.windowId;
-            const userLoyalty = userData.loyalty || {};
-            const unlockKey = `unlocked_${windowId}`;
-
-            if (!userLoyalty[unlockKey]) {
-                await logAuditEvent('purchase_denied_loyalty', {
-                    userId: uid,
-                    compId: compId,
-                    reason: `User not unlocked for window ${windowId}.`,
-                });
-                throw new HttpsError('failed-precondition', 'You must unlock this competition by entering 3 eligible tech competitions this month.');
-            }
-        }
-
         const tier = compData.ticketTiers.find(t => t.amount === ticketsBought);
         if (!tier) {
             throw new HttpsError('invalid-argument', 'Selected ticket bundle is not valid for this competition.');
@@ -149,7 +117,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
         if (tier.price !== expectedPrice) {
             throw new HttpsError('invalid-argument', 'Price mismatch. Please refresh and try again.');
         }
-        
+
         let entryType = 'paid';
         if (paymentMethod === 'credit') {
             entryType = 'credit';
@@ -170,15 +138,15 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
 
         transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsBought) });
         transaction.update(userRef, { [`entryCount.${compId}`]: FieldValue.increment(ticketsBought) });
-        
+
         const entryRef = compRef.collection('entries').doc();
         transaction.set(entryRef, {
             userId: uid, userDisplayName: userData.displayName || "N/A",
             ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
-            enteredAt: FieldValue.serverTimestamp(), 
+            enteredAt: FieldValue.serverTimestamp(),
             entryType: entryType,
         });
-        
+
         let awardedTokens = [];
         if (compData.instantWinsConfig?.enabled === true) {
             const newTokens = [];
@@ -195,9 +163,62 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
             transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
             awardedTokens = newTokens;
         }
-        
-        return { success: true, ticketsBought, awardedTokens };
+
+        return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens };
     });
+});
+
+// --- getRevenueAnalytics ---
+exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
+  await assertIsAdmin(request);
+
+  const competitionsSnapshot = await db.collection("competitions").get();
+  let totalRevenue = 0;
+
+  for (const doc of competitionsSnapshot.docs) {
+    const compId = doc.id;
+    const entriesRef = db.collection("competitions").doc(compId).collection("entries");
+    const entriesSnapshot = await entriesRef.where("entryType", "==", "paid").get();
+
+    let competitionRevenue = 0;
+    entriesSnapshot.forEach(entryDoc => {
+      const entryData = entryDoc.data();
+      const competitionData = doc.data();
+      const tier = competitionData.ticketTiers.find(t => t.amount === entryData.ticketsBought);
+      if (tier) {
+        competitionRevenue += tier.price;
+      }
+    });
+    totalRevenue += competitionRevenue;
+  }
+
+  const spinWinsSnapshot = await db.collection("spin_wins").where("prizeType", "==", "cash").get();
+  let totalCost = 0;
+  spinWinsSnapshot.forEach(doc => {
+    totalCost += doc.data().prizeValue;
+  });
+
+  const netProfit = totalRevenue - totalCost;
+
+  const creditAwardedSnapshot = await db.collection("spin_wins").where("prizeType", "==", "credit").get();
+  let totalSiteCreditAwarded = 0;
+  creditAwardedSnapshot.forEach(doc => {
+    totalSiteCreditAwarded += doc.data().prizeValue;
+  });
+
+  const creditSpentSnapshot = await db.collectionGroup("entries").where("entryType", "==", "credit").get();
+  let totalSiteCreditSpent = 0;
+  for (const doc of creditSpentSnapshot.docs) {
+      const entryData = doc.data();
+      const compDoc = await db.collection("competitions").doc(doc.ref.parent.parent.id).get();
+      const competitionData = compDoc.data();
+      const tier = competitionData.ticketTiers.find(t => t.amount === entryData.ticketsBought);
+      if (tier) {
+        totalSiteCreditSpent += tier.price;
+      }
+  }
+
+  return { success: true, totalRevenue, totalCost, netProfit, totalSiteCreditAwarded, totalSiteCreditSpent };
 });
 
 // --- spendSpinToken ---
@@ -254,9 +275,98 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
             });
             if (finalPrize.prizeType === 'credit') {
                 transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+            } else if (finalPrize.prizeType === 'cash') {
+                transaction.update(userRef, { cashBalance: FieldValue.increment(finalPrize.value) });
             }
         }
         return finalPrize;
+    });
+});
+
+// --- transferCashToCredit ---
+exports.transferCashToCredit = onCall(functionOptions, async (request) => {
+    const schema = z.object({
+        amount: z.number().positive("Amount must be a positive number."),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+        throw new HttpsError('invalid-argument', validation.error.errors[0].message);
+    }
+    const { amount } = validation.data;
+
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+            throw new HttpsError('not-found', 'User profile not found.');
+        }
+
+        const userData = userDoc.data();
+        const userCashBalance = userData.cashBalance || 0;
+
+        if (userCashBalance < amount) {
+            throw new HttpsError('failed-precondition', 'Insufficient cash balance.');
+        }
+
+        const creditToAdd = amount * 1.5;
+
+        transaction.update(userRef, {
+            cashBalance: FieldValue.increment(-amount),
+            creditBalance: FieldValue.increment(creditToAdd)
+        });
+
+        return { success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd };
+    });
+});
+
+// --- requestCashPayout ---
+exports.requestCashPayout = onCall(functionOptions, async (request) => {
+    const schema = z.object({
+        amount: z.number().positive("Amount must be a positive number."),
+    });
+
+    const validation = schema.safeParse(request.data);
+    if (!validation.success) {
+        throw new HttpsError('invalid-argument', validation.error.errors[0].message);
+    }
+    const { amount } = validation.data;
+
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const userRef = db.collection('users').doc(uid);
+
+    return db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+            throw new HttpsError('not-found', 'User profile not found.');
+        }
+
+        const userData = userDoc.data();
+        const userCashBalance = userData.cashBalance || 0;
+
+        if (userCashBalance < amount) {
+            throw new HttpsError('failed-precondition', 'Insufficient cash balance.');
+        }
+
+        transaction.update(userRef, {
+            cashBalance: FieldValue.increment(-amount)
+        });
+
+        const payoutRequestRef = db.collection('payoutRequests').doc();
+        transaction.set(payoutRequestRef, {
+            userId: uid,
+            amount: amount,
+            status: 'pending',
+            requestedAt: FieldValue.serverTimestamp(),
+            userDisplayName: userData.displayName || 'N/A',
+            userEmail: userData.email || 'N/A'
+        });
+
+        return { success: true, message: "Payout request submitted successfully." };
     });
 });
 
@@ -278,7 +388,7 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
 
         if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
         if (!settingsDoc.exists) throw new HttpsError('internal', 'Plinko prize configuration is not available.');
-        
+
         const userData = userDoc.data();
         const settings = settingsDoc.data();
         const PLINKO_ROWS = settings.rows || 12;
@@ -329,7 +439,7 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
                 transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
             }
         }
-        
+
         return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };
     });
 });
@@ -344,7 +454,7 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     const { compId } = validation.data;
 
     await assertIsAdmin(request);
-    
+
     const compRef = db.collection('competitions').doc(compId);
     const compDoc = await compRef.get();
     if (!compDoc.exists || compDoc.data().status !== 'ended') {
@@ -360,289 +470,6 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
     }
 });
 
-// --- backfillCompetitionSchema (Admin-only Migration) ---
-exports.backfillCompetitionSchema = onCall(functionOptions, async (request) => {
-    await assertIsAdmin(request);
-
-    logger.log("Starting competition schema backfill...");
-
-    const batch = db.batch();
-    let updatedCount = 0;
-
-    // 1. Set up the global settings document
-    const settingsRef = db.collection('settings').doc('loyaltyTechDraw');
-    const settingsDoc = await settingsRef.get();
-
-    if (!settingsDoc.exists) {
-        batch.set(settingsRef, {
-            enabled: false,
-            windowStrategy: "monthly",
-            windowId: "2025-08",
-            threshold: 3,
-            targetCompId: "replace-with-real-comp-id",
-            postalLimitPerComp: 1,
-            notifications: { email: true, inApp: true }
-        });
-        logger.log("Created 'settings/loyaltyTechDraw' document with default values.");
-    } else {
-        logger.log("'settings/loyaltyTechDraw' document already exists.");
-    }
-
-    // 2. Backfill all competition documents
-    const compsSnapshot = await db.collection('competitions').get();
-
-    compsSnapshot.forEach(doc => {
-        const compData = doc.data();
-        let needsUpdate = false;
-        const updatePayload = {};
-
-        // Check and apply default for each new field group
-        if (compData.category === undefined) {
-            updatePayload.category = "other";
-            needsUpdate = true;
-        }
-        if (compData.labels === undefined) {
-            updatePayload.labels = [];
-            needsUpdate = true;
-        }
-        if (compData.loyalty === undefined) {
-            updatePayload.loyalty = {
-                isLoyaltyComp: false,
-                requiresUnlock: false,
-                eligibleForTechUnlock: false,
-                windowId: null,
-                displayBadge: null,
-                eligibilityNote: null
-            };
-            needsUpdate = true;
-        }
-        if (compData.freeRoute === undefined) {
-            updatePayload.freeRoute = {
-                postalEnabled: true,
-                postalLimitPerUser: 1
-            };
-            needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-            batch.update(doc.ref, updatePayload);
-            updatedCount++;
-        }
-    });
-
-    if (updatedCount > 0) {
-        await batch.commit();
-        logger.log(`Successfully backfilled schema for ${updatedCount} competitions.`);
-        return { success: true, message: `Updated ${updatedCount} competitions and ensured settings doc exists.` };
-    } else {
-        // If there were no comps to update, we still need to commit the settings doc if it was created
-        if (!settingsDoc.exists) {
-            await batch.commit();
-            return { success: true, message: "Created settings document. No competitions required updates." };
-        }
-        logger.log("No competitions required schema updates.");
-        return { success: true, message: "No competitions required updates, and settings doc already exists." };
-    }
-});
-
-// --- submitPostalEntry ---
-exports.submitPostalEntry = onCall(functionOptions, async (request) => {
-    const schema = z.object({
-      compId: z.string().min(1),
-    });
-
-    const validation = schema.safeParse(request.data);
-    if (!validation.success) {
-      throw new HttpsError('invalid-argument', 'A valid competition ID is required.');
-    }
-    const { compId } = validation.data;
-
-    assertIsAuthenticated(request);
-    const uid = request.auth.uid;
-
-    const compRef = db.collection('competitions').doc(compId);
-    const userRef = db.collection('users').doc(uid);
-    const entriesRef = compRef.collection('entries');
-
-    return await db.runTransaction(async (transaction) => {
-        const [compDoc, userDoc] = await Promise.all([
-            transaction.get(compRef),
-            transaction.get(userRef)
-        ]);
-
-        if (!compDoc.exists) throw new HttpsError('not-found', 'Competition not found.');
-        if (!userDoc.exists) throw new HttpsError('not-found', 'User profile not found.');
-
-        const compData = compDoc.data();
-        const userData = userDoc.data();
-
-        if (compData.status !== 'live') {
-            throw new HttpsError('failed-precondition', 'This competition is not live.');
-        }
-        if (compData.freeRoute?.postalEnabled !== true) {
-            throw new HttpsError('failed-precondition', 'Postal entries are not enabled for this competition.');
-        }
-
-        const postalLimit = compData.freeRoute?.postalLimitPerUser || 1;
-
-        const postalQuery = entriesRef
-            .where('userId', '==', uid)
-            .where('entryType', '==', 'free_postal');
-
-        const existingPostalEntries = await transaction.get(postalQuery);
-
-        if (existingPostalEntries.size >= postalLimit) {
-            throw new HttpsError('failed-precondition', `You have reached the postal entry limit for this competition.`);
-        }
-
-        const ticketsSoldBefore = compData.ticketsSold || 0;
-        if (ticketsSoldBefore + 1 > compData.totalTickets) {
-            throw new HttpsError('failed-precondition', 'Not enough tickets available.');
-        }
-
-        // Grant one free ticket
-        transaction.update(compRef, { ticketsSold: FieldValue.increment(1) });
-
-        const entryRef = compRef.collection('entries').doc();
-        transaction.set(entryRef, {
-            userId: uid,
-            userDisplayName: userData.displayName || "N/A",
-            ticketsBought: 1,
-            ticketStart: ticketsSoldBefore,
-            ticketEnd: ticketsSoldBefore,
-            enteredAt: FieldValue.serverTimestamp(),
-            entryType: 'free_postal',
-        });
-
-        await logAuditEvent('postal_entry_submitted', {
-            userId: uid,
-            compId: compId,
-            ticketCount: 1,
-        });
-
-        return { success: true, message: 'Your postal entry has been submitted successfully.' };
-    });
-});
-
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-
-// --- onNewEntryCheckForUnlock ---
-exports.onNewEntryCheckForUnlock = onDocumentCreated("competitions/{compId}/entries/{entryId}", async (event) => {
-    const snap = event.data;
-    if (!snap) {
-        logger.log("No data associated with the event, exiting.");
-        return;
-    }
-    const entryData = snap.data();
-    const userId = entryData.userId;
-    const compId = event.params.compId;
-
-    try {
-        // 1. Get loyalty settings and check if the feature is enabled
-        const settingsDoc = await db.collection('settings').doc('loyaltyTechDraw').get();
-        if (!settingsDoc.exists() || !settingsDoc.data().enabled) {
-            logger.log("Loyalty feature is disabled. Exiting unlock check.");
-            return;
-        }
-        const settings = settingsDoc.data();
-        const { windowId, threshold, targetCompId } = settings;
-        const unlockFlag = `loyalty.unlocked_${windowId}`;
-        const bonusTicketFlag = `loyalty.bonus_${windowId}`;
-
-        // 2. Check if the source competition is eligible
-        const sourceCompDoc = await db.collection('competitions').doc(compId).get();
-        if (!sourceCompDoc.exists() || sourceCompDoc.data().loyalty?.eligibleForTechUnlock !== true) {
-            logger.log(`Comp ${compId} is not eligible for tech unlock. Exiting.`);
-            return;
-        }
-
-        // 3. Check if user is already unlocked for this window
-        const userRef = db.collection('users').doc(userId);
-        const userDoc = await userRef.get();
-        if (!userDoc.exists()) return;
-        const userData = userDoc.data();
-        if (userData.loyalty && userData.loyalty[`unlocked_${windowId}`]) {
-            logger.log(`User ${userId} is already unlocked for window ${windowId}. Exiting.`);
-            return;
-        }
-
-        // 4. Count unique, eligible tech comp entries for this user in this window
-        const allUserEntriesSnapshot = await db.collectionGroup('entries').where('userId', '==', userId).get();
-        const enteredCompIds = new Set();
-        allUserEntriesSnapshot.forEach(doc => {
-            enteredCompIds.add(doc.ref.parent.parent.id);
-        });
-
-        let eligibleEntryCount = 0;
-        const compPromises = Array.from(enteredCompIds).map(id => db.collection('competitions').doc(id).get());
-        const compDocs = await Promise.all(compPromises);
-
-        for (const doc of compDocs) {
-            if (doc.exists && doc.data().loyalty?.eligibleForTechUnlock === true) {
-                 // Optional: Check if comp was live during the correct window. For now, we assume any entry counts.
-                 eligibleEntryCount++;
-            }
-        }
-
-        logger.log(`User ${userId} has ${eligibleEntryCount} eligible tech entries for window ${windowId}. Threshold is ${threshold}.`);
-
-        // 5. If threshold is met, grant unlock and bonus ticket idempotently
-        if (eligibleEntryCount >= threshold) {
-            await db.runTransaction(async (transaction) => {
-                const userSnap = await transaction.get(userRef);
-                // Double-check the user hasn't been unlocked by a concurrent function run
-                if (userSnap.data().loyalty && userSnap.data().loyalty[`unlocked_${windowId}`]) {
-                    logger.log('Unlock race condition averted. User already unlocked.');
-                    return;
-                }
-
-                // Grant the unlock
-                transaction.update(userRef, { [unlockFlag]: true, [bonusTicketFlag]: 'granted' });
-
-                // Grant the bonus ticket to the target competition
-                const targetCompRef = db.collection('competitions').doc(targetCompId);
-                const targetCompDoc = await transaction.get(targetCompRef);
-                if (!targetCompDoc.exists() || targetCompDoc.data().status !== 'live') {
-                    logger.error(`Target comp ${targetCompId} not found or not live. Cannot grant bonus ticket.`);
-                    // Still grant the unlock, but log the error
-                    return;
-                }
-                const targetCompData = targetCompDoc.data();
-                const ticketsSoldBefore = targetCompData.ticketsSold || 0;
-
-                transaction.update(targetCompRef, { ticketsSold: FieldValue.increment(1) });
-
-                const bonusEntryRef = targetCompRef.collection('entries').doc(`bonus_${windowId}_${userId}`);
-                transaction.set(bonusEntryRef, {
-                    userId: userId,
-                    userDisplayName: userData.displayName || "N/A",
-                    ticketsBought: 1,
-                    ticketStart: ticketsSoldBefore,
-                    ticketEnd: ticketsSoldBefore,
-                    enteredAt: FieldValue.serverTimestamp(),
-                    entryType: 'bonus_loyalty_tech',
-                });
-
-                await logAuditEvent('loyalty_unlocked', {
-                    userId: userId,
-                    windowId: windowId,
-                    threshold: threshold,
-                    triggeringCompId: compId,
-                });
-                await logAuditEvent('bonus_ticket_granted', {
-                    userId: userId,
-                    targetCompId: targetCompId,
-                    reason: `Loyalty unlock for window ${windowId}`,
-                });
-
-                logger.log(`Successfully unlocked user ${userId} for window ${windowId} and granted bonus ticket to ${targetCompId}.`);
-            });
-        }
-    } catch (error) {
-        logger.error(`Error in onNewEntryCheckForUnlock for user ${userId} and comp ${compId}:`, error);
-    }
-});
-
 // --- weeklyTokenCompMaintenance ---
 exports.weeklyTokenCompMaintenance = onSchedule({
     schedule: "every monday 12:00",
@@ -653,12 +480,12 @@ exports.weeklyTokenCompMaintenance = onSchedule({
     const compsRef = db.collection('competitions');
     const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const oldCompsQuery = query(compsRef, 
-        where('competitionType', '==', 'token'), 
+    const oldCompsQuery = query(compsRef,
+        where('competitionType', '==', 'token'),
         where('status', '==', 'live'),
         where('createdAt', '<=', oneWeekAgo)
     );
-    
+
     const snapshot = await oldCompsQuery.get();
 
     if (snapshot.empty) {

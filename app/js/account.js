@@ -2,13 +2,19 @@
 
 import { app } from './auth.js';
 import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js';
 import { 
     getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, 
-    collection, collectionGroup, query, where, getDocs, orderBy, documentId 
+    collection, collectionGroup, query, where, getDocs, orderBy, documentId, onSnapshot
 } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
 
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const functions = getFunctions(app);
+
+// Balance-related Cloud Functions
+const transferCashToCredit = httpsCallable(functions, 'transferCashToCredit');
+const requestCashPayout = httpsCallable(functions, 'requestCashPayout');
 
 const elUserName = document.getElementById('account-user-name');
 const elUserEmail = document.getElementById('account-user-email');
@@ -18,6 +24,19 @@ const elMarketingTgl = document.getElementById('marketing-consent');
 const elMarketingFeedback = document.getElementById('preference-feedback');
 const elEntriesList = document.getElementById('entries-list');
 const elAdminContainer = document.getElementById('admin-panel-container');
+
+// Balance display elements
+const elCreditBalance = document.getElementById('account-credit-balance');
+const elCashBalance = document.getElementById('account-cash-balance');
+const elBalanceFeedback = document.getElementById('balance-feedback');
+
+// Transfer form elements
+const elTransferForm = document.getElementById('transfer-form');
+const elTransferAmount = document.getElementById('transfer-amount');
+
+// Payout form elements
+const elPayoutForm = document.getElementById('payout-form');
+const elPayoutAmount = document.getElementById('payout-amount');
 
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
@@ -169,66 +188,156 @@ async function loadUserEntries(user) {
   }
 }
 
-async function ensureAndLoadUserProfile(user) {
-  const userRef = doc(db, 'users', user.uid);
-  try {
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) {
-      const payload = {
-        uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL,
-        isAdmin: false, marketingConsent: false, createdAt: serverTimestamp(),
-      };
-      await setDoc(userRef, payload);
-      return payload;
-    }
-    return snap.data();
-  } catch (err) {
-    console.error('[Profile] Failed to load/create user profile:', err);
-    return { displayName: user.displayName, email: user.email, photoURL: user.photoURL, marketingConsent: false };
-  }
-}
 
 function setupEventListeners(user, profile) {
-  if (elMarketingTgl) {
-    elMarketingTgl.checked = !!profile?.marketingConsent;
-    elMarketingTgl.addEventListener('change', async (e) => {
-      const checked = !!e.currentTarget.checked;
-      setText(elMarketingFeedback, 'Saving...');
-      try {
-        await updateDoc(doc(db, 'users', user.uid), { marketingConsent: checked });
-        setText(elMarketingFeedback, 'Preferences Saved!');
-      } catch (err) {
-        console.error('[Marketing] Failed to update preference:', err);
-        setText(elMarketingFeedback, 'Error saving.');
-      } finally {
-        setTimeout(() => setText(elMarketingFeedback, ''), 2000);
-      }
-    });
-  }
+    // Marketing consent toggle
+    if (elMarketingTgl) {
+        elMarketingTgl.checked = !!profile?.marketingConsent;
+        elMarketingTgl.addEventListener('change', async(e) => {
+            const checked = !!e.currentTarget.checked;
+            setText(elMarketingFeedback, 'Saving...');
+            try {
+                await updateDoc(doc(db, 'users', user.uid), { marketingConsent: checked });
+                setText(elMarketingFeedback, 'Preferences Saved!');
+            } catch (err) {
+                console.error('[Marketing] Failed to update preference:', err);
+                setText(elMarketingFeedback, 'Error saving.');
+            } finally {
+                setTimeout(() => setText(elMarketingFeedback, ''), 2000);
+            }
+        });
+    }
 
-  if (elSignOut) {
-    elSignOut.addEventListener('click', () => signOut(auth));
-  }
+    // Sign out button
+    if (elSignOut) {
+        elSignOut.addEventListener('click', () => signOut(auth));
+    }
+
+    // Transfer form submission
+    if (elTransferForm) {
+        elTransferForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = parseFloat(elTransferAmount.value);
+            if (isNaN(amount) || amount <= 0) {
+                setText(elBalanceFeedback, "Please enter a valid amount to transfer.");
+                return;
+            }
+
+            const button = e.target.querySelector('button[type="submit"]');
+            const originalButtonText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Processing...';
+            setText(elBalanceFeedback, '');
+
+            try {
+                await transferCashToCredit({ amount });
+                setText(elBalanceFeedback, `Successfully transferred £${amount.toFixed(2)} to credit!`);
+                elTransferForm.reset();
+            } catch (error) {
+                console.error("Transfer failed:", error);
+                setText(elBalanceFeedback, `Error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = originalButtonText;
+                 setTimeout(() => setText(elBalanceFeedback, ''), 4000);
+            }
+        });
+    }
+
+    // Payout form submission
+    if (elPayoutForm) {
+        elPayoutForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = parseFloat(elPayoutAmount.value);
+             if (isNaN(amount) || amount <= 0) {
+                setText(elBalanceFeedback, "Please enter a valid amount for payout.");
+                return;
+            }
+
+            const button = e.target.querySelector('button[type="submit"]');
+            const originalButtonText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Processing...';
+            setText(elBalanceFeedback, '');
+
+            try {
+                await requestCashPayout({ amount });
+                setText(elBalanceFeedback, `Payout request for £${amount.toFixed(2)} submitted successfully.`);
+                elPayoutForm.reset();
+            } catch (error) {
+                console.error("Payout request failed:", error);
+                setText(elBalanceFeedback, `Error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = originalButtonText;
+                setTimeout(() => setText(elBalanceFeedback, ''), 4000);
+            }
+        });
+    }
 }
 
-auth.onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.replace('login.html');
-    return;
-  }
+let userProfileUnsubscribe = null;
 
-  const profile = await ensureAndLoadUserProfile(user);
+auth.onAuthStateChanged(async(user) => {
+    if (!user) {
+        window.location.replace('login.html');
+        return;
+    }
 
-  setText(elUserName, profile.displayName || 'My Account');
-  setText(elUserEmail, user.email || '');
-  renderAvatar(elUserAvatar, user);
-  
-  if (elAdminContainer && profile.isAdmin) {
-    elAdminContainer.innerHTML = ''; 
-    const adminButton = createElement('a', { href: 'admin.html', class: 'btn' }, ['Admin Panel']);
-    elAdminContainer.append(adminButton);
-  }
+    // Unsubscribe from any previous listener
+    if (userProfileUnsubscribe) {
+        userProfileUnsubscribe();
+    }
 
-  setupEventListeners(user, profile);
-  await loadUserEntries(user);
+    const userRef = doc(db, 'users', user.uid);
+    userProfileUnsubscribe = onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const profile = docSnap.data();
+
+            // Update profile info
+            setText(elUserName, profile.displayName || 'My Account');
+            setText(elUserEmail, user.email || '');
+            renderAvatar(elUserAvatar, user);
+
+            // Update balances
+            const creditBalance = profile.creditBalance || 0;
+            const cashBalance = profile.cashBalance || 0;
+            if (elCreditBalance) setText(elCreditBalance, `£${creditBalance.toFixed(2)}`);
+            if (elCashBalance) setText(elCashBalance, `£${cashBalance.toFixed(2)}`);
+
+            // Show admin panel if applicable
+            if (elAdminContainer) {
+                elAdminContainer.innerHTML = '';
+                if (profile.isAdmin) {
+                    const adminButton = createElement('a', { href: 'admin.html', class: 'btn' }, ['Admin Panel']);
+                    elAdminContainer.append(adminButton);
+                }
+            }
+
+            // Setup event listeners with the latest profile data
+            // This is repeatedly called, but event listeners are idempotent
+            setupEventListeners(user, profile);
+
+        } else {
+            // This case is for a user who is authenticated but has no profile document yet.
+            // We should create it.
+            const payload = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                isAdmin: false,
+                marketingConsent: false,
+                createdAt: serverTimestamp(),
+                creditBalance: 0,
+                cashBalance: 0,
+            };
+            setDoc(userRef, payload).catch(err => {
+                console.error("Failed to create user profile:", err);
+            });
+        }
+    });
+
+    // Load static or less frequently updated data
+    await loadUserEntries(user);
 });

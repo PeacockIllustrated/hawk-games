@@ -74,6 +74,20 @@ function initializeAdminPage() {
     document.getElementById('admin-menu-toggle').addEventListener('click', () => {
         document.querySelector('.admin-layout').classList.toggle('nav-open');
     });
+
+    // Add the new nav link dynamically
+    const plinkoStatsLink = document.querySelector('a[data-view="plinko-stats"]');
+    if (plinkoStatsLink) {
+        const newNavItem = createElement('li', { class: 'admin-nav-item' });
+        const revenueAnalyticsLink = createElement('a', {
+            href: '#',
+            class: 'admin-nav-link',
+            'data-view': 'revenue-analytics',
+            textContent: 'Revenue Analytics'
+        });
+        newNavItem.appendChild(revenueAnalyticsLink);
+        plinkoStatsLink.parentElement.insertAdjacentElement('afterend', newNavItem);
+    }
 }
 
 // --- Navigation & View Rendering ---
@@ -99,7 +113,7 @@ function renderView(viewName) {
         case 'spinner-settings': renderSpinnerSettingsView(); break;
         case 'plinko-settings': renderPlinkoSettingsView(); break;
         case 'plinko-stats': renderPlinkoStatsView(); break;
-        case 'loyalty-settings': renderLoyaltySettingsView(); break;
+        case 'revenue-analytics': renderRevenueAnalyticsView(); break;
     }
 }
 
@@ -335,102 +349,60 @@ function renderPlinkoStatsView() {
     mainContentContainer.append(panel);
 }
 
-// --- VIEW: Loyalty Settings ---
-async function renderLoyaltySettingsView() {
+// --- VIEW: Revenue Analytics ---
+async function renderRevenueAnalyticsView() {
     const panel = createElement('div', { class: 'content-panel' });
+    const title = createElement('h2', { textContent: 'Revenue Analytics' });
+    const statsContainer = createElement('div', { class: 'stats-container' });
+
+    panel.append(title, statsContainer);
     mainContentContainer.append(panel);
-    panel.innerHTML = `<div class="placeholder">Loading loyalty settings...</div>`;
 
+    statsContainer.innerHTML = '<p>Loading analytics data...</p>';
     try {
-        const settingsRef = doc(db, 'settings', 'loyaltyTechDraw');
-        const settingsSnap = await getDoc(settingsRef);
-        const settings = settingsSnap.exists() ? settingsSnap.data() : {
-            enabled: false,
-            windowStrategy: 'monthly',
-            windowId: '',
-            threshold: 3,
-            targetCompId: '',
-            postalLimitPerComp: 1,
-            notifications: { email: true, inApp: true }
-        };
+        const getRevenueAnalytics = httpsCallable(functions, 'getRevenueAnalytics');
+        const result = await getRevenueAnalytics();
+        if (!result.data.success) throw new Error(result.data.message || 'The function reported an error.');
 
-        const form = createElement('form', { id: 'loyalty-settings-form', class: 'admin-form' }, [
-            createElement('fieldset', {}, [
-                createElement('legend', { textContent: 'General Loyalty Settings' }),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { class: 'toggle-switch' }, [
-                        createElement('input', { type: 'checkbox', id: 'loyalty-enabled', checked: settings.enabled }),
-                        createElement('span', { class: 'slider' }),
-                        createElement('span', { class: 'label-text', textContent: 'Enable Tech Loyalty Feature' })
-                    ])
-                ]),
-                createElement('div', { class: 'form-group-inline' }, [
-                    createElement('div', { class: 'form-group' }, [
-                        createElement('label', { for: 'loyalty-threshold', textContent: 'Unlock Threshold (Tech Comps)' }),
-                        createElement('input', { type: 'number', id: 'loyalty-threshold', value: settings.threshold, required: true })
-                    ]),
-                    createElement('div', { class: 'form-group' }, [
-                        createElement('label', { for: 'loyalty-target-comp', textContent: 'Target Loyalty Competition ID' }),
-                        createElement('input', { type: 'text', id: 'loyalty-target-comp', value: settings.targetCompId, placeholder: 'Enter the comp ID for the loyalty draw' })
-                    ])
-                ])
-            ]),
-            createElement('fieldset', {}, [
-                createElement('legend', { textContent: 'Time Window' }),
-                createElement('div', { class: 'form-group-inline' }, [
-                    createElement('div', { class: 'form-group' }, [
-                        createElement('label', { for: 'loyalty-window-strategy', textContent: 'Window Strategy' }),
-                        createElement('select', { id: 'loyalty-window-strategy' }, [
-                            createElement('option', { value: 'monthly', textContent: 'Monthly' }),
-                            createElement('option', { value: 'weekly', textContent: 'Weekly' }),
-                            createElement('option', { value: 'rolling', textContent: 'Rolling' })
-                        ])
-                    ]),
-                    createElement('div', { class: 'form-group' }, [
-                        createElement('label', { for: 'loyalty-window-id', textContent: 'Current Window ID (e.g., 2025-08)' }),
-                        createElement('input', { type: 'text', id: 'loyalty-window-id', value: settings.windowId, required: true })
-                    ])
-                ])
-            ]),
-            createElement('button', { type: 'submit', class: ['btn', 'btn-primary'] }, ['Save Loyalty Settings'])
+        const data = result.data;
+        console.log("Revenue analytics data:", data);
+        const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+        const revenueCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Total Revenue' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalRevenue || 0) }),
+            createElement('p', { class: 'stat-annotation', textContent: 'Cash sales from all competitions.' })
+        ]);
+        const costCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Total Cost (Prizes)' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalCost || 0) }),
+            createElement('p', { class: 'stat-annotation', textContent: 'The value of all cash prizes won.' })
+        ]);
+        const profitCard = createElement('div', { class: ['stat-card', data.netProfit >= 0 ? 'profit' : 'loss'] }, [
+            createElement('h3', { textContent: 'Net Profit' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.netProfit || 0) }),
+            createElement('p', { class: 'stat-annotation', textContent: 'Total Revenue - Total Cost.' })
         ]);
 
-        form.querySelector('#loyalty-window-strategy').value = settings.windowStrategy;
+        const creditAwardedCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Site Credit Awarded' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalSiteCreditAwarded || 0) }),
+            createElement('p', { class: 'stat-annotation', textContent: 'Total site credit won from prizes.' })
+        ]);
 
-        panel.innerHTML = '';
-        panel.append(
-            createElement('h2', { textContent: 'Tech Loyalty Settings' }),
-            createElement('p', { textContent: 'Configure the rules for the Tech Loyalty promotion.'}),
-            form
-        );
+        const creditSpentCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Site Credit Spent' }),
+            createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalSiteCreditSpent || 0) }),
+            createElement('p', { class: 'stat-annotation', textContent: 'Total site credit spent on entries.' })
+        ]);
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Saving...';
-            try {
-                const updatedSettings = {
-                    enabled: document.getElementById('loyalty-enabled').checked,
-                    threshold: parseInt(document.getElementById('loyalty-threshold').value),
-                    targetCompId: document.getElementById('loyalty-target-comp').value,
-                    windowStrategy: document.getElementById('loyalty-window-strategy').value,
-                    windowId: document.getElementById('loyalty-window-id').value,
-                };
-                await setDoc(settingsRef, updatedSettings, { merge: true });
-                alert('Loyalty settings saved successfully!');
-            } catch (error) {
-                console.error('Error saving loyalty settings:', error);
-                alert('Error: ' + error.message);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Loyalty Settings';
-            }
-        });
+        statsContainer.innerHTML = '';
+        statsContainer.append(revenueCard, costCard, profitCard, creditAwardedCard, creditSpentCard);
 
     } catch (error) {
-        console.error("Error loading loyalty settings:", error);
-        panel.innerHTML = `<div class="placeholder" style="color:red">Failed to load settings.</div>`;
+        console.error("Error fetching revenue analytics:", error);
+        statsContainer.innerHTML = '';
+        statsContainer.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
     }
 }
 
@@ -503,67 +475,6 @@ function createCompetitionForm({ type, title }) {
                 createElement('div', { class: 'form-group' }, [createElement('label', { for: 'cashAlternative', textContent: 'Prize / Cash Alt (£)' }), createElement('input', { type: 'number', id: 'cashAlternative', required: true })]),
                 !isToken && createElement('div', { class: 'form-group', id: 'end-date-group' }, [createElement('label', { for: 'endDate', textContent: 'End Date & Time' }), createElement('input', { type: 'datetime-local', id: 'endDate', required: !isToken })])
             ].filter(Boolean))
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Category & Labels' }),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'category', textContent: 'Category' }),
-                    createElement('select', { id: 'category' }, [
-                        createElement('option', { value: 'tech', textContent: 'Tech' }),
-                        createElement('option', { value: 'auto', textContent: 'Auto' }),
-                        createElement('option', { value: 'lifestyle', textContent: 'Lifestyle' }),
-                        createElement('option', { value: 'cash', textContent: 'Cash' }),
-                        createElement('option', { value: 'other', textContent: 'Other', selected: true })
-                    ])
-                ]),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'labels', textContent: 'Labels (comma-separated)' }),
-                    createElement('input', { type: 'text', id: 'labels', placeholder: 'e.g. gaming, console, new' })
-                ])
-            ])
-        ]),
-        !isToken && createElement('fieldset', { id: 'loyalty-fields' }, [
-            createElement('legend', { textContent: 'Loyalty Settings' }),
-            createElement('div', { class: 'form-group-inline' }, [
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { class: 'toggle-switch' }, [
-                        createElement('input', { type: 'checkbox', id: 'eligibleForTechUnlock' }),
-                        createElement('span', { class: 'slider' }),
-                        createElement('span', { class: 'label-text', textContent: 'Eligible for Tech Unlock' })
-                    ])
-                ]),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { class: 'toggle-switch' }, [
-                        createElement('input', { type: 'checkbox', id: 'isLoyaltyComp' }),
-                        createElement('span', { class: 'slider' }),
-                        createElement('span', { class: 'label-text', textContent: 'Is the Loyalty Draw Prize' })
-                    ])
-                ]),
-                 createElement('div', { class: 'form-group' }, [
-                    createElement('label', { class: 'toggle-switch' }, [
-                        createElement('input', { type: 'checkbox', id: 'requiresUnlock' }),
-                        createElement('span', { class: 'slider' }),
-                        createElement('span', { class: 'label-text', textContent: 'Requires Unlock to Enter' })
-                    ])
-                ]),
-            ])
-        ]),
-        createElement('fieldset', {}, [
-            createElement('legend', { textContent: 'Free Entry Route' }),
-            createElement('div', { class: 'form-group-inline' }, [
-                 createElement('div', { class: 'form-group' }, [
-                    createElement('label', { class: 'toggle-switch' }, [
-                        createElement('input', { type: 'checkbox', id: 'postalEnabled', checked: true }),
-                        createElement('span', { class: 'slider' }),
-                        createElement('span', { class: 'label-text', textContent: 'Enable Postal Route' })
-                    ])
-                ]),
-                createElement('div', { class: 'form-group' }, [
-                    createElement('label', { for: 'postalLimitPerUser', textContent: 'Postal Entries Per User' }),
-                    createElement('input', { type: 'number', id: 'postalLimitPerUser', value: '1', required: true })
-                ])
-            ])
         ]),
         createElement('fieldset', {}, [createElement('legend', { textContent: 'Ticket Pricing' }), tiersContainer, addTierBtn]),
         isMain && createElement('fieldset', {}, [
@@ -639,22 +550,6 @@ async function handleCreateFormSubmit(e, formType) {
             skillQuestion: { text: form.querySelector('#questionText').value, answers: answersObject, correctAnswer: correctKey },
             ticketTiers,
             prizeImage: form.querySelector('#prizeImage')?.value || 'assets/logo-icon.png',
-
-            // New Loyalty and Category fields
-            category: form.querySelector('#category').value,
-            labels: form.querySelector('#labels').value.split(',').map(s => s.trim()).filter(Boolean),
-            loyalty: {
-                isLoyaltyComp: form.querySelector('#isLoyaltyComp')?.checked || false,
-                requiresUnlock: form.querySelector('#requiresUnlock')?.checked || false,
-                eligibleForTechUnlock: form.querySelector('#eligibleForTechUnlock')?.checked || false,
-                windowId: null, // Admin should set this manually for now if needed
-                displayBadge: null,
-                eligibilityNote: null
-            },
-            freeRoute: {
-                postalEnabled: form.querySelector('#postalEnabled').checked,
-                postalLimitPerUser: parseInt(form.querySelector('#postalLimitPerUser').value)
-            }
         };
         if (competitionType !== 'token') {
              competitionPayload.endDate = Timestamp.fromDate(new Date(form.querySelector('#endDate').value));

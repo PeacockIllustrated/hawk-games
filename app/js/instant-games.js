@@ -13,6 +13,7 @@ let userTokens = []; // Spinner tokens
 // let userPlinkoTokens = []; // Plinko tokens
 let userProfile = {};
 let userCreditBalance = 0;
+let userCashBalance = 0;
 let spinnerPrizes = [];
 // let plinkoConfig = {};
 let isSpinning = false;
@@ -23,6 +24,7 @@ let activeTokenCompetition = null;
 const tokenCountElement = document.getElementById('token-count');
 // const plinkoTokenCountElement = document.getElementById('plinko-token-count');
 const creditBalanceElement = document.getElementById('credit-balance-display');
+const cashBalanceElement = document.getElementById('cash-balance-display');
 const tokenAccordionContainer = document.getElementById('token-accordion-container');
 const buySpinnerBtn = document.getElementById('buy-spinner-tokens-btn');
 // const buyPlinkoBtn = document.getElementById('buy-plinko-tokens-btn');
@@ -74,6 +76,7 @@ auth.onAuthStateChanged((user) => {
             if (docSnap.exists()) {
                 userProfile = docSnap.data();
                 userCreditBalance = userProfile.creditBalance || 0;
+                userCashBalance = userProfile.cashBalance || 0;
                 userTokens = (userProfile.spinTokens || []).sort((a, b) => new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000));
                 // userPlinkoTokens = (userProfile.plinkoTokens || []);
                 if (!isSpinning) {
@@ -121,6 +124,7 @@ async function loadAllGameSettings() {
 function updateUI() {
     tokenCountElement.textContent = userTokens.length;
     creditBalanceElement.textContent = `£${userCreditBalance.toFixed(2)}`;
+    cashBalanceElement.textContent = `£${userCashBalance.toFixed(2)}`;
 
     const tokensAvailable = userTokens.length;
     spinButton.disabled = tokensAvailable < 1 || isSpinning;
@@ -225,13 +229,20 @@ async function handleMultiSpin(spinCount) {
     const spinResults = [];
     const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
 
-    for (let i = 0; i < spinCount; i++) {
-        const tokenToSpend = userTokens[i];
+    // --- BUG FIX ---
+    // Create a static copy of the tokens to be spent. This prevents a race condition
+    // where the onSnapshot listener modifies the userTokens array while this loop is running.
+    const tokensToSpend = userTokens.slice(0, spinCount);
+
+    for (const tokenToSpend of tokensToSpend) {
         try {
+            // Pass the tokenId from our static 'tokensToSpend' array
             const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
             spinResults.push(result.data);
         } catch (error) {
-            console.error(`Error on spin ${i + 1}:`, error);
+            console.error(`Error on spin for token ${tokenToSpend.tokenId}:`, error);
+            // If a spin fails, we push a non-winning result. The user's token is not
+            // consumed by the backend in this case, so it will reappear on the next UI update.
             spinResults.push({ won: false, error: error.message });
         }
     }
@@ -241,7 +252,9 @@ async function handleMultiSpin(spinCount) {
     const finalAngle = baseSpins + randomAdditionalRotation;
     const spinDuration = 2 + spinCount * 0.5; // Longer duration
 
-    tokenCountElement.textContent = userTokens.length - spinCount;
+    // This optimistic update is removed. The UI will now only update when the
+    // onSnapshot listener receives the new token count from the server,
+    // which is the source of truth. This prevents visual glitches.
 
     wheel.style.transition = `transform ${spinDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
     wheel.style.transform = `rotate(${finalAngle}deg)`;
@@ -296,9 +309,28 @@ function showMultiWinModal(wins) {
     winCelebrationModal.classList.add('show', 'multi-win-modal');
 }
 
-spinButton.addEventListener('click', () => handleMultiSpin(1));
-spinX3Button.addEventListener('click', () => handleMultiSpin(3));
-spinX5Button.addEventListener('click', () => handleMultiSpin(5));
+const allSpinButtons = [spinButton, spinX3Button, spinX5Button];
+
+const createSpinHandler = (spinCount) => {
+    return () => {
+        // First, check if a spin is already in progress. This is the primary guard.
+        if (isSpinning) {
+            console.warn("Spin attempt ignored: already spinning.");
+            return;
+        }
+
+        // Immediately disable all buttons to prevent double-clicks or race conditions
+        // before the async handleMultiSpin function sets its own isSpinning flag.
+        allSpinButtons.forEach(btn => btn.disabled = true);
+
+        // Now, call the main logic
+        handleMultiSpin(spinCount);
+    };
+};
+
+spinButton.addEventListener('click', createSpinHandler(1));
+spinX3Button.addEventListener('click', createSpinHandler(3));
+spinX5Button.addEventListener('click', createSpinHandler(5));
 
 spinPrizeReveal.addEventListener('click', () => {
     if (isSpinning || spinPrizeReveal.classList.contains('revealed')) return;
@@ -530,17 +562,38 @@ async function openPurchaseModal(tokenType) {
                  createElement('div', { class: 'ticket-options' }, bundlesHTML)
             ]),
             createElement('div', { id: 'credit-payment-option', style: { display: 'none', marginTop: '1rem' } }),
+            createElement('div', { id: 'terms-container', style: { marginTop: '1rem' } }),
             createElement('div', { class: 'modal-actions' }, [
                 createElement('button', { type: 'button', class: ['btn', 'btn-secondary'], 'data-close-modal': true }, ['Cancel']),
-                createElement('button', { type: 'submit', class: 'btn' }, ['Confirm & Pay'])
+                createElement('button', { type: 'submit', class: 'btn', disabled: true }, ['Confirm & Pay'])
             ])
         ]);
         
         modalBody.append(form);
 
+        const termsContainer = form.querySelector('#terms-container');
+        const submitBtn = form.querySelector('button[type="submit"]');
+
+        const termsCheckbox = createElement('input', { type: 'checkbox', id: 'modal-terms-checkbox', style: { marginRight: '0.75rem', accentColor: 'var(--primary-gold)', width: '18px', height: '18px', marginTop: '2px', flexShrink: '0' } });
+        const termsLabel = createElement('label', { for: 'modal-terms-checkbox', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#ccc', maxWidth: '380px', margin: '1rem auto 0 auto', textAlign: 'left', lineHeight: '1.5', cursor: 'pointer' } }, [
+            termsCheckbox,
+            createElement('span', {}, [
+                'I confirm I am 18+ and have read the ',
+                createElement('a', { href: 'terms-and-conditions.html', target: 'blank', style: { color: 'var(--primary-gold)' } }, ['Terms & Conditions.'])
+            ])
+        ]);
+
+        termsContainer.append(termsLabel);
+
+        termsCheckbox.addEventListener('change', () => {
+            submitBtn.disabled = !termsCheckbox.checked;
+        });
+
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            handleTokenCompEntry(form, tokenType, 'card');
+            if (termsCheckbox.checked) {
+                handleTokenCompEntry(form, tokenType, 'card');
+            }
         });
 
     } catch (error) {

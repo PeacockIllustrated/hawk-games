@@ -1,19 +1,16 @@
 // app/js/competition.js
-// Fully updated to integrate Trust Payments HPP (Hosted Payment Page) flow.
-// - Card checkout now calls CF 'createTrustOrder' and auto-posts to Trust HPP.
-// - No ticket allocation happens client-side for card path; fulfilment is via webhook.
-// - Existing UX (questions, tiers, timer, parallax, instant-win modal) preserved.
+// Updated for Trust Payments integration with card (HPP) + site credit checkout.
+// Full drop-in replacement, no brevity. 
 
 // --- Firebase Imports ---
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 import { app } from './auth.js';
+import { payByCard, payByCredit } from './payments.js';
 
 // --- Singletons ---
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app);
 
 // --- Module State ---
 let currentCompetitionData = null;
@@ -51,45 +48,6 @@ function createElement(tag, options = {}, children = []) {
   return el;
 }
 
-// --- HPP Helpers (Trust Payments) ---
-
-/**
- * Create and submit a hidden POST form to the Trust Payments HPP endpoint.
- * @param {string} endpoint 
- * @param {Record<string,string>} fields 
- */
-function postToHPP(endpoint, fields) {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = endpoint;
-
-  Object.entries(fields).forEach(([name, value]) => {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = String(value ?? "");
-    form.appendChild(input);
-  });
-
-  document.body.appendChild(form);
-  form.submit();
-}
-
-/**
- * Start a card checkout by asking the server to create an order and return HPP fields.
- * INTENT carries only identifiers/quantities; the server validates pricing.
- * @param {{type:'tickets', compId:string, ticketsBought:number}|{type:'spinner_bundle', bundleId:string}} intent 
- */
-async function payByCard(intent) {
-  const createTrustOrder = httpsCallable(functions, "createTrustOrder");
-  // Server should: validate intent, snapshot unit prices, create orders/{id}, return {endpoint, fields}
-  const { data } = await createTrustOrder({ intent });
-  if (!data || !data.endpoint || !data.fields) {
-    throw new Error("Unable to start payment: invalid response from server.");
-  }
-  postToHPP(data.endpoint, data.fields);
-}
-
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
@@ -120,16 +78,13 @@ async function loadCompetitionDetails(id) {
       currentCompetitionData = docSnap.data();
       document.title = `${currentCompetitionData.title} | The Hawk Games`;
 
-      // Clear placeholders and build page
       pageContent.innerHTML = '';
       pageContent.append(...createHeroPageElements(currentCompetitionData));
 
-      // Optional parallax
       if (currentCompetitionData.hasParallax) {
         initializeParallax();
       }
 
-      // Countdown if present
       if (currentCompetitionData.endDate) {
         setupCountdown(currentCompetitionData.endDate.toDate());
       }
@@ -221,7 +176,9 @@ function showConfirmationModal() {
   const tickets = parseInt(selectedTicket.dataset.amount);
   const price = parseFloat(selectedTicket.dataset.price); // display only
 
-  const confirmBtn = createElement('button', { id: 'confirm-entry-btn', class: 'btn', disabled: true }, ['Confirm & Pay']);
+  const payByCardBtn = createElement('button', { id: 'pay-card-btn', class: 'btn', disabled: true }, ['Pay by Card']);
+  const payByCreditBtn = createElement('button', { id: 'pay-credit-btn', class: ['btn', 'btn-secondary'], disabled: true }, ['Pay with Credit']);
+
   const termsCheckbox = createElement('input', {
     type: 'checkbox',
     id: 'modal-terms-checkbox',
@@ -268,32 +225,32 @@ function showConfirmationModal() {
       `.`
     ]),
     termsLabel,
-    createElement('div', { class: 'modal-actions', style: { marginTop: '1.5rem' } }, [
+    createElement('div', { class: 'modal-actions', style: { marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' } }, [
       createElement('button', { 'data-close-modal': true, class: ['btn', 'btn-secondary'] }, ['Cancel']),
-      confirmBtn
+      payByCardBtn,
+      payByCreditBtn
     ])
   ]);
 
   openModal(content);
 
-  // Enable confirm when terms checked
   const modalCheckbox = document.getElementById('modal-terms-checkbox');
-  if (modalCheckbox) {
-    modalCheckbox.addEventListener('change', () => {
-      confirmBtn.disabled = !modalCheckbox.checked;
-    });
-  }
+  modalCheckbox.addEventListener('change', () => {
+    payByCardBtn.disabled = !modalCheckbox.checked;
+    payByCreditBtn.disabled = !modalCheckbox.checked;
+  });
 
-  // On confirm, start HPP flow (card path). Price is NOT sent to server; server validates based on tier config.
-  confirmBtn.addEventListener('click', () => handleEntry(tickets), { once: true });
+  payByCardBtn.addEventListener('click', async () => {
+    await handleEntryCard(tickets);
+  });
+
+  payByCreditBtn.addEventListener('click', async () => {
+    await handleEntryCredit(tickets);
+  });
 }
 
-/**
- * Handle entry via card: call createTrustOrder with intent and redirect to HPP.
- * After payment, Trust returns to success page which listens on the order doc for fulfilment.
- * @param {number} ticketsBought 
- */
-async function handleEntry(ticketsBought) {
+// --- Entry Handlers ---
+async function handleEntryCard(ticketsBought) {
   openModal(createElement('div', {}, [
     createElement('h2', { textContent: 'Redirecting to Secure Payment…' }),
     createElement('div', { class: 'loader' }),
@@ -301,19 +258,49 @@ async function handleEntry(ticketsBought) {
   ]));
 
   try {
-    // Important: Do NOT send price here. Server will validate qty and compute price from Firestore.
     const intent = {
       type: 'tickets',
       compId: competitionId,
-      ticketsBought: Number.isFinite(ticketsBought) ? ticketsBought : 1
+      ticketsBought
     };
-
-    await payByCard(intent); // will navigate to Trust HPP; code after this generally won't run
+    await payByCard(intent); // navigates to Trust HPP
   } catch (error) {
-    console.error("Entry failed to start:", error);
+    console.error("Card checkout failed:", error);
     openModal(createElement('div', {}, [
       createElement('h2', { textContent: 'Error' }),
-      createElement('p', { textContent: error.message || 'Could not start payment.' }),
+      createElement('p', { textContent: error.message || 'Could not start card payment.' }),
+      createElement('button', { 'data-close-modal': true, class: 'btn' }, ['Close'])
+    ]));
+  }
+}
+
+async function handleEntryCredit(ticketsBought) {
+  openModal(createElement('div', {}, [
+    createElement('h2', { textContent: 'Processing Credit Payment…' }),
+    createElement('div', { class: 'loader' }),
+    createElement('p', { textContent: 'Please wait, do not close this window.' })
+  ]));
+
+  try {
+    const data = await payByCredit({ compId: competitionId, ticketsBought });
+    if (data.awardedTokens && data.awardedTokens.length > 0) {
+      showInstantWinModal(data.awardedTokens.length);
+    } else {
+      const successMessage = `Your tickets #${data.ticketStart} to #${data.ticketStart + data.ticketsBought - 1} have been successfully registered. Good luck!`;
+      const doneBtn = createElement('button', { 'data-close-modal': true, class: 'btn', style: { marginTop: '1rem' } }, ['Done']);
+      doneBtn.onclick = () => window.location.reload();
+      openModal(createElement('div', { class: 'celebration-modal' }, [
+        createElement('div', { class: 'modal-icon-success', textContent: '✓' }),
+        createElement('h2', { textContent: 'Entry Successful!' }),
+        createElement('p', { textContent: successMessage }),
+        doneBtn
+      ]));
+    }
+  } catch (error) {
+    console.error("Credit checkout failed:", error);
+    openModal(createElement('div', {}, [
+      createElement('h2', { textContent: 'Error' }),
+      createElement('p', { textContent: error.message || 'Could not complete credit payment.' }),
       createElement('button', { 'data-close-modal': true, class: 'btn' }, ['Close'])
     ]));
   }
@@ -365,25 +352,20 @@ function setupCountdown(endDate) {
       timerElement.textContent = `${d}:${h}:${m}:${s}`;
     } else {
       timerElement.append(
-        d,
-        createElement('small', { textContent: 'd' }),
-        ` : ${h}`,
-        createElement('small', { textContent: 'h' }),
-        ` : ${m}`,
-        createElement('small', { textContent: 'm' }),
-        ` : ${s}`,
+        d, createElement('small', { textContent: 'd' }), ` : ${h}`,
+        createElement('small', { textContent: 'h' }), ` : ${m}`,
+        createElement('small', { textContent: 'm' }), ` : ${s}`,
         createElement('small', { textContent: 's' })
       );
     }
   }, 1000);
 }
 
-// --- Parallax (optional) ---
+// --- Parallax ---
 function initializeParallax() {
   const bg = document.querySelector('.hero-comp-header-bg');
   const fg = document.querySelector('.hero-comp-header-fg');
   if (!bg || !fg) return;
-
   window.addEventListener('scroll', () => {
     const scrollValue = window.scrollY;
     bg.style.transform = `translateY(${scrollValue * 0.1}px)`;
@@ -393,14 +375,12 @@ function initializeParallax() {
 
 // --- Page builder ---
 function createHeroPageElements(data) {
-  // Answers
   const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) =>
     createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value })
   );
 
   const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
-  // Mark "best value" tier
   let bestValueAmount = -1;
   if (data.ticketTiers && data.ticketTiers.length > 1) {
     const bestTier = data.ticketTiers.reduce((best, current) =>
@@ -428,7 +408,6 @@ function createHeroPageElements(data) {
   const mainContentSections = [];
 
   if (isTrueHero) {
-    // HERO header
     header = createElement('header', { class: 'hero-comp-header' }, [
       createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
       createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
@@ -438,38 +417,29 @@ function createHeroPageElements(data) {
       createElement('section', { class: 'hero-comp-title-section' }, [
         createElement('h1', { textContent: `Win a ${data.title}` }),
         createElement('p', { class: 'cash-alternative-hero' }, [
-          'Or take ',
-          createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }),
-          ' Cash Alternative'
+          'Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative'
         ]),
         createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING' }),
         createElement('div', { id: 'timer', class: 'hero-digital-timer' })
       ]),
       createElement('section', { class: 'hero-comp-progress-section' }, [
         createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
-        createElement('div', { class: 'progress-bar' }, [
-          createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })
-        ])
+        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
       ])
     );
   } else {
-    // MAIN competition layout
-    header = createElement('header'); // empty
+    header = createElement('header'); // Empty header, does not take up space
 
     const introDetails = createElement('div', { style: { flex: '1 1 50%', display: 'flex', flexDirection: 'column' } }, [
       createElement('h1', { textContent: `Win a ${data.title}` }),
       createElement('p', { class: 'cash-alternative-hero' }, [
-        'Or take ',
-        createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }),
-        ' Cash Alternative'
+        'Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative'
       ]),
       createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING', style: { marginTop: 'auto' } }),
       createElement('div', { id: 'timer', class: 'hero-digital-timer' }),
       createElement('div', { class: 'hero-comp-progress-section', style: { marginTop: '1rem' } }, [
         createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
-        createElement('div', { class: 'progress-bar' }, [
-          createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })
-        ])
+        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
       ])
     ]);
 
@@ -491,7 +461,7 @@ function createHeroPageElements(data) {
       viewsContainer
     ]);
 
-    // 3D toggle wiring
+    // 3D toggle logic
     if (data.splineUrl) {
       threeDButton.style.display = 'inline-block';
 
@@ -517,7 +487,7 @@ function createHeroPageElements(data) {
     }
 
     const introSection = createElement('section', {
-      class: 'main-comp-layout',
+      class: 'main-comp-layout', // Class added for mobile stacking
       style: { display: 'flex', gap: '2rem', paddingTop: '120px' }
     }, [
       prizeVisualsPanel,
@@ -595,7 +565,7 @@ function createHeroPageElements(data) {
   return [header, main];
 }
 
-// --- INSTANT WIN MODAL LOGIC (unchanged flow) ---
+// --- INSTANT WIN MODAL LOGIC ---
 function showInstantWinModal(tokenCount) {
   const modal = document.getElementById('instant-win-modal');
   if (!modal) return;
@@ -663,9 +633,12 @@ async function handleSpinButtonClick() {
     new Date(a.earnedAt.seconds * 1000) - new Date(b.earnedAt.seconds * 1000)
   )[0];
 
-  const spendTokenFunc = httpsCallable(functions, 'spendSpinToken');
-
   try {
+    // Spend token via CF
+    const spendToken = (await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js"));
+    const functions = spendToken.getFunctions(app);
+    const spendTokenFunc = spendToken.httpsCallable(functions, 'spendSpinToken');
+
     const result = await spendTokenFunc({ tokenId: tokenToSpend.tokenId });
     const { won, prizeType, value } = result.data;
 

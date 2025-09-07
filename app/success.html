@@ -1,63 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Payment Successful | The Hawk Games</title>
-  <link rel="stylesheet" href="/app/css/style.css">
-  <style>
-    body {
-      background: #1a1a1a;
-      color: #e0a94a;
-      font-family: 'Montserrat', sans-serif;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      min-height: 100vh; text-align: center;
-    }
-    .card {
-      background: #2a2a2a;
-      padding: 2rem;
-      border-radius: 1rem;
-      box-shadow: 0 0 20px rgba(224,169,74,0.4);
-      max-width: 500px;
-    }
-    h1 { color: #ff6b00; }
-    .spinner { margin-top: 1rem; }
-  </style>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app/css/checkout.css">
 </head>
 <body>
-  <div class="card">
-    <h1>Payment Processing...</h1>
-    <p>We’re confirming your order with Trust Payments. Your tickets or spins will appear shortly.</p>
-    <div class="spinner">⏳</div>
+  <div class="shards">
+    <div class="shard"></div><div class="shard"></div><div class="shard"></div><div class="shard"></div>
   </div>
+
+  <main class="hawk-frame" id="frame">
+    <div class="hawk-badge">
+      <div class="logo">H</div>
+      <span>The Hawk Games • Secure Checkout</span>
+    </div>
+    <h1 class="hawk-title" id="title">Confirming your payment…</h1>
+    <p class="hawk-sub" id="sub">We’re finalising your order with Trust Payments. This usually takes a moment.</p>
+    <div class="loader" id="loader" aria-hidden="true"></div>
+
+    <p class="small">Do not close this tab. We’ll update as soon as your order is confirmed.</p>
+  </main>
+
+  <!-- Firebase v9 modules already used in your app -->
   <script type="module">
-    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-    import { app } from "./js/auth.js"; // your existing firebase init
+    import { app } from "./js/auth.js";
+    import {
+      getFirestore, doc, onSnapshot, getDoc
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
     const db = getFirestore(app);
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('orderId');
+    const qs = new URLSearchParams(location.search);
+    const orderId = qs.get("orderId");
 
-    if(orderId){
+    const title = document.getElementById("title");
+    const sub   = document.getElementById("sub");
+    const frame = document.getElementById("frame");
+    const loader = document.getElementById("loader");
+
+    async function boot(){
+      if(!orderId){
+        title.textContent = "Missing order reference";
+        sub.textContent = "We couldn’t find your orderId in the URL.";
+        loader.remove();
+        return;
+      }
+
       const ref = doc(db, "orders", orderId);
+
+      // If webhook lands a touch after navigation, snapshot will flip state live.
       onSnapshot(ref, (snap) => {
-        if(!snap.exists()) return;
-        const data = snap.data();
-        if(data.status === "paid"){
-          document.querySelector('.card').innerHTML = `
-            <h1>Payment Complete ✅</h1>
-            <p>Your entries/spins are live. Good luck!</p>
-            <a href="/app/index.html" style="color:#e0a94a;text-decoration:underline">Back to Games</a>
-          `;
-        } else if(data.status === "failed" || data.status === "cancelled"){
-          document.querySelector('.card').innerHTML = `
-            <h1>Payment Failed ❌</h1>
-            <p>${data.failureReason || 'Your payment could not be completed.'}</p>
-            <a href="/app/index.html" style="color:#e0a94a;text-decoration:underline">Try Again</a>
-          `;
+        if(!snap.exists()){
+          title.textContent = "Preparing your order…";
+          return;
+        }
+        const o = snap.data();
+
+        if(o.status === "paid"){
+          title.textContent = "Payment complete — you're in! ✅";
+          sub.innerHTML = "Your entries/spins are now active on your account. Good luck!";
+          loader.remove();
+
+          const cta = document.createElement("a");
+          cta.className = "hawk-btn alt";
+          cta.href = "/app/index.html";
+          cta.textContent = "Back to Games";
+          frame.appendChild(cta);
+
+          const info = document.createElement("p");
+          info.className = "small";
+          info.textContent = `Order: ${orderId} • Ref: ${o.providerRef || '—'}`;
+          frame.appendChild(info);
+        }
+        else if(o.status === "failed" || o.status === "cancelled"){
+          title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
+          sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
+          loader.remove();
+
+          const retry = document.createElement("a");
+          retry.className = "hawk-btn";
+          retry.href = "/app/index.html";
+          retry.textContent = "Back to Games";
+          frame.appendChild(retry);
+        }
+        else {
+          // created / redirected → keep loader
         }
       });
     }
+    boot();
   </script>
 </body>
 </html>

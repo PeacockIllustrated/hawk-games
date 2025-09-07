@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Payment Successful | The Hawk Games</title>
+  <link rel="stylesheet" href="/app/css/style.css">
+  <style>
+    body {
+      background: #1a1a1a;
+      color: #e0a94a;
+      font-family: 'Montserrat', sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 100vh; text-align: center;
+    }
+    .card {
+      background: #2a2a2a;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 0 20px rgba(224,169,74,0.4);
+      max-width: 500px;
+    }
+    h1 { color: #ff6b00; }
+    .spinner { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Payment Processing...</h1>
+    <p>We’re confirming your order with Trust Payments. Your tickets or spins will appear shortly.</p>
+    <div class="spinner">⏳</div>
+  </div>
+  <script type="module">
+    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { app } from "./js/auth.js"; // your existing firebase init
+
+    const db = getFirestore(app);
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId');
+
+    if(orderId){
+      const ref = doc(db, "orders", orderId);
+      onSnapshot(ref, (snap) => {
+        if(!snap.exists()) return;
+        const data = snap.data();
+        if(data.status === "paid"){
+          document.querySelector('.card').innerHTML = `
+            <h1>Payment Complete ✅</h1>
+            <p>Your entries/spins are live. Good luck!</p>
+            <a href="/app/index.html" style="color:#e0a94a;text-decoration:underline">Back to Games</a>
+          `;
+        } else if(data.status === "failed" || data.status === "cancelled"){
+          document.querySelector('.card').innerHTML = `
+            <h1>Payment Failed ❌</h1>
+            <p>${data.failureReason || 'Your payment could not be completed.'}</p>
+            <a href="/app/index.html" style="color:#e0a94a;text-decoration:underline">Try Again</a>
+          `;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

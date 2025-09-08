@@ -51,7 +51,15 @@ function createElement(tag, options = {}, children = []) {
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
-  competitionId = params.get('id');
+ // Be liberal in what we accept
+  competitionId =
+   params.get('id') ||
+    params.get('cid') ||
+    params.get('rid') ||
+    params.get('compId') ||
+    params.get('competitionId') ||
+    document.querySelector('[data-comp-id]')?.getAttribute('data-comp-id') ||
+    null;
   const pageContent = document.getElementById('competition-page-content');
 
   if (competitionId) {

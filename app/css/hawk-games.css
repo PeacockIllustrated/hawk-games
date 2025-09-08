@@ -649,11 +649,15 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* --- 28. COMPETITION PAGE LAYOUT REFINEMENTS --- */
 .main-comp-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 3rem;
-    align-items: flex-start;
+    align-items: center;
     padding-top: 120px; /* Standard top padding */
+}
+
+.prize-visuals-panel img {
+    border: 5px solid var(--primary-gold);
 }
 
 .prize-visuals-panel {

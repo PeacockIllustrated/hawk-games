@@ -47,24 +47,32 @@ function priceTicketsFromComp(comp, qty) {
   return {totalPence, tierPrice: totalPrice};
 }
 
-function buildHppFields({siteRef, orderId, amountPence, successUrl, cancelUrl, notifyUrl, user}) {
-  return {
-    // HPP required fields
+function buildHppFields({ siteRef, orderId, amountPence, successUrl, cancelUrl, notifyUrl, user }) {
+  const f = {
+    // required
     sitereference: siteRef,
     orderreference: orderId,
     currencyiso3a: "GBP",
     mainamount: asGBP(amountPence),
-    // URLs
-    success_url: `${successUrl}?orderId=${orderId}`,
-    cancel_url: `${cancelUrl}?orderId=${orderId}`,
+
+    // Advanced Rule params (match STR-6/7/10)
+    successfulurlredirect: successUrl,
+    declinedurlredirect:  cancelUrl,
+    allurlnotification:    notifyUrl,
+
+    // Legacy names (harmless; keeps compat if rules change)
+    success_url: successUrl,
+    cancel_url:  cancelUrl,
     notification_url: notifyUrl,
-    // Nice-to-haves (non-sensitive; helps autofill)
-    billingemail: user?.email || "",
+
+    // optional
+    billingemail:     user?.email || "",
     billingfirstname: user?.displayName?.split(" ")[0] || "",
-    billinglastname: user?.displayName?.split(" ").slice(1).join(" ") || "",
-    // stprofile: "hawk_games", // if you set a themed profile in MyST
+    billinglastname:  (user?.displayName?.split(" ").slice(1).join(" ") || "")
   };
+  return f;
 }
+
 
 async function fulfilOrderTickets(orderId) {
   const orderRef = db.collection("orders").doc(orderId);

@@ -207,7 +207,8 @@ const assertIsAuthenticated = (context) => {
 const functionOptions = {
   region: "us-central1",
   enforceAppCheck: true,
-  cors: ["https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "http://localhost:5000", "http://127.0.0.1:5000"],
+  cors: ["https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "https://the-hawk-games-staging.netlify.app",
+    /netlify\.app$/, "http://localhost:5000", "http://127.0.0.1:5000"],
 };
 
 /* ============================

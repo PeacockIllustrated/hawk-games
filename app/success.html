@@ -1,47 +1,166 @@
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-  import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-  import { firebaseConfig } from "./js/firebase-config.js"; // export this from a tiny file
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Payment Successful | The Hawk Games</title>
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+  <!-- Fonts + Brand styling -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
 
-  const qs = new URLSearchParams(location.search);
-  let orderId = qs.get("orderId") || qs.get("orderreference") || qs.get("requestreference") || localStorage.getItem("pendingOrderId") || "";
+  <!-- Keep this file aligned with your site look & feel -->
+  <link rel="stylesheet" href="/app/css/checkout.css">
 
-  console.log("Success URL:", location.href);
-  console.log("orderId (resolved):", orderId);
+  <meta name="robots" content="noindex" />
+</head>
+<body>
+  <noscript>
+    <style>main{display:none}</style>
+    <div style="color:#fff;background:#000;padding:1rem;text-align:center">
+      JavaScript is required to confirm your payment. Please enable it and refresh.
+    </div>
+  </noscript>
 
-  const title  = document.getElementById("title");
-  const sub    = document.getElementById("sub");
-  const frame  = document.getElementById("frame");
-  const loader = document.getElementById("loader");
+  <!-- subtle background shards -->
+  <div class="shards">
+    <div class="shard"></div><div class="shard"></div><div class="shard"></div><div class="shard"></div>
+  </div>
 
-  function missing() {
-    title.textContent = "Missing order reference";
-    sub.textContent = "We couldn’t find your orderId. We’ll keep checking for confirmation.";
-    loader?.remove();
-  }
+  <main class="hawk-frame" id="frame" aria-live="polite">
+    <div class="hawk-badge">
+      <div class="logo">H</div>
+      <span>The Hawk Games • Secure Checkout</span>
+    </div>
 
-  if (!orderId) {
-    missing();
-  } else {
-    const ref = doc(db, "orders", orderId);
-    onSnapshot(ref, (snap) => {
-      if (!snap.exists()) return;
+    <h1 class="hawk-title" id="title">Confirming your payment…</h1>
+    <p class="hawk-sub" id="sub">We’re finalising your order with Trust Payments. This usually takes a moment.</p>
+    <div class="loader" id="loader" aria-hidden="false"></div>
 
-      const o = snap.data();
-      if (o.status === "paid") {
-        title.textContent = "Payment complete — you're in! ✅";
-        sub.textContent   = "Your entries/spins are now active on your account. Good luck!";
-        loader?.remove();
-        localStorage.removeItem("pendingOrderId");
-      } else if (o.status === "failed" || o.status === "cancelled") {
-        title.textContent = o.status === "failed" ? "Payment failed ❌" : "Payment cancelled ❌";
-        sub.textContent   = o.failureReason || "No funds were taken. You can safely try again.";
-        loader?.remove();
-        localStorage.removeItem("pendingOrderId");
+    <p class="small">Do not close this tab. We’ll update as soon as your order is confirmed.</p>
+  </main>
+
+  <script type="module">
+    // ---- Pure modular Firebase (no compat) ----
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { firebaseConfig } from "./js/firebase-config.js"; // Must export: export const firebaseConfig = { ... };
+
+    // Init
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    // Elements
+    const title  = document.getElementById("title");
+    const sub    = document.getElementById("sub");
+    const frame  = document.getElementById("frame");
+    const loader = document.getElementById("loader");
+
+    // Resolve orderId from several places:
+    // - Preferred: ?orderId=<docId> we added to the success_url
+    // - Fallbacks: ?orderreference= / ?requestreference= (TP names seen in some setups)
+    // - Last resort: localStorage (we stash it before redirect)
+    const qs = new URLSearchParams(location.search);
+    let orderId =
+      qs.get("orderId") ||
+      qs.get("orderreference") ||
+      qs.get("requestreference") ||
+      localStorage.getItem("pendingOrderId") ||
+      "";
+
+    console.log("[SUCCESS] URL:", location.href);
+    console.log("[SUCCESS] Resolved orderId:", orderId);
+
+    function showMissing() {
+      title.textContent = "Missing order reference";
+      sub.textContent = "We couldn’t find your orderId in the URL. If you just paid, we’ll keep watching for confirmation.";
+      loader?.remove();
+
+      const home = document.createElement("a");
+      home.className = "hawk-btn";
+      home.href = "/app/index.html";
+      home.textContent = "Back to Games";
+      frame.appendChild(home);
+    }
+
+    function showSuccess(o) {
+      title.textContent = "Payment complete — you're in! ✅";
+      sub.textContent = "Your entries/spins are now active on your account. Good luck!";
+      loader?.remove();
+
+      const cta = document.createElement("a");
+      cta.className = "hawk-btn alt";
+      cta.href = "/app/index.html";
+      cta.textContent = "Back to Games";
+      frame.appendChild(cta);
+
+      const info = document.createElement("p");
+      info.className = "small";
+      info.textContent = `Order: ${orderId} • Ref: ${o.providerRef || "—"}`;
+      frame.appendChild(info);
+
+      localStorage.removeItem("pendingOrderId");
+    }
+
+    function showFailure(o) {
+      title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
+      sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
+      loader?.remove();
+
+      const home = document.createElement("a");
+      home.className = "hawk-btn";
+      home.href = "/app/index.html";
+      home.textContent = "Back to Games";
+      frame.appendChild(home);
+
+      localStorage.removeItem("pendingOrderId");
+    }
+
+    async function boot() {
+      if (!orderId) {
+        showMissing();
+        return;
       }
-    });
-  }
-</script>
+
+      const ref = doc(db, "orders", orderId);
+
+      // First quick read (sometimes webhook already landed)
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const o = snap.data();
+          if (o.status === "paid") return showSuccess(o);
+          if (o.status === "failed" || o.status === "cancelled") return showFailure(o);
+        }
+      } catch (e) {
+        console.warn("[SUCCESS] Initial getDoc error:", e);
+      }
+
+      // Live updates (most common path: webhook arrives shortly after redirect)
+      const unsub = onSnapshot(ref, (snap) => {
+        if (!snap.exists()) return; // still creating
+        const o = snap.data();
+        console.log("[SUCCESS] Order update:", o.status);
+
+        if (o.status === "paid") {
+          unsub();
+          showSuccess(o);
+        } else if (o.status === "failed" || o.status === "cancelled") {
+          unsub();
+          showFailure(o);
+        }
+        // else 'created' / 'pending' → keep waiting
+      });
+
+      // Optional safety net: after 2 minutes, show a gentle message if still pending
+      setTimeout(() => {
+        if (!document.querySelector(".hawk-btn.alt")) {
+          sub.textContent = "Still waiting on confirmation… if this takes longer than expected, we’ll email you as soon as it completes.";
+        }
+      }, 120000);
+    }
+
+    boot();
+  </script>
+</body>
+</html>

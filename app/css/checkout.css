@@ -1,109 +1,146 @@
+/* === The Hawk Games – Checkout Pages (success/cancel) ===================== */
+
 :root{
-  --charcoal:#0f0f12;
-  --charcoal-2:#18181c;
-  --charcoal-3:#222228;
-  --gold:#e0a94a;
-  --orange:#ff6b00;
-  --muted:#9b9b9b;
-  --ring: rgba(224,169,74,0.35);
+  --bg: #0b0c0f;
+  --bg-2:#0a0b0e;
+  --panel: #13141a;
+  --panel-2: #101116;
+  --text: #e9eaf1;
+  --muted:#9aa0ad;
+  --gold:#F2B035;          /* brand gold */
+  --gold-2:#E09D22;
+  --accent:#F2B035;
+  --success:#22c55e;
+  --danger:#ef4444;
+  --radius: 18px;
+  --shadow: 0 10px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
 }
 
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
+* { box-sizing: border-box; }
+
+html,body{
+  height:100%;
+  background: radial-gradient(1200px 800px at 20% -10%, #121317 0%, transparent 60%),
+              radial-gradient(1000px 700px at 110% 10%, #14161b 0%, transparent 55%),
+              linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  color: var(--text);
+  font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  line-height: 1.45;
   margin:0;
-  font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif;
-  background: radial-gradient(1200px 600px at 70% -10%, rgba(255,107,0,0.10), transparent 60%),
-              radial-gradient(800px 400px at 10% 110%, rgba(224,169,74,0.08), transparent 60%),
-              var(--charcoal);
-  color: var(--gold);
-  display:grid;
-  place-items:center;
-  overflow:hidden;
 }
 
-.hawk-frame{
-  width:min(680px, calc(100% - 32px));
-  background: linear-gradient(180deg, var(--charcoal-2), var(--charcoal-3));
-  border-radius:20px;
-  padding:28px 26px;
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.03) inset,
-    0 10px 40px rgba(0,0,0,0.55),
-    0 0 40px var(--ring);
-  text-align:center;
-  position:relative;
-  isolation:isolate;
-}
+a { color: var(--accent); text-decoration: none; }
+a:hover { opacity:.92; }
 
-.hawk-title{
-  margin:0 0 8px;
-  font-weight:800;
-  letter-spacing:.3px;
-  font-size: clamp(22px, 3.2vw, 32px);
-  color: var(--orange);
-}
-.hawk-sub{ color: var(--muted); margin:0 0 20px; }
-
-.hawk-btn{
-  display:inline-block;
-  padding:12px 18px;
-  border-radius:12px;
-  text-decoration:none;
-  font-weight:700;
-  background: linear-gradient(180deg, var(--gold), #c79233);
-  color:#111;
-  box-shadow: 0 6px 18px rgba(224,169,74,0.35);
-  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-}
-.hawk-btn:hover{ transform: translateY(-1px); box-shadow:0 10px 22px rgba(224,169,74,0.45); }
-.hawk-btn.alt{
-  background: linear-gradient(180deg, var(--orange), #d55a00);
-  color:white;
-  box-shadow: 0 6px 18px rgba(255,107,0,0.35);
-}
-
-.hawk-badge{
-  display:inline-flex; gap:8px; align-items:center; justify-content:center;
-  padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.04);
-  color:#fff; font-size:13px; margin:8px auto 18px;
-}
-.hawk-badge svg{opacity:.9}
-
-.small{ font-size:13px; color:var(--muted); margin-top:14px; }
-
-/* Animated shard backdrop (subtle, performance-safe) */
-.shards{
-  position:absolute; inset:-20vh -10vw; z-index:-1; pointer-events:none; opacity:0.55;
-  filter: drop-shadow(0 10px 18px rgba(255,107,0,0.15));
-}
+/* subtle animated shards in the background */
+.shards{ position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
 .shard{
-  position:absolute; width:22vmin; height:28vmin; background: radial-gradient(120% 120% at 30% 20%, rgba(255,107,0,0.45), rgba(224,169,74,0.25) 40%, transparent 70%);
-  clip-path: polygon(60% 0, 100% 30%, 80% 100%, 35% 85%, 0 60%, 25% 15%);
-  mix-blend-mode: screen; opacity:.18; transform: rotate(var(--r)) translate(var(--tx), var(--ty)) scale(var(--s));
-  animation: float 12s ease-in-out infinite;
+  position:absolute; width:220px; height:220px; border-radius:24px;
+  background: conic-gradient(from 220deg at 60% 40%, rgba(242,176,53,.18), rgba(242,176,53,.02));
+  filter: blur(18px) saturate(120%);
+  animation: drift 22s linear infinite;
+  opacity:.5;
 }
-.shard:nth-child(2){ --r:18deg; --tx:30vw; --ty:10vh; --s:1.0; animation-delay:-2s;}
-.shard:nth-child(3){ --r:-12deg; --tx:-10vw; --ty:35vh; --s:.9; animation-delay:-4s;}
-.shard:nth-child(4){ --r:6deg; --tx:15vw; --ty:55vh; --s:1.1; animation-delay:-6s;}
-@keyframes float{
-  0%,100%{ transform: translate(var(--tx), var(--ty)) rotate(var(--r)) scale(var(--s)); }
-  50%{ transform: translate(calc(var(--tx) + 2vw), calc(var(--ty) - 2vh)) rotate(calc(var(--r) + 3deg)) scale(calc(var(--s) * 1.02)); }
+.shard:nth-child(1){ top:-40px; left:8%; transform: rotate(12deg); }
+.shard:nth-child(2){ bottom:-60px; right:10%; transform: rotate(-16deg); animation-duration: 26s; }
+.shard:nth-child(3){ top:30%; right:-60px; transform: rotate(6deg); animation-duration: 28s; }
+.shard:nth-child(4){ bottom:20%; left:-70px; transform: rotate(-12deg); animation-duration: 30s; }
+@keyframes drift { to { transform: translate3d(0, -10px, 0) rotate(360deg); } }
+
+/* centered card */
+.hawk-frame{
+  position:relative; z-index:1;
+  width:min(760px, 92vw);
+  margin: min(12vh, 8rem) auto;
+  padding: clamp(28px, 4vw, 44px);
+  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)) ,
+              linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255,255,255,.06);
+}
+.hawk-frame::before{
+  /* gold glow border */
+  content:"";
+  position:absolute; inset:-1px; border-radius: calc(var(--radius) + 2px);
+  padding:1px; pointer-events:none;
+  background:
+    linear-gradient(180deg, rgba(242,176,53,.55), rgba(242,176,53,.08));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  box-shadow: 0 0 40px rgba(242,176,53,.1), inset 0 0 16px rgba(242,176,53,.08);
 }
 
-/* Minimal inline loader */
+/* top badge */
+.hawk-badge{
+  display:flex; align-items:center; gap:10px;
+  width:max-content; padding:8px 12px; border-radius:999px;
+  background: rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  margin-bottom: 20px;
+}
+.hawk-badge .logo{
+  width:28px; height:28px; display:grid; place-items:center;
+  border-radius:8px; font-weight:800; letter-spacing:.5px;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 100%);
+  color:#111; box-shadow: 0 2px 14px rgba(242,176,53,.4);
+}
+
+/* titles, copy */
+.hawk-title{
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 800;
+  letter-spacing: .5px;
+  margin: 6px 0 8px;
+}
+.hawk-sub{
+  color: var(--muted);
+  margin: 0 0 22px;
+}
+.small{
+  color: #aab0bd;
+  font-size: .92rem;
+  margin-top: 14px;
+}
+
+/* loader spinner */
 .loader{
-  margin:14px auto 0;
-  width:56px; height:56px; border-radius:50%;
-  border:3px solid rgba(224,169,74,0.25);
-  border-top-color: var(--orange);
-  animation: spin .9s linear infinite;
+  --size: 36px;
+  width: var(--size); height: var(--size);
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.16);
+  border-top-color: var(--gold);
+  animation: spin 1s linear infinite;
+  margin: 18px 0;
 }
-@keyframes spin{ to{ transform: rotate(360deg);} }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.logo{
-  width:42px; height:42px; border-radius:10px;
-  background: conic-gradient(from 200deg, var(--orange), var(--gold));
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset, 0 6px 18px rgba(255,107,0,0.25);
-  display:inline-grid; place-items:center; color:#111; font-weight:900;
+/* buttons */
+.hawk-btn{
+  --btn-py: 14px; --btn-px: 22px;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding: var(--btn-py) var(--btn-px);
+  border-radius: 14px; font-weight: 800; letter-spacing:.3px;
+  color:#121212; background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 100%);
+  box-shadow: 0 8px 24px rgba(242,176,53,.3);
+  border: none; cursor: pointer; transition: transform .08s ease, filter .18s ease, box-shadow .18s ease;
+}
+.hawk-btn:hover { filter: brightness(1.04); transform: translateY(-1px); box-shadow: 0 10px 28px rgba(242,176,53,.38); }
+.hawk-btn:active{ transform: translateY(0); }
+
+.hawk-btn.alt{
+  background: transparent; color: var(--text);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:none;
+}
+.hawk-btn.alt:hover{ border-color: rgba(255,255,255,.2); }
+
+/* success / error accents if you want to swap classes */
+.success { color: var(--success); }
+.error { color: var(--danger); }
+
+@media (max-width: 520px){
+  .hawk-badge{ margin-bottom:14px; }
+  .loader{ margin: 14px 0; }
 }

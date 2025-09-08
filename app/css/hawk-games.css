@@ -682,6 +682,9 @@ input:checked + .slider:before { transform: translateX(26px); }
     .main-comp-layout {
         grid-template-columns: 1fr;
     }
+    .prize-visuals-panel {
+        position: static;
+    }
     .main-nav-desktop { display: none; }
     .hero-home { background-image: url('../assets/hero-bg-mobile.png'); }
     .hero-card-title { font-size: 2rem; }

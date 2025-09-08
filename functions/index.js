@@ -186,15 +186,29 @@ export const createTrustOrder = onCall(
       if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
       const comp = compSnap.data();
 
-      const unitPricePence =
-        typeof comp?.ticketPricePence === "number"
-          ? comp.ticketPricePence
-          : typeof comp?.pricePence === "number"
-          ? comp.pricePence
-          : null;
+      let unitPricePence = null;
 
-      if (unitPricePence === null)
-        throw new HttpsError("failed-precondition", "Competition missing ticket price (ticketPricePence/pricePence).");
+      // New logic: determine price from ticketTiers, like the credit function and client do.
+      if (Array.isArray(comp?.ticketTiers) && comp.ticketTiers.length > 0) {
+        const tier = comp.ticketTiers[0];
+        if (typeof tier.price === 'number' && typeof tier.amount === 'number' && tier.amount > 0) {
+            // Price is in pounds, convert to pence.
+            unitPricePence = Math.round((tier.price / tier.amount) * 100);
+        }
+      }
+
+      // Fallback to old logic for legacy competitions
+      if (unitPricePence === null) {
+        unitPricePence =
+          typeof comp?.ticketPricePence === "number"
+            ? comp.ticketPricePence
+            : typeof comp?.pricePence === "number"
+            ? comp.pricePence
+            : null;
+      }
+
+      if (unitPricePence === null || !Number.isFinite(unitPricePence))
+        throw new HttpsError("failed-precondition", "Competition missing ticket price (ticketPricePence/pricePence or valid ticketTiers).");
 
       const amountPence = unitPricePence * qty;
       const mainamount = (amountPence / 100).toFixed(2);

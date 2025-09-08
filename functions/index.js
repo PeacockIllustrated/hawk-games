@@ -154,6 +154,7 @@ export const createTrustOrder = onCall(
       RETURN_URL_SUCCESS,
       RETURN_URL_CANCEL,
       NOTIFICATION_URL,
+      TRUST_NOTIFY_PASSWORD,
     ],
   },
   async (req) => {

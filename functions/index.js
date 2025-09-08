@@ -238,6 +238,7 @@ export const createTrustOrder = onCall(
         successfulurlredirectmethod: "GET",
         declinedurlredirectmethod: "GET",
         allurlnotification: notifyUrl,
+        notificationpassword: notifyPwd,
         // Optional prefill
         billingemail: req.auth?.token?.email || "",
         billingfirstname: (req.auth?.token?.name || "").split(" ")[0] || "",
@@ -299,6 +300,18 @@ export const trustWebhook = onRequest(
         return;
       }
 
+      const providedPwd = (
+        (body.notification_password || body.notificationpassword || req.query?.t || "")
+).trim();
+
+const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
+
+if (!providedPwd || providedPwd !== expectedPwd) {
+  logger.warn("Webhook rejected: bad password", { ip: req.ip });
+  res.status(401).send("unauthorised");
+  return;
+}
+      
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists) {

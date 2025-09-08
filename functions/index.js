@@ -47,29 +47,54 @@ function priceTicketsFromComp(comp, qty) {
   return {totalPence, tierPrice: totalPrice};
 }
 
-function buildHppFields({ siteRef, orderId, amountPence, successUrl, cancelUrl, notifyUrl, user }) {
+function buildHppFields({
+  siteRef,
+  orderId,
+  amountPence,
+  successUrl,
+  cancelUrl,
+  notifyUrl,
+  user
+}) {
+  // helper: add/replace a query param in a URL
+  const withParam = (url, key, value) => {
+    try {
+      const u = new URL(url);
+      if (!u.searchParams.has(key)) u.searchParams.append(key, value);
+      else u.searchParams.set(key, value);
+      return u.toString();
+    } catch {
+      // fallback if a bare path somehow slips in
+      const sep = url.includes("?") ? "&" : "?";
+      return `${url}${sep}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+    }
+  };
+
+  const successWithId = withParam(successUrl, "orderId", orderId);
+  const cancelWithId  = withParam(cancelUrl,  "orderId", orderId);
+
   return {
-    // required
+    // REQUIRED
     sitereference: siteRef,
     orderreference: orderId,
     currencyiso3a: "GBP",
-    mainamount: asGBP(amountPence),
+    mainamount: asGBP(amountPence), // e.g. "2.99" or "0.01"
 
-    // Advanced Redirect parameters (so STR-6/7 fire)
-    successfulurlredirect: successUrl,           // e.g. https://.../success.html?orderId=...
-    declinedurlredirect:  cancelUrl,             // e.g. https://.../cancel.html?orderId=...
-    successfulurlredirectmethod: "GET",          // <— force GET so the querystring stays
-    declinedurlredirectmethod:   "GET",          // <— force GET so the querystring stays
+    // Advanced Redirect (ensures STR-6/7 work & keeps ?orderId=...)
+    successfulurlredirect: successWithId,
+    declinedurlredirect:   cancelWithId,
+    successfulurlredirectmethod: "GET",
+    declinedurlredirectmethod:   "GET",
 
-    // URL notification (STR-10) – webhook
-    allurlnotification: notifyUrl,
+    // Webhook / URL notification (ensures STR-10 fires)
+    allurlnotification: notifyUrl || "",
 
-    // Legacy aliases (harmless; keeps backwards compatibility)
-    success_url: successUrl,
-    cancel_url:  cancelUrl,
-    notification_url: notifyUrl,
+    // Legacy aliases (harmless; some configs read these)
+    success_url: successWithId,
+    cancel_url:  cancelWithId,
+    notification_url: notifyUrl || "",
 
-    // optional niceties
+    // Optional niceties for the HPP
     billingemail:     user?.email || "",
     billingfirstname: user?.displayName?.split(" ")[0] || "",
     billinglastname:  (user?.displayName?.split(" ").slice(1).join(" ") || "")

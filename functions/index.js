@@ -279,7 +279,7 @@ export const trustWebhook = onRequest(
           ? readUrlEncoded(req)
           : (typeof req.body === "object" && req.body) || readUrlEncoded(req);
 
-      const providedPwd = body.notification_password || body.password || "";
+      
       const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD");
       if (!providedPwd || providedPwd !== expectedPwd) {
         logger.warn("Webhook rejected: bad password", { ip: req.ip });

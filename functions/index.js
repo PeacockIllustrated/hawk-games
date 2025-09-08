@@ -22,6 +22,7 @@ const DEFAULT_SUCCESS_URL = "https://the-hawk-games.co.uk/app/success.html";
 const DEFAULT_CANCEL_URL = "https://the-hawk-games.co.uk/app/cancel.html";
 
 // Secrets (set with: firebase functions:secrets:set NAME --data="value")
+const TRUST_MODE = defineSecret("TRUST_MODE"); // "test" | "live"
 const TRUST_SITEREFERENCE = defineSecret("TRUST_SITEREFERENCE"); // live
 const TRUST_TEST_SITEREFERENCE = defineSecret("TRUST_TEST_SITEREFERENCE"); // test
 const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // required
@@ -221,82 +222,96 @@ const functionOptions = {
  * Client never sends price; server prices from competition config.
  */
 exports.createTrustOrder = onCall(
-    {
-      ...functionOptions,
-      secrets: [TRUST_SITEREFERENCE, TRUST_TEST_SITEREFERENCE, RETURN_URL_SUCCESS, RETURN_URL_CANCEL, NOTIFICATION_URL],
-    },
-    async (request) => {
-      assertIsAuthenticated(request);
-      const uid = request.auth.uid;
-      const token = request.auth.token || {};
+  {
+    ...functionOptions,
+    secrets: [
+      TRUST_SITEREFERENCE,
+      TRUST_TEST_SITEREFERENCE,
+      RETURN_URL_SUCCESS,
+      RETURN_URL_CANCEL,
+      NOTIFICATION_URL,
+      TRUST_MODE,                // <-- include mode secret
+    ],
+  },
+  async (request) => {
+    assertIsAuthenticated(request);
+    const uid = request.auth.uid;
+    const token = request.auth.token || {};
 
-      const schema = z.object({
-        intent: z.object({
-          type: z.literal("tickets"),
-          compId: z.string().min(1),
-          ticketsBought: z.number().int().positive(),
-        }),
-      });
+    const schema = z.object({
+      intent: z.object({
+        type: z.literal("tickets"),
+        compId: z.string().min(1),
+        ticketsBought: z.number().int().positive(),
+      }),
+    });
 
-      const parse = schema.safeParse(request.data || {});
-      if (!parse.success) throw new HttpsError("invalid-argument", "Invalid intent.");
-      const {compId, ticketsBought} = parse.data.intent;
+    const parse = schema.safeParse(request.data || {});
+    if (!parse.success) throw new HttpsError("invalid-argument", "Invalid intent.");
+    const { compId, ticketsBought } = parse.data.intent;
 
-      const compRef = db.collection("competitions").doc(compId);
-      const compSnap = await compRef.get();
-      if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
-      const comp = compSnap.data();
+    const compRef = db.collection("competitions").doc(compId);
+    const compSnap = await compRef.get();
+    if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
+    const comp = compSnap.data();
 
-      // Availability check (final guard in fulfilment)
-      const sold = Number(comp.ticketsSold || 0);
-      const total = Number(comp.totalTickets || 0);
-      if (sold + ticketsBought > total) {
-        throw new HttpsError("failed-precondition", "Not enough tickets remaining.");
-      }
+    // Availability guard (final guard is in fulfilment)
+    const sold = Number(comp.ticketsSold || 0);
+    const total = Number(comp.totalTickets || 0);
+    if (sold + ticketsBought > total) {
+      throw new HttpsError("failed-precondition", "Not enough tickets remaining.");
+    }
 
-      const {totalPence} = priceTicketsFromComp(comp, ticketsBought);
+    // Price by selected bundle (uses your helper)
+    const { totalPence } = priceTicketsFromComp(comp, ticketsBought);
 
-      // Pick site reference (prefer test if set)
-      const liveRef = TRUST_SITEREFERENCE.value() || DEFAULT_LIVE_SITE_REF;
-      const testRef = TRUST_TEST_SITEREFERENCE.value() || DEFAULT_TEST_SITE_REF;
-      const siteRef = testRef || liveRef;
+    // --- Mode-aware site reference selection ---
+    const liveRef = TRUST_SITEREFERENCE.value() || DEFAULT_LIVE_SITE_REF;
+    const testRef = TRUST_TEST_SITEREFERENCE.value() || DEFAULT_TEST_SITE_REF;
+    const mode = ((TRUST_MODE.value && TRUST_MODE.value()) || "test").toLowerCase();
+    const useLive = mode === "live";
+    const siteRef = useLive ? liveRef : testRef;
 
-      const orderRef = db.collection("orders").doc();
-      const orderDoc = {
-        userId: uid,
-        userDisplayName: token.name || null,
-        type: "tickets",
-        items: [{kind: "tickets", compId, qty: ticketsBought}],
-        amountPence: totalPence,
-        currency: "GBP",
-        status: "created",
-        provider: "trust",
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-        isTest: !!testRef,
-      };
-      await orderRef.set(orderDoc);
+    // Create order snapshot
+    const orderRef = db.collection("orders").doc();
+    const orderDoc = {
+      userId: uid,
+      userDisplayName: token.name || null,
+      type: "tickets",
+      items: [{ kind: "tickets", compId, qty: ticketsBought }],
+      amountPence: totalPence,
+      currency: "GBP",
+      status: "created",
+      provider: "trust",
+      env: useLive ? "live" : "test",
+      isTest: !useLive,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    await orderRef.set(orderDoc);
 
-      const fields = buildHppFields({
-        siteRef,
-        orderId: orderRef.id,
-        amountPence: totalPence,
-        successUrl: RETURN_URL_SUCCESS.value() || DEFAULT_SUCCESS_URL,
-        cancelUrl: RETURN_URL_CANCEL.value() || DEFAULT_CANCEL_URL,
-        notifyUrl: NOTIFICATION_URL.value() || "", // should be set!
-        user: {email: token.email || "", displayName: token.name || ""},
-      });
+    // Build HPP fields
+    const fields = buildHppFields({
+      siteRef,
+      orderId: orderRef.id,
+      amountPence: totalPence,
+      successUrl: RETURN_URL_SUCCESS.value() || DEFAULT_SUCCESS_URL,
+      cancelUrl:  RETURN_URL_CANCEL.value()  || DEFAULT_CANCEL_URL,
+      notifyUrl:  NOTIFICATION_URL.value()   || "", // should be set!
+      user: { email: token.email || "", displayName: token.name || "" },
+    });
 
-      if (!fields.notification_url) {
-        logger.warn("NOTIFICATION_URL secret is missing; set it to your trustWebhook URL.");
-      }
+    if (!fields.notification_url) {
+      logger.warn("NOTIFICATION_URL secret is missing; set it to your trustWebhook URL.");
+    }
 
-      return {
-        endpoint: "https://payments.securetrading.net/process/payments/details",
-        fields,
-      };
-    },
+    return {
+      endpoint: "https://payments.securetrading.net/process/payments/details",
+      fields,
+    };
+  }
 );
+
 
 /**
  * trustWebhook — onRequest

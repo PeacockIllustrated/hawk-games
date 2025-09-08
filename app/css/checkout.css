@@ -1,0 +1,109 @@
+:root{
+  --charcoal:#0f0f12;
+  --charcoal-2:#18181c;
+  --charcoal-3:#222228;
+  --gold:#e0a94a;
+  --orange:#ff6b00;
+  --muted:#9b9b9b;
+  --ring: rgba(224,169,74,0.35);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 70% -10%, rgba(255,107,0,0.10), transparent 60%),
+              radial-gradient(800px 400px at 10% 110%, rgba(224,169,74,0.08), transparent 60%),
+              var(--charcoal);
+  color: var(--gold);
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+}
+
+.hawk-frame{
+  width:min(680px, calc(100% - 32px));
+  background: linear-gradient(180deg, var(--charcoal-2), var(--charcoal-3));
+  border-radius:20px;
+  padding:28px 26px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 10px 40px rgba(0,0,0,0.55),
+    0 0 40px var(--ring);
+  text-align:center;
+  position:relative;
+  isolation:isolate;
+}
+
+.hawk-title{
+  margin:0 0 8px;
+  font-weight:800;
+  letter-spacing:.3px;
+  font-size: clamp(22px, 3.2vw, 32px);
+  color: var(--orange);
+}
+.hawk-sub{ color: var(--muted); margin:0 0 20px; }
+
+.hawk-btn{
+  display:inline-block;
+  padding:12px 18px;
+  border-radius:12px;
+  text-decoration:none;
+  font-weight:700;
+  background: linear-gradient(180deg, var(--gold), #c79233);
+  color:#111;
+  box-shadow: 0 6px 18px rgba(224,169,74,0.35);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.hawk-btn:hover{ transform: translateY(-1px); box-shadow:0 10px 22px rgba(224,169,74,0.45); }
+.hawk-btn.alt{
+  background: linear-gradient(180deg, var(--orange), #d55a00);
+  color:white;
+  box-shadow: 0 6px 18px rgba(255,107,0,0.35);
+}
+
+.hawk-badge{
+  display:inline-flex; gap:8px; align-items:center; justify-content:center;
+  padding:8px 10px; border-radius:999px; background:rgba(255,255,255,0.04);
+  color:#fff; font-size:13px; margin:8px auto 18px;
+}
+.hawk-badge svg{opacity:.9}
+
+.small{ font-size:13px; color:var(--muted); margin-top:14px; }
+
+/* Animated shard backdrop (subtle, performance-safe) */
+.shards{
+  position:absolute; inset:-20vh -10vw; z-index:-1; pointer-events:none; opacity:0.55;
+  filter: drop-shadow(0 10px 18px rgba(255,107,0,0.15));
+}
+.shard{
+  position:absolute; width:22vmin; height:28vmin; background: radial-gradient(120% 120% at 30% 20%, rgba(255,107,0,0.45), rgba(224,169,74,0.25) 40%, transparent 70%);
+  clip-path: polygon(60% 0, 100% 30%, 80% 100%, 35% 85%, 0 60%, 25% 15%);
+  mix-blend-mode: screen; opacity:.18; transform: rotate(var(--r)) translate(var(--tx), var(--ty)) scale(var(--s));
+  animation: float 12s ease-in-out infinite;
+}
+.shard:nth-child(2){ --r:18deg; --tx:30vw; --ty:10vh; --s:1.0; animation-delay:-2s;}
+.shard:nth-child(3){ --r:-12deg; --tx:-10vw; --ty:35vh; --s:.9; animation-delay:-4s;}
+.shard:nth-child(4){ --r:6deg; --tx:15vw; --ty:55vh; --s:1.1; animation-delay:-6s;}
+@keyframes float{
+  0%,100%{ transform: translate(var(--tx), var(--ty)) rotate(var(--r)) scale(var(--s)); }
+  50%{ transform: translate(calc(var(--tx) + 2vw), calc(var(--ty) - 2vh)) rotate(calc(var(--r) + 3deg)) scale(calc(var(--s) * 1.02)); }
+}
+
+/* Minimal inline loader */
+.loader{
+  margin:14px auto 0;
+  width:56px; height:56px; border-radius:50%;
+  border:3px solid rgba(224,169,74,0.25);
+  border-top-color: var(--orange);
+  animation: spin .9s linear infinite;
+}
+@keyframes spin{ to{ transform: rotate(360deg);} }
+
+.logo{
+  width:42px; height:42px; border-radius:10px;
+  background: conic-gradient(from 200deg, var(--orange), var(--gold));
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset, 0 6px 18px rgba(255,107,0,0.25);
+  display:inline-grid; place-items:center; color:#111; font-weight:900;
+}

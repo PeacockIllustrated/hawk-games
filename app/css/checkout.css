@@ -1,146 +1,158 @@
-/* === The Hawk Games – Checkout Pages (success/cancel) ===================== */
+/* =======================================================================
+   THE HAWK GAMES – CHECKOUT (Success / Cancel) 
+   - Ports master styles (variables, fonts, buttons, card look)
+   - Fully scoped to hawk-* to avoid collisions
+   ======================================================================= */
 
+/* Fonts (match master: Chakra Petch + Roboto) */
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Roboto:wght@400;500;700&display=swap');
+
+/* Root tokens – inherit from master if present, else fall back */
 :root{
-  --bg: #0b0c0f;
-  --bg-2:#0a0b0e;
-  --panel: #13141a;
-  --panel-2: #101116;
-  --text: #e9eaf1;
-  --muted:#9aa0ad;
-  --gold:#F2B035;          /* brand gold */
-  --gold-2:#E09D22;
-  --accent:#F2B035;
-  --success:#22c55e;
-  --danger:#ef4444;
-  --radius: 18px;
-  --shadow: 0 10px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
+  --primary-gold: var(--primary-gold, #e0a94a);
+  --light-white: var(--light-white, #f0f0f0);
+  --dark-bg:     var(--dark-bg, #121212);
+  --card-bg:     var(--card-bg, #1a1a1a);
+  --border-color:var(--border-color, #2c2c2c);
+  --success-green:var(--success-green, #27ae60);
+
+  --font-heading: var(--font-heading, 'Chakra Petch', sans-serif);
+  --font-body:    var(--font-body, 'Roboto', sans-serif);
 }
 
-* { box-sizing: border-box; }
-
-html,body{
-  height:100%;
-  background: radial-gradient(1200px 800px at 20% -10%, #121317 0%, transparent 60%),
-              radial-gradient(1000px 700px at 110% 10%, #14161b 0%, transparent 55%),
-              linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
-  color: var(--text);
-  font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  line-height: 1.45;
-  margin:0;
+/* Page base (only affects standalone checkout pages) */
+html, body{
+  height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(900px 600px at 15% -10%, rgba(224,169,74,.10), transparent 60%),
+    radial-gradient(900px 600px at 115% 0%, rgba(224,169,74,.06), transparent 55%),
+    var(--dark-bg);
+  color: var(--light-white);
+  font-family: var(--font-body);
+  line-height: 1.55;
 }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { opacity:.92; }
-
-/* subtle animated shards in the background */
-.shards{ position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
-.shard{
-  position:absolute; width:220px; height:220px; border-radius:24px;
-  background: conic-gradient(from 220deg at 60% 40%, rgba(242,176,53,.18), rgba(242,176,53,.02));
-  filter: blur(18px) saturate(120%);
-  animation: drift 22s linear infinite;
-  opacity:.5;
+/* Decorative background shards (subtle) */
+.hawk-shards{ position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+.hawk-shard{
+  position:absolute; width:220px; height:220px; border-radius:22px;
+  background: conic-gradient(from 210deg at 60% 40%, rgba(224,169,74,.18), rgba(224,169,74,.02));
+  filter: blur(18px) saturate(120%); opacity:.45; animation: hawk-drift 26s linear infinite;
 }
-.shard:nth-child(1){ top:-40px; left:8%; transform: rotate(12deg); }
-.shard:nth-child(2){ bottom:-60px; right:10%; transform: rotate(-16deg); animation-duration: 26s; }
-.shard:nth-child(3){ top:30%; right:-60px; transform: rotate(6deg); animation-duration: 28s; }
-.shard:nth-child(4){ bottom:20%; left:-70px; transform: rotate(-12deg); animation-duration: 30s; }
-@keyframes drift { to { transform: translate3d(0, -10px, 0) rotate(360deg); } }
+.hawk-shard:nth-child(1){ top:-40px; left:8%; transform: rotate(12deg); }
+.hawk-shard:nth-child(2){ bottom:-60px; right:10%; transform: rotate(-16deg); animation-duration: 30s; }
+.hawk-shard:nth-child(3){ top:30%; right:-60px; transform: rotate(6deg);  animation-duration: 32s; }
+.hawk-shard:nth-child(4){ bottom:18%; left:-70px; transform: rotate(-10deg); animation-duration: 34s; }
 
-/* centered card */
+@keyframes hawk-drift { to { transform: translate3d(0,-8px,0) rotate(360deg); } }
+
+/* Frame (card) */
 .hawk-frame{
   position:relative; z-index:1;
   width:min(760px, 92vw);
-  margin: min(12vh, 8rem) auto;
+  margin: min(12vh, 7rem) auto;
   padding: clamp(28px, 4vw, 44px);
-  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)) ,
-              linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(255,255,255,.06);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)),
+    var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
 }
 .hawk-frame::before{
-  /* gold glow border */
-  content:"";
-  position:absolute; inset:-1px; border-radius: calc(var(--radius) + 2px);
-  padding:1px; pointer-events:none;
-  background:
-    linear-gradient(180deg, rgba(242,176,53,.55), rgba(242,176,53,.08));
+  /* subtle gold glow outline to match cards/CTA aura */
+  content:""; position:absolute; inset:-1px; border-radius:14px; pointer-events:none;
+  background: linear-gradient(180deg, rgba(224,169,74,.55), rgba(224,169,74,.08));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
-  box-shadow: 0 0 40px rgba(242,176,53,.1), inset 0 0 16px rgba(242,176,53,.08);
+  padding:1px; opacity:.9;
+  box-shadow: 0 0 32px rgba(224,169,74,.10), inset 0 0 16px rgba(224,169,74,.08);
 }
 
-/* top badge */
+/* Badge */
 .hawk-badge{
   display:flex; align-items:center; gap:10px;
   width:max-content; padding:8px 12px; border-radius:999px;
   background: rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.08);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .hawk-badge .logo{
   width:28px; height:28px; display:grid; place-items:center;
-  border-radius:8px; font-weight:800; letter-spacing:.5px;
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 100%);
-  color:#111; box-shadow: 0 2px 14px rgba(242,176,53,.4);
+  border-radius:6px; font: 800 14px/1 var(--font-heading);
+  background: linear-gradient(180deg, var(--primary-gold), color-mix(in oklab, var(--primary-gold), #000 18%));
+  color:#111; box-shadow: 0 2px 14px rgba(224,169,74,.35);
 }
 
-/* titles, copy */
+/* Headings + copy */
 .hawk-title{
+  font-family: var(--font-heading);
   font-size: clamp(28px, 4vw, 40px);
-  font-weight: 800;
+  font-weight: 700;
+  text-transform: uppercase;
   letter-spacing: .5px;
   margin: 6px 0 8px;
 }
-.hawk-sub{
-  color: var(--muted);
-  margin: 0 0 22px;
-}
-.small{
-  color: #aab0bd;
-  font-size: .92rem;
-  margin-top: 14px;
-}
+.hawk-sub{ color:#b8bdc8; margin:0 0 20px; }
+.hawk-small{ color:#9aa0ad; font-size:.95rem; margin-top:12px; }
 
-/* loader spinner */
-.loader{
+/* Loader matches master accent */
+.hawk-loader{
   --size: 36px;
   width: var(--size); height: var(--size);
   border-radius: 50%;
   border: 3px solid rgba(255,255,255,.16);
-  border-top-color: var(--gold);
-  animation: spin 1s linear infinite;
-  margin: 18px 0;
+  border-top-color: var(--primary-gold);
+  animation: hawk-spin 1s linear infinite;
+  margin: 16px 0;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes hawk-spin { to { transform: rotate(360deg); } }
 
-/* buttons */
+/* Buttons – mapped to master .btn look */
 .hawk-btn{
-  --btn-py: 14px; --btn-px: 22px;
   display:inline-flex; align-items:center; justify-content:center;
-  padding: var(--btn-py) var(--btn-px);
-  border-radius: 14px; font-weight: 800; letter-spacing:.3px;
-  color:#121212; background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 100%);
-  box-shadow: 0 8px 24px rgba(242,176,53,.3);
-  border: none; cursor: pointer; transition: transform .08s ease, filter .18s ease, box-shadow .18s ease;
+  padding:.9rem 2rem;
+  background-color: var(--primary-gold);
+  color: var(--dark-bg);
+  text-decoration: none;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border: 2px solid var(--primary-gold);
+  border-radius: 4px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1), background-color .3s, color .3s;
+  box-shadow: 0 8px 24px rgba(224,169,74,.25);
 }
-.hawk-btn:hover { filter: brightness(1.04); transform: translateY(-1px); box-shadow: 0 10px 28px rgba(242,176,53,.38); }
-.hawk-btn:active{ transform: translateY(0); }
+.hawk-btn:hover{ background-color: transparent; color: var(--primary-gold); transform: translateY(-2px); }
+.hawk-btn:active{ transform: translateY(-1px); }
 
 .hawk-btn.alt{
-  background: transparent; color: var(--text);
-  border:1px solid rgba(255,255,255,.12);
-  box-shadow:none;
+  background: transparent; color: var(--light-white);
+  border: 1px solid var(--border-color);
+  box-shadow: none; letter-spacing: 1px;
 }
-.hawk-btn.alt:hover{ border-color: rgba(255,255,255,.2); }
+.hawk-btn.alt:hover{ border-color:#666; color: var(--primary-gold); }
 
-/* success / error accents if you want to swap classes */
-.success { color: var(--success); }
-.error { color: var(--danger); }
+/* State helpers */
+.hawk-success{ color: var(--success-green); }
+.hawk-error{ color: #ef4444; }
 
+/* Responsive tweaks */
 @media (max-width: 520px){
-  .hawk-badge{ margin-bottom:14px; }
-  .loader{ margin: 14px 0; }
+  .hawk-frame { padding: 24px; }
+  .hawk-badge{ margin-bottom:12px; }
+  .hawk-loader{ margin: 12px 0; }
 }
+
+/* Utility wrapper classes for the pages (optional) */
+.hawk-page{ min-height: 100dvh; display:block; }
+
+/* -----------------------------------------------------------------------
+   Minimal “system” classes used by the success page script
+   ----------------------------------------------------------------------- */
+.hawk-row{ display:flex; gap:.75rem; flex-wrap:wrap; align-items:center; }
+.hawk-spacer{ height:8px; }

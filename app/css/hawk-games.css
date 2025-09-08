@@ -357,6 +357,73 @@ input:checked + .slider:before { transform: translateX(26px); }
 .card-style-option { background-color: transparent; border: 2px solid var(--border-color); border-radius: 5px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; }
 .card-style-option:hover { border-color: var(--primary-gold); transform: translateY(-5px); }
 .card-style-option.selected { border-color: var(--primary-gold); background-color: rgba(224, 169, 74, 0.1); }
+
+/* --- Ticket Slider Styles --- */
+.ticket-slider-container {
+    padding: 1rem;
+    background-color: var(--dark-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.ticket-slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+#ticket-count-display {
+    font-weight: bold;
+    font-family: var(--font-heading);
+    color: var(--primary-gold);
+}
+
+.ticket-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 10px;
+    background: #333;
+    border-radius: 5px;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity .2s;
+}
+
+.ticket-slider:hover {
+    opacity: 1;
+}
+
+.ticket-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 25px;
+    height: 25px;
+    background: var(--primary-gold);
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.ticket-slider::-moz-range-thumb {
+    width: 25px;
+    height: 25px;
+    background: var(--primary-gold);
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.ticket-price-display {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 1.5rem;
+    font-family: var(--font-heading);
+}
+
+#ticket-price-display-value {
+    color: var(--primary-gold);
+    font-weight: bold;
+}
 .ticket-amount { font-family: var(--font-heading); font-size: 3rem; display: block; line-height: 1; }
 .ticket-label { font-size: 1rem; text-transform: uppercase; color: #aaa; }
 .ticket-price { font-size: 1.2rem; color: #fff; margin-top: 0.5rem; display: block; }

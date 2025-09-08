@@ -128,15 +128,22 @@ function setupEntryLogic(correctAnswer) {
     });
   }
 
-  const ticketWrap = document.querySelector('.ticket-options');
-  if (ticketWrap) {
-    ticketWrap.addEventListener('click', (e) => {
-      const option = e.target.closest('.ticket-option');
-      if (!option) return;
-      document.querySelectorAll('.ticket-options .ticket-option').forEach(opt => opt.classList.remove('selected'));
-      option.classList.add('selected');
-      entryButton.disabled = false;
+  const slider = document.getElementById('ticket-slider');
+  if (slider) {
+    const ticketCountDisplay = document.getElementById('ticket-count-display');
+    const priceDisplay = document.getElementById('ticket-price-display-value');
+
+    const basePricePerTicket = currentCompetitionData.ticketTiers && currentCompetitionData.ticketTiers.length > 0
+      ? currentCompetitionData.ticketTiers[0].price / currentCompetitionData.ticketTiers[0].amount
+      : 1;
+
+    slider.addEventListener('input', (e) => {
+      const numTickets = e.target.value;
+      ticketCountDisplay.textContent = numTickets;
+      priceDisplay.textContent = `£${(numTickets * basePricePerTicket).toFixed(2)}`;
     });
+    // Enable entry button by default if slider exists, as it starts at a valid value
+    entryButton.disabled = false;
   }
 
   if (entryButton) {
@@ -163,18 +170,21 @@ function setupEntryLogic(correctAnswer) {
 }
 
 function showConfirmationModal() {
-  const selectedTicket = document.querySelector('.ticket-option.selected');
-  if (!selectedTicket) {
+  const slider = document.getElementById('ticket-slider');
+  if (!slider) {
     openModal(createElement('div', {}, [
-      createElement('h2', { textContent: 'Select Tickets' }),
-      createElement('p', { textContent: 'Please choose a ticket bundle.' }),
+      createElement('h2', { textContent: 'Error' }),
+      createElement('p', { textContent: 'Could not find ticket slider.' }),
       createElement('button', { 'data-close-modal': true, class: 'btn' }, ['OK'])
     ]));
     return;
   }
 
-  const tickets = parseInt(selectedTicket.dataset.amount);
-  const price = parseFloat(selectedTicket.dataset.price); // display only
+  const tickets = parseInt(slider.value, 10);
+  const basePricePerTicket = currentCompetitionData.ticketTiers && currentCompetitionData.ticketTiers.length > 0
+    ? currentCompetitionData.ticketTiers[0].price / currentCompetitionData.ticketTiers[0].amount
+    : 1;
+  const price = tickets * basePricePerTicket;
 
   const payByCardBtn = createElement('button', { id: 'pay-card-btn', class: 'btn', disabled: true }, ['Pay by Card']);
   const payByCreditBtn = createElement('button', { id: 'pay-credit-btn', class: ['btn', 'btn-secondary'], disabled: true }, ['Pay with Credit']);
@@ -381,27 +391,40 @@ function createHeroPageElements(data) {
 
   const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
 
-  let bestValueAmount = -1;
-  if (data.ticketTiers && data.ticketTiers.length > 1) {
-    const bestTier = data.ticketTiers.reduce((best, current) =>
-      (current.price / current.amount < best.price / best.amount) ? current : best
-    );
-    bestValueAmount = bestTier.amount;
-  }
+  const ticketsRemaining = data.totalTickets - (data.ticketsSold || 0);
+  const maxTickets = Math.min(ticketsRemaining, data.userEntryLimit || 75);
 
-  const ticketTiers = data.ticketTiers.map(tier => {
-    const isBestValue = tier.amount === bestValueAmount;
-    return createElement('div', {
-      class: ['ticket-option', 'card-style-option', isBestValue ? 'best-value' : ''],
-      'data-amount': tier.amount,
-      'data-price': tier.price
-    }, [
-      isBestValue ? createElement('div', { class: 'best-value-badge', textContent: 'BEST VALUE' }) : null,
-      createElement('span', { class: 'ticket-amount', textContent: tier.amount }),
-      createElement('span', { class: 'ticket-label', textContent: `Entr${tier.amount > 1 ? 'ies' : 'y'}` }),
-      createElement('span', { class: 'ticket-price', textContent: `£${tier.price.toFixed(2)}` })
+  // Find the base price per ticket from the first tier
+  const basePricePerTicket = data.ticketTiers && data.ticketTiers.length > 0
+    ? data.ticketTiers[0].price / data.ticketTiers[0].amount
+    : 1; // Default to 1 if no tiers defined
+
+  const sliderContainer = createElement('div', { class: 'ticket-slider-container' });
+
+  if (maxTickets > 0) {
+    const sliderLabel = createElement('div', { class: 'ticket-slider-label' }, [
+      createElement('span', { textContent: 'Number of entries: ' }),
+      createElement('span', { id: 'ticket-count-display', textContent: '1' })
     ]);
-  });
+
+    const slider = createElement('input', {
+      type: 'range',
+      id: 'ticket-slider',
+      min: '1',
+      max: maxTickets.toString(),
+      value: '1',
+      class: 'ticket-slider'
+    });
+
+    const priceDisplay = createElement('div', { class: 'ticket-price-display' }, [
+      createElement('span', { textContent: 'Total Price: ' }),
+      createElement('span', { id: 'ticket-price-display-value', textContent: `£${basePricePerTicket.toFixed(2)}` })
+    ]);
+
+    sliderContainer.append(sliderLabel, slider, priceDisplay);
+  } else {
+    sliderContainer.append(createElement('p', { textContent: 'No tickets available.' }));
+  }
 
   const isTrueHero = data.isHeroComp && data.hasParallax;
   let header;
@@ -507,7 +530,7 @@ function createHeroPageElements(data) {
       ]),
       createElement('div', { class: 'entry-step tickets-step' }, [
         createElement('h2', { textContent: '2. Choose Your Tickets' }),
-        createElement('div', { class: 'ticket-options' }, ticketTiers)
+        sliderContainer
       ])
     ]),
     createElement('section', { class: 'hero-comp-confirm-section' }, [

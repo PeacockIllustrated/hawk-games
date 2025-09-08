@@ -22,11 +22,11 @@ const DEFAULT_SUCCESS_URL = "https://the-hawk-games.co.uk/app/success.html";
 const DEFAULT_CANCEL_URL  = "https://the-hawk-games.co.uk/app/cancel.html";
 
 // Secrets (set with: firebase functions:secrets:set NAME --data="value")
-const TRUST_SITEREFERENCE      = defineSecret("TRUST_SITEREFERENCE");       // live
-const TRUST_TEST_SITEREFERENCE = defineSecret("TRUST_TEST_SITEREFERENCE");  // test
+const TRUST_SITEREFERENCE      = defineSecret("thehawkgam142858");       // live
+const TRUST_TEST_SITEREFERENCE = defineSecret("test_thehawkgam142858");  // test
 const TRUST_NOTIFY_PASSWORD    = defineSecret("TRUST_NOTIFY_PASSWORD");     // required
-const RETURN_URL_SUCCESS       = defineSecret("RETURN_URL_SUCCESS");
-const RETURN_URL_CANCEL        = defineSecret("RETURN_URL_CANCEL");
+const RETURN_URL_SUCCESS       = defineSecret("https://the-hawk-games.co.uk/app/success.html");
+const RETURN_URL_CANCEL        = defineSecret("https://the-hawk-games.co.uk/app/cancel.html");
 const NOTIFICATION_URL         = defineSecret("NOTIFICATION_URL");          // required (webhook URL)
 
 // Helpers (Trust)

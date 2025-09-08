@@ -41,126 +41,61 @@
   </main>
 
   <script type="module">
-    // ---- Pure modular Firebase (no compat) ----
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-    import { firebaseConfig } from "./js/firebase-config.js"; // Must export: export const firebaseConfig = { ... };
+  import { initializeApp, getApps, getApp }
+    from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getFirestore, doc, onSnapshot, getDoc }
+    from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { firebaseConfig } from "./js/firebase-config.js"; // <-- correct relative path
 
-    // Init
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
 
-    // Elements
-    const title  = document.getElementById("title");
-    const sub    = document.getElementById("sub");
-    const frame  = document.getElementById("frame");
-    const loader = document.getElementById("loader");
+  const qs = new URLSearchParams(location.search);
+  const orderId = qs.get("orderId");
 
-    // Resolve orderId from several places:
-    // - Preferred: ?orderId=<docId> we added to the success_url
-    // - Fallbacks: ?orderreference= / ?requestreference= (TP names seen in some setups)
-    // - Last resort: localStorage (we stash it before redirect)
-    const qs = new URLSearchParams(location.search);
-    let orderId =
-      qs.get("orderId") ||
-      qs.get("orderreference") ||
-      qs.get("requestreference") ||
-      localStorage.getItem("pendingOrderId") ||
-      "";
+  const title  = document.getElementById("title");
+  const sub    = document.getElementById("sub");
+  const frame  = document.getElementById("frame");
+  const loader = document.getElementById("loader");
 
-    console.log("[SUCCESS] URL:", location.href);
-    console.log("[SUCCESS] Resolved orderId:", orderId);
+  if (!orderId) {
+    title.textContent = "Missing order reference";
+    sub.textContent   = "We couldn’t find your orderId in the URL.";
+    loader.remove();
+  } else {
+    const ref = doc(db, "orders", orderId);
 
-    function showMissing() {
-      title.textContent = "Missing order reference";
-      sub.textContent = "We couldn’t find your orderId in the URL. If you just paid, we’ll keep watching for confirmation.";
-      loader?.remove();
-
-      const home = document.createElement("a");
-      home.className = "hawk-btn";
-      home.href = "/app/index.html";
-      home.textContent = "Back to Games";
-      frame.appendChild(home);
-    }
-
-    function showSuccess(o) {
-      title.textContent = "Payment complete — you're in! ✅";
-      sub.textContent = "Your entries/spins are now active on your account. Good luck!";
-      loader?.remove();
-
-      const cta = document.createElement("a");
-      cta.className = "hawk-btn alt";
-      cta.href = "/app/index.html";
-      cta.textContent = "Back to Games";
-      frame.appendChild(cta);
-
-      const info = document.createElement("p");
-      info.className = "small";
-      info.textContent = `Order: ${orderId} • Ref: ${o.providerRef || "—"}`;
-      frame.appendChild(info);
-
-      localStorage.removeItem("pendingOrderId");
-    }
-
-    function showFailure(o) {
-      title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
-      sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
-      loader?.remove();
-
-      const home = document.createElement("a");
-      home.className = "hawk-btn";
-      home.href = "/app/index.html";
-      home.textContent = "Back to Games";
-      frame.appendChild(home);
-
-      localStorage.removeItem("pendingOrderId");
-    }
-
-    async function boot() {
-      if (!orderId) {
-        showMissing();
+    onSnapshot(ref, (snap) => {
+      if (!snap.exists()) {
+        title.textContent = "Preparing your order…";
         return;
       }
 
-      const ref = doc(db, "orders", orderId);
+      const o = snap.data();
 
-      // First quick read (sometimes webhook already landed)
-      try {
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          const o = snap.data();
-          if (o.status === "paid") return showSuccess(o);
-          if (o.status === "failed" || o.status === "cancelled") return showFailure(o);
-        }
-      } catch (e) {
-        console.warn("[SUCCESS] Initial getDoc error:", e);
+      if (o.status === "paid") {
+        title.textContent = "Payment complete — you're in! ✅";
+        sub.textContent   = "Your entries/spins are now active on your account.";
+        loader.remove();
+
+        const cta = document.createElement("a");
+        cta.className = "hawk-btn alt";
+        cta.href = "/app/index.html";
+        cta.textContent = "Back to Games";
+        frame.appendChild(cta);
+      } else if (o.status === "failed" || o.status === "cancelled") {
+        title.textContent = o.status === "failed" ? "Payment failed ❌" : "Payment cancelled ❌";
+        sub.textContent   = o.failureReason || "No funds were taken. You can try again.";
+        loader.remove();
+
+        const retry = document.createElement("a");
+        retry.className = "hawk-btn";
+        retry.href = "/app/index.html";
+        retry.textContent = "Back to Games";
+        frame.appendChild(retry);
       }
-
-      // Live updates (most common path: webhook arrives shortly after redirect)
-      const unsub = onSnapshot(ref, (snap) => {
-        if (!snap.exists()) return; // still creating
-        const o = snap.data();
-        console.log("[SUCCESS] Order update:", o.status);
-
-        if (o.status === "paid") {
-          unsub();
-          showSuccess(o);
-        } else if (o.status === "failed" || o.status === "cancelled") {
-          unsub();
-          showFailure(o);
-        }
-        // else 'created' / 'pending' → keep waiting
-      });
-
-      // Optional safety net: after 2 minutes, show a gentle message if still pending
-      setTimeout(() => {
-        if (!document.querySelector(".hawk-btn.alt")) {
-          sub.textContent = "Still waiting on confirmation… if this takes longer than expected, we’ll email you as soon as it completes.";
-        }
-      }, 120000);
-    }
-
-    boot();
-  </script>
+    });
+  }
+</script>
 </body>
 </html>

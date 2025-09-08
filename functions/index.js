@@ -174,9 +174,13 @@ export const createTrustOrder = onCall(
       const mode = getMode();
       const isTest = mode === "test";
 
-      const siteRef = isTest
-        ? (TRUST_TEST_SITEREFERENCE.value() || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
-        : readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
+      // Safely read optional test site reference (no throw if unset)
+const testSiteRef = (() => {
+  try { return TRUST_TEST_SITEREFERENCE.value() || ""; } catch { return ""; }
+})();
+const siteRef = isTest
+  ? (testSiteRef || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
+  : readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
 
       const successUrl = readSecret(RETURN_URL_SUCCESS, "RETURN_URL_SUCCESS");
       const cancelUrl = readSecret(RETURN_URL_CANCEL, "RETURN_URL_CANCEL");
@@ -227,6 +231,8 @@ export const createTrustOrder = onCall(
         createdAt: nowServer(),
         updatedAt: nowServer(),
       });
+ 
+      const notifyPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
 
       const fields = {
         sitereference: siteRef,

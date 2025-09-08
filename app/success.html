@@ -1,32 +1,26 @@
 <script type="module">
-  import { app } from "./js/auth.js";
-  import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  import { firebaseConfig } from "./js/firebase-config.js"; // export this from a tiny file
 
-  const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
   const qs = new URLSearchParams(location.search);
+  let orderId = qs.get("orderId") || qs.get("orderreference") || qs.get("requestreference") || localStorage.getItem("pendingOrderId") || "";
 
-  // 1) Our query param
-  let orderId = qs.get("orderId");
-
-  // 2) Trust sometimes appends its own fields — grab those if present
-  if (!orderId) orderId = qs.get("orderreference") || qs.get("requestreference");
-
-  // 3) Fallback to what we stashed locally before redirect
-  if (!orderId) orderId = localStorage.getItem("pendingOrderId") || "";
-
-  // Optional: log to help diagnose
   console.log("Success URL:", location.href);
   console.log("orderId (resolved):", orderId);
 
-  const title = document.getElementById("title");
-  const sub   = document.getElementById("sub");
-  const frame = document.getElementById("frame");
+  const title  = document.getElementById("title");
+  const sub    = document.getElementById("sub");
+  const frame  = document.getElementById("frame");
   const loader = document.getElementById("loader");
 
   function missing() {
     title.textContent = "Missing order reference";
     sub.textContent = "We couldn’t find your orderId. We’ll keep checking for confirmation.";
-    loader.remove?.();
+    loader?.remove();
   }
 
   if (!orderId) {
@@ -34,19 +28,18 @@
   } else {
     const ref = doc(db, "orders", orderId);
     onSnapshot(ref, (snap) => {
-      if (!snap.exists()) return; // first few ms before webhook writes
+      if (!snap.exists()) return;
 
       const o = snap.data();
       if (o.status === "paid") {
         title.textContent = "Payment complete — you're in! ✅";
-        sub.textContent = "Your entries/spins are now active on your account. Good luck!";
-        loader.remove?.();
-        // clean up fallback value
+        sub.textContent   = "Your entries/spins are now active on your account. Good luck!";
+        loader?.remove();
         localStorage.removeItem("pendingOrderId");
       } else if (o.status === "failed" || o.status === "cancelled") {
         title.textContent = o.status === "failed" ? "Payment failed ❌" : "Payment cancelled ❌";
-        sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
-        loader.remove?.();
+        sub.textContent   = o.failureReason || "No funds were taken. You can safely try again.";
+        loader?.remove();
         localStorage.removeItem("pendingOrderId");
       }
     });

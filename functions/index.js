@@ -311,6 +311,10 @@ exports.createTrustOrder = onCall(
       cancelUrl:  RETURN_URL_CANCEL.value()  || DEFAULT_CANCEL_URL,
       notifyUrl:  NOTIFICATION_URL.value()   || "", // should be set!
       user: { email: token.email || "", displayName: token.name || "" },
+      success_url,                  // e.g. https://…/app/success.html?orderId=${orderRef.id}
+      cancel_url,                   // e.g. https://…/app/cancel.html?orderId=${orderRef.id}
+      successfulurlredirect: "1",   // <— REQUIRED for STR-6 “Advanced redirect browser to Success…”
+      declinedurlredirect:   "1",   // <— REQUIRED for STR-7 “Advanced redirect browser to Declined…”
     });
 
     if (!fields.notification_url) {
@@ -319,6 +323,7 @@ exports.createTrustOrder = onCall(
 
     return {
       endpoint: "https://payments.securetrading.net/process/payments/details",
+       orderId: orderRef.id, // <— add this
       fields,
     };
   }

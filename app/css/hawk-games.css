@@ -652,7 +652,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     display: grid;
     grid-template-columns: 35% 1fr;
     gap: 3rem;
-    align-items: flex-start;
+    align-items: end;
     padding-top: 120px; /* Standard top padding */
 }
 
@@ -663,6 +663,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 .prize-visuals-panel img {
     border-radius: 5px;
+    border: 5px solid var(--primary-gold);
 }
 
 .intro-details-panel {

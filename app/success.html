@@ -1,107 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0b0c0f" />
-  <title>Payment Successful | The Hawk Games</title>
+<script type="module">
+  import { app } from "./js/auth.js";
+  import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/app/css/checkout.css" />
-</head>
-<body>
-  <div class="shards">
-    <div class="shard"></div><div class="shard"></div><div class="shard"></div><div class="shard"></div>
-  </div>
+  const db = getFirestore(app);
+  const qs = new URLSearchParams(location.search);
 
-  <main class="hawk-frame" id="frame">
-    <div class="hawk-badge">
-      <div class="logo">H</div>
-      <span>The Hawk Games • Secure Checkout</span>
-    </div>
+  // 1) Our query param
+  let orderId = qs.get("orderId");
 
-    <h1 class="hawk-title" id="title">Confirming your payment…</h1>
-    <p class="hawk-sub" id="sub">
-      We’re finalising your order with Trust Payments. This usually takes a moment.
-    </p>
-    <div class="loader" id="loader" aria-hidden="true"></div>
+  // 2) Trust sometimes appends its own fields — grab those if present
+  if (!orderId) orderId = qs.get("orderreference") || qs.get("requestreference");
 
-    <p class="small">Do not close this tab. We’ll update as soon as your order is confirmed.</p>
-  </main>
+  // 3) Fallback to what we stashed locally before redirect
+  if (!orderId) orderId = localStorage.getItem("pendingOrderId") || "";
 
-  <!-- Live confirmation via Firestore -->
-  <script type="module">
-    import { app } from "./js/auth.js";
-    import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+  // Optional: log to help diagnose
+  console.log("Success URL:", location.href);
+  console.log("orderId (resolved):", orderId);
 
-    const db = getFirestore(app);
-    const qs = new URLSearchParams(location.search);
-    let orderId = qs.get("orderId");
+  const title = document.getElementById("title");
+  const sub   = document.getElementById("sub");
+  const frame = document.getElementById("frame");
+  const loader = document.getElementById("loader");
 
-    const title  = document.getElementById("title");
-    const sub    = document.getElementById("sub");
-    const frame  = document.getElementById("frame");
-    const loader = document.getElementById("loader");
+  function missing() {
+    title.textContent = "Missing order reference";
+    sub.textContent = "We couldn’t find your orderId. We’ll keep checking for confirmation.";
+    loader.remove?.();
+  }
 
-    // Fallback: if URL param is missing for any reason, try the cached id
-    if (!orderId) {
-      orderId = localStorage.getItem("hawk_last_orderId") || "";
-    }
+  if (!orderId) {
+    missing();
+  } else {
+    const ref = doc(db, "orders", orderId);
+    onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return; // first few ms before webhook writes
 
-    function addButton(href, text, alt=false){
-      const a = document.createElement("a");
-      a.href = href;
-      a.textContent = text;
-      a.className = "hawk-btn" + (alt ? " alt" : "");
-      frame.appendChild(a);
-      return a;
-    }
-
-    async function init(){
-      if (!orderId) {
-        title.textContent = "Missing order reference";
-        sub.textContent   = "We couldn’t find your orderId in the URL.";
-        loader.remove();
-        addButton("/app/index.html", "Back to Games", true);
-        return;
+      const o = snap.data();
+      if (o.status === "paid") {
+        title.textContent = "Payment complete — you're in! ✅";
+        sub.textContent = "Your entries/spins are now active on your account. Good luck!";
+        loader.remove?.();
+        // clean up fallback value
+        localStorage.removeItem("pendingOrderId");
+      } else if (o.status === "failed" || o.status === "cancelled") {
+        title.textContent = o.status === "failed" ? "Payment failed ❌" : "Payment cancelled ❌";
+        sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
+        loader.remove?.();
+        localStorage.removeItem("pendingOrderId");
       }
-
-      const ref = doc(db, "orders", orderId);
-
-      // Live updates (webhook flips status to 'paid' on success)
-      onSnapshot(ref, (snap) => {
-        if (!snap.exists()) {
-          // still writing; keep spinner
-          return;
-        }
-        const o = snap.data();
-
-        if (o.status === "paid") {
-          title.textContent = "Payment complete — you're in! ✅";
-          sub.innerHTML = "Your entries are now active on your account. Good luck!";
-          loader.remove();
-
-          // Clear cached order id so future visits don't reuse it
-          localStorage.removeItem("hawk_last_orderId");
-
-          addButton("/app/index.html", "Back to Games");
-          const info = document.createElement("p");
-          info.className = "small";
-          info.textContent = `Order: ${orderId} • Ref: ${o.providerRef || "—"}`;
-          frame.appendChild(info);
-        }
-        else if (o.status === "failed" || o.status === "cancelled") {
-          title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
-          sub.textContent   = o.failureReason || "No funds were taken. You can safely try again.";
-          loader.remove();
-          addButton("/app/index.html", "Back to Games");
-        }
-        // else: created/processing – keep spinner
-      });
-    }
-    init();
-  </script>
-</body>
-</html>
+    });
+  }
+</script>

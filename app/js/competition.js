@@ -440,7 +440,7 @@ function createHeroPageElements(data) {
 
 function createPrizeVisuals(data) {
   const photoView = createElement('div', { class: 'view-panel photo-view active' }, [
-    createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
+    createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%' } })
   ]);
   const threeDView = createElement('div', { class: 'view-panel spline-view' });
   const viewsContainer = createElement('div', { class: 'views-container' }, [photoView, threeDView]);

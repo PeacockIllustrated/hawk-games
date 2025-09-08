@@ -44,12 +44,14 @@
     // Firebase (CDN, v9 modules)
     import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
     // Your config, exported as: export const firebaseConfig = { ... }
     import { firebaseConfig } from "./js/firebase-config.js";
 
     // Init (idempotent)
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     const db  = getFirestore(app);
+    const auth = getAuth(app);
 
     // Grab order id from multiple possible param names (Trust can rename things)
     const qs = new URLSearchParams(location.search);
@@ -82,53 +84,76 @@
       return a;
     }
 
-    if (!orderId) {
-      title.textContent = "Missing order reference";
-      sub.textContent   = "We couldn’t find your orderId in the URL.";
-      loader?.remove();
-    } else {
-      const ref = doc(db, "orders", orderId);
+    // Wait for auth state before trying to read from Firestore
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in, proceed with order lookup.
+        if (debug) console.log("[Success] User authenticated:", user.uid);
 
-      onSnapshot(ref, (snap) => {
-        if (!snap.exists()) {
-          // Webhook may land a touch after redirect; keep spinner and friendly copy
-          title.textContent = "Preparing your order…";
-          sub.textContent   = "Hang tight while we finish up. This usually takes a moment.";
+        if (!orderId) {
+          title.textContent = "Missing order reference";
+          sub.textContent = "We couldn’t find your orderId in the URL.";
+          loader?.remove();
+          addCTA("Go to My Account", "/app/account.html");
           return;
         }
 
-        const o = snap.data();
-        if (debug) console.log("[Success] Order doc:", o);
+        const ref = doc(db, "orders", orderId);
+        const unsubscribe = onSnapshot(ref, (snap) => {
+          if (!snap.exists()) {
+            // Webhook may land a touch after redirect; keep spinner and friendly copy
+            title.textContent = "Preparing your order…";
+            sub.textContent = "Hang tight. This usually takes just a moment.";
+            return;
+          }
 
-        if (o.status === "paid") {
-          title.textContent = "Payment complete — you're in! ✅";
-          sub.textContent   = "Your entries/spins are now active on your account. Good luck!";
+          const o = snap.data();
+          if (debug) console.log("[Success] Order doc update:", o);
+
+          // Check for a terminal status to kill the listener
+          if (o.status === "paid" || o.status === "fulfilled") {
+            unsubscribe(); // Stop listening, we're done.
+            title.textContent = "Payment complete — you're in! ✅";
+            sub.textContent = "Your entries are now active on your account. Good luck!";
+            loader?.remove();
+
+            addCTA("Back to Games", "/app/index.html");
+
+            const info = document.createElement("p");
+            info.className = "small";
+            info.textContent = `Order: ${orderId}${o.providerRef ? " • Ref: " + o.providerRef : ""}`;
+            frame.appendChild(info);
+
+          } else if (o.status === "failed" || o.status === "cancelled") {
+            unsubscribe(); // Stop listening, we're done.
+            title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
+            sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
+            loader?.remove();
+            addCTA("Back to Games", "/app/index.html", true);
+
+          } else {
+            // Status is 'created' or 'processing', just wait.
+            title.textContent = "Confirming your payment…";
+            sub.textContent = "We’re waiting for final confirmation from the payment provider.";
+          }
+        }, (err) => {
+          unsubscribe(); // Stop listening on error.
+          if (debug) console.error("[Success] onSnapshot error:", err);
+          title.textContent = "We hit a snag";
+          sub.textContent = "There was a problem checking your order status. Please check your account page for your entries.";
           loader?.remove();
+          addCTA("Go to My Account", "/app/account.html");
+        });
 
-          addCTA("Back to Games", "/app/index.html", true);
-
-          const info = document.createElement("p");
-          info.className = "small";
-          info.textContent = `Order: ${orderId}${o.providerRef ? " • Ref: " + o.providerRef : ""}`;
-          frame.appendChild(info);
-        } else if (o.status === "failed" || o.status === "cancelled") {
-          title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
-          sub.textContent   = o.failureReason || "No funds were taken. You can safely try again.";
-          loader?.remove();
-          addCTA("Back to Games", "/app/index.html");
-        } else {
-          // created / processing → keep loader and copy
-          title.textContent = "Confirming your payment…";
-          sub.textContent   = "We’re just waiting for final confirmation.";
-        }
-      }, (err) => {
-        if (debug) console.error("[Success] onSnapshot error:", err);
-        title.textContent = "We hit a snag";
-        sub.textContent   = "Please refresh this page or return to the site.";
+      } else {
+        // User is not signed in.
+        if (debug) console.log("[Success] No authenticated user found.");
+        title.textContent = "Please sign in";
+        sub.textContent = "To confirm your order status, please sign in to your account.";
         loader?.remove();
-        addCTA("Back to Games", "/app/index.html");
-      });
-    }
+        addCTA("Sign In", `/app/login.html?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+      }
+    });
   </script>
 </body>
 </html>

@@ -1,15 +1,17 @@
 // functions/index.js
-// ESM build. Ensure:  functions/package.json  has  "type": "module"
+// ESM build. Ensure functions/package.json has: { "type": "module" }
 
-import * as admin from "firebase-admin";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { z } from "zod";
+import crypto from "node:crypto";
 import { defineSecret } from "firebase-functions/params";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 
-// -------------------- Firebase Admin --------------------
-if (!admin.apps.length) admin.initializeApp();
+// -------------------- Firebase Admin (modular) --------------------
+if (!getApps().length) initializeApp();
 const db = getFirestore();
 
 // -------------------- Global options --------------------
@@ -62,6 +64,16 @@ const readUrlEncoded = (req) => {
     return {};
   }
 };
+
+const assertIsAuthenticated = (request) => {
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Please sign in.");
+};
+
+const assertIsAdmin = async (request) => {
+  const isAdmin = request.auth?.token?.admin === true || request.auth?.token?.role === "admin";
+  if (!isAdmin) throw new HttpsError("permission-denied", "Admin only.");
+};
+
 
 const nowServer = () => FieldValue.serverTimestamp();
 
@@ -352,7 +364,7 @@ export const retryUnfulfilledPaidOrders = onSchedule(
 // allocateTicketsAndAwardTokens
 // UPDATED: expectedPrice now optional; for 'credit' we price server-side.
 // For 'card' we reject (card is now via Trust HPP).
-exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
+export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
   const schema = z.object({
     compId: z.string().min(1),
     ticketsBought: z.number().int().positive(),
@@ -443,7 +455,7 @@ exports.allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) 
 });
 
 // getRevenueAnalytics (unchanged)
-exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
+export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
   await assertIsAdmin(request);
 
   const competitionsSnapshot = await db.collection("competitions").get();
@@ -496,7 +508,7 @@ exports.getRevenueAnalytics = onCall(functionOptions, async (request) => {
 });
 
 // spendSpinToken (unchanged)
-exports.spendSpinToken = onCall(functionOptions, async (request) => {
+export const spendSpinToken = onCall(functionOptions, async (request) => {
   const schema = z.object({tokenId: z.string().min(1)});
   const validation = schema.safeParse(request.data);
   if (!validation.success) {
@@ -558,7 +570,7 @@ exports.spendSpinToken = onCall(functionOptions, async (request) => {
 });
 
 // transferCashToCredit (unchanged)
-exports.transferCashToCredit = onCall(functionOptions, async (request) => {
+export const transferCashToCredit = onCall(functionOptions, async (request) => {
   const schema = z.object({
     amount: z.number().positive("Amount must be a positive number."),
   });
@@ -598,7 +610,7 @@ exports.transferCashToCredit = onCall(functionOptions, async (request) => {
 });
 
 // requestCashPayout (unchanged)
-exports.requestCashPayout = onCall(functionOptions, async (request) => {
+export const requestCashPayout = onCall(functionOptions, async (request) => {
   const schema = z.object({
     amount: z.number().positive("Amount must be a positive number."),
   });
@@ -645,7 +657,7 @@ exports.requestCashPayout = onCall(functionOptions, async (request) => {
 });
 
 // playPlinko (unchanged)
-exports.playPlinko = onCall(functionOptions, async (request) => {
+export const playPlinko = onCall(functionOptions, async (request) => {
   const schema = z.object({tokenId: z.string().min(1)});
   const validation = schema.safeParse(request.data);
   if (!validation.success) {
@@ -718,7 +730,7 @@ exports.playPlinko = onCall(functionOptions, async (request) => {
 });
 
 // drawWinner (unchanged)
-exports.drawWinner = onCall(functionOptions, async (request) => {
+export const drawWinner = onCall(functionOptions, async (request) => {
   const schema = z.object({compId: z.string().min(1)});
   const validation = schema.safeParse(request.data);
   if (!validation.success) {
@@ -744,7 +756,7 @@ exports.drawWinner = onCall(functionOptions, async (request) => {
 });
 
 // weeklyTokenCompMaintenance (FIXED: admin SDK query chaining)
-exports.weeklyTokenCompMaintenance = onSchedule({
+export const weeklyTokenCompMaintenance = onSchedule({
   schedule: "every monday 12:00",
   timeZone: "Europe/London",
 }, async () => {
@@ -787,26 +799,5 @@ exports.weeklyTokenCompMaintenance = onSchedule({
     logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
   }
 
-  return null;
-});
-
-// Retry any 'paid' orders that haven't been fulfilled (safety net)
-exports.retryUnfulfilledPaidOrders = onSchedule({
-  schedule: "every 10 minutes",
-  timeZone: "Europe/London",
-}, async () => {
-  const snap = await db.collection("orders")
-    .where("status", "==", "paid")
-    .where("fulfilled", "==", false)
-    .limit(25)
-    .get();
-  if (snap.empty) return null;
-  for (const doc of snap.docs) {
-    try {
-      await fulfilOrderTickets(doc.id);
-    } catch (e) {
-      logger.error("retryUnfulfilledPaidOrders error", { orderId: doc.id, err: e?.message || e });
-    }
-  }
   return null;
 });

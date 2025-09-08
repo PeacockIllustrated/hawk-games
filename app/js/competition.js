@@ -385,154 +385,35 @@ function initializeParallax() {
 
 // --- Page builder ---
 function createHeroPageElements(data) {
-  const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) =>
-    createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value })
-  );
-
-  const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
-
-  const ticketsRemaining = data.totalTickets - (data.ticketsSold || 0);
-  const maxTickets = Math.min(ticketsRemaining, data.userEntryLimit || 75);
-
-  // Find the base price per ticket from the first tier
-  const basePricePerTicket = data.ticketTiers && data.ticketTiers.length > 0
-    ? data.ticketTiers[0].price / data.ticketTiers[0].amount
-    : 1; // Default to 1 if no tiers defined
-
-  const sliderContainer = createElement('div', { class: 'ticket-slider-container' });
-
-  if (maxTickets > 0) {
-    const sliderLabel = createElement('div', { class: 'ticket-slider-label' }, [
-      createElement('span', { textContent: 'Number of entries: ' }),
-      createElement('span', { id: 'ticket-count-display', textContent: '1' })
-    ]);
-
-    const slider = createElement('input', {
-      type: 'range',
-      id: 'ticket-slider',
-      min: '1',
-      max: maxTickets.toString(),
-      value: '1',
-      class: 'ticket-slider'
-    });
-
-    const priceDisplay = createElement('div', { class: 'ticket-price-display' }, [
-      createElement('span', { textContent: 'Total Price: ' }),
-      createElement('span', { id: 'ticket-price-display-value', textContent: `£${basePricePerTicket.toFixed(2)}` })
-    ]);
-
-    sliderContainer.append(sliderLabel, slider, priceDisplay);
-  } else {
-    sliderContainer.append(createElement('p', { textContent: 'No tickets available.' }));
-  }
-
   const isTrueHero = data.isHeroComp && data.hasParallax;
-  let header;
+
+  // --- 1. Header ---
+  const header = isTrueHero
+    ? createElement('header', { class: 'hero-comp-header' }, [
+        createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
+        createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
+      ])
+    : createElement('header'); // Empty header for non-hero comps to keep structure
+
+  // --- 2. Main Content ---
   const mainContentSections = [];
 
-  if (isTrueHero) {
-    header = createElement('header', { class: 'hero-comp-header' }, [
-      createElement('div', { class: 'hero-comp-header-bg', style: { backgroundImage: `url('${data.imageSet.background}')` } }),
-      createElement('img', { class: 'hero-comp-header-fg', src: data.imageSet.foreground, alt: data.title })
-    ]);
+  // --- 2a. Prize Visuals (for non-hero) ---
+  const prizeVisualsPanel = !isTrueHero ? createPrizeVisuals(data) : null;
 
-    mainContentSections.push(
-      createElement('section', { class: 'hero-comp-title-section' }, [
-        createElement('h1', { textContent: `Win a ${data.title}` }),
-        createElement('p', { class: 'cash-alternative-hero' }, [
-          'Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative'
-        ]),
-        createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING' }),
-        createElement('div', { id: 'timer', class: 'hero-digital-timer' })
-      ]),
-      createElement('section', { class: 'hero-comp-progress-section' }, [
-        createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
-        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
-      ])
-    );
-  } else {
-    header = createElement('header'); // Empty header, does not take up space
+  // --- 2b. Intro Details (shared logic) ---
+  const introDetails = createIntroDetails(data, isTrueHero);
 
-    const introDetails = createElement('div', { style: { flex: '1 1 50%', display: 'flex', flexDirection: 'column' } }, [
-      createElement('h1', { textContent: `Win a ${data.title}` }),
-      createElement('p', { class: 'cash-alternative-hero' }, [
-        'Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative'
-      ]),
-      createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING', style: { marginTop: 'auto' } }),
-      createElement('div', { id: 'timer', class: 'hero-digital-timer' }),
-      createElement('div', { class: 'hero-comp-progress-section', style: { marginTop: '1rem' } }, [
-        createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` }),
-        createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })])
-      ])
-    ]);
+  // --- 2c. Main Layout Section (assembles visuals and details) ---
+  const introSectionClass = isTrueHero ? 'hero-comp-title-section' : 'main-comp-layout';
+  const introSectionChildren = isTrueHero ? [introDetails] : [prizeVisualsPanel, introDetails];
+  mainContentSections.push(createElement('section', { class: introSectionClass }, introSectionChildren));
 
-    // Prize visuals
-    const photoView = createElement('div', { class: 'view-panel photo-view active' }, [
-      createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
-    ]);
-    const threeDView = createElement('div', { class: 'view-panel spline-view' });
+  // --- 2d. Entry Flow (shared) ---
+  mainContentSections.push(createEntryFlow(data));
 
-    const viewsContainer = createElement('div', { class: 'views-container' }, [photoView, threeDView]);
-
-    const photosButton = createElement('button', { class: ['btn', 'btn-small', 'active'], textContent: 'Photos' });
-    const threeDButton = createElement('button', { class: ['btn', 'btn-small'], textContent: '3D View', style: { display: 'none' } });
-
-    const viewToggle = createElement('div', { class: 'view-toggle-buttons' }, [photosButton, threeDButton]);
-
-    const prizeVisualsPanel = createElement('div', { style: { flex: '1 1 50%' } }, [
-      viewToggle,
-      viewsContainer
-    ]);
-
-    // 3D toggle logic
-    if (data.splineUrl) {
-      threeDButton.style.display = 'inline-block';
-
-      const splineViewer = createElement('spline-viewer', {
-        url: data.splineUrl,
-        'loading-anim': 'true'
-      });
-      threeDView.append(splineViewer);
-
-      photosButton.addEventListener('click', () => {
-        photosButton.classList.add('active');
-        threeDButton.classList.remove('active');
-        photoView.classList.add('active');
-        threeDView.classList.remove('active');
-      });
-
-      threeDButton.addEventListener('click', () => {
-        threeDButton.classList.add('active');
-        photosButton.classList.remove('active');
-        threeDView.classList.add('active');
-        photoView.classList.remove('active');
-      });
-    }
-
-    const introSection = createElement('section', {
-      class: 'main-comp-layout', // Class added for mobile stacking
-      style: { display: 'flex', gap: '2rem', paddingTop: '120px' }
-    }, [
-      prizeVisualsPanel,
-      introDetails
-    ]);
-
-    mainContentSections.push(introSection);
-  }
-
-  // Common entry sections
+  // --- 2e. Confirm Button (shared) ---
   mainContentSections.push(
-    createElement('section', { class: 'hero-comp-entry-flow' }, [
-      createElement('div', { class: 'entry-step question-step' }, [
-        createElement('h2', { textContent: '1. Answer The Question' }),
-        createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
-        createElement('div', { class: 'answer-options' }, answers)
-      ]),
-      createElement('div', { class: 'entry-step tickets-step' }, [
-        createElement('h2', { textContent: '2. Choose Your Tickets' }),
-        sliderContainer
-      ])
-    ]),
     createElement('section', { class: 'hero-comp-confirm-section' }, [
       createElement('button', { id: 'entry-button', class: ['btn', 'hero-cta-btn'], disabled: true }, [
         'Enter Now',
@@ -541,51 +422,143 @@ function createHeroPageElements(data) {
     ])
   );
 
-  // Hero-only glance section
+  // --- 2f. At a Glance (hero-only) ---
   if (isTrueHero) {
-    const prizeSpecs = [
-      'AMG Spec',
-      'Diesel Coupe',
-      'Premium Black Finish',
-      `Cash Alternative: £${(data.cashAlternative || 0).toLocaleString()}`
-    ].map(spec => createElement('li', { textContent: spec }));
-
-    const glanceImage = data.imageSet.foreground;
-
-    mainContentSections.push(
-      createElement('section', { class: 'hero-comp-glance-section' }, [
-        createElement('h2', { textContent: '3. Prize At a Glance' }),
-        createElement('div', { class: 'glance-content' }, [
-          createElement('img', { src: glanceImage, alt: 'Prize image' }),
-          createElement('ul', {}, prizeSpecs)
-        ])
-      ])
-    );
+    mainContentSections.push(createGlanceSection(data));
   }
 
-  // Trust badges
-  mainContentSections.push(
-    createElement('section', { class: 'hero-comp-trust-section' }, [
-      createElement('div', { class: 'trust-badge' }, [
-        createElement('span', { class: 'trust-icon', textContent: '🛡️' }),
-        createElement('h3', { textContent: '100% Secure Payments' })
-      ]),
-      createElement('div', { class: 'trust-badge' }, [
-        createElement('span', { class: 'trust-icon', textContent: '⚖️' }),
-        createElement('h3', { textContent: 'Licensed & Fully Compliant' })
-      ]),
-      createElement('div', { class: 'trust-badge' }, [
-        createElement('span', { class: 'trust-icon', textContent: '🏆' }),
-        createElement('h3', { textContent: 'Real Winners Every Week' })
-      ])
-    ])
-  );
+  // --- 2g. Trust Badges (shared) ---
+  mainContentSections.push(createTrustBadges());
 
+  // --- 3. Final Assembly ---
   const main = createElement('main', { class: 'hero-comp-main' }, [
     createElement('div', { class: 'container' }, mainContentSections)
   ]);
 
   return [header, main];
+}
+
+function createPrizeVisuals(data) {
+  const photoView = createElement('div', { class: 'view-panel photo-view active' }, [
+    createElement('img', { src: data.prizeImage, alt: data.title, style: { width: '100%', borderRadius: '5px' } })
+  ]);
+  const threeDView = createElement('div', { class: 'view-panel spline-view' });
+  const viewsContainer = createElement('div', { class: 'views-container' }, [photoView, threeDView]);
+
+  const photosButton = createElement('button', { class: ['btn', 'btn-small', 'active'], textContent: 'Photos' });
+  const threeDButton = createElement('button', { class: ['btn', 'btn-small'], textContent: '3D View', style: { display: 'none' } });
+  const viewToggle = createElement('div', { class: 'view-toggle-buttons' }, [photosButton, threeDButton]);
+
+  if (data.splineUrl) {
+    threeDButton.style.display = 'inline-block';
+    const splineViewer = createElement('spline-viewer', { url: data.splineUrl, 'loading-anim': 'true' });
+    threeDView.append(splineViewer);
+
+    photosButton.addEventListener('click', () => {
+      photosButton.classList.add('active');
+      threeDButton.classList.remove('active');
+      photoView.classList.add('active');
+      threeDView.classList.remove('active');
+    });
+
+    threeDButton.addEventListener('click', () => {
+      threeDButton.classList.add('active');
+      photosButton.classList.remove('active');
+      threeDView.classList.add('active');
+      photoView.classList.remove('active');
+    });
+  }
+
+  return createElement('div', { class: 'prize-visuals-panel' }, [viewToggle, viewsContainer]);
+}
+
+function createIntroDetails(data, isTrueHero) {
+  const progressPercent = (data.ticketsSold / data.totalTickets) * 100;
+
+  const title = createElement('h1', { textContent: `Win a ${data.title}` });
+  const cashAlternative = createElement('p', { class: 'cash-alternative-hero' }, [
+    'Or take ', createElement('span', { textContent: `£${(data.cashAlternative || 0).toLocaleString()}` }), ' Cash Alternative'
+  ]);
+  const timeRemaining = createElement('div', { class: 'time-remaining', textContent: 'TIME REMAINING' });
+  const timer = createElement('div', { id: 'timer', class: 'hero-digital-timer' });
+  const progressLabel = createElement('label', { textContent: `Tickets Sold: ${data.ticketsSold || 0} / ${data.totalTickets}` });
+  const progressBar = createElement('div', { class: 'progress-bar' }, [createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })]);
+  const progressSection = createElement('div', { class: 'hero-comp-progress-section' }, [progressLabel, progressBar]);
+
+  if (isTrueHero) {
+    return [title, cashAlternative, timeRemaining, timer, progressSection];
+  } else {
+    const container = createElement('div', { class: 'intro-details-panel' });
+    container.append(title, cashAlternative, timeRemaining, timer, progressSection);
+    return container;
+  }
+}
+
+function createEntryFlow(data) {
+  // Skill Question
+  const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) =>
+    createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value })
+  );
+  const questionStep = createElement('div', { class: 'entry-step question-step' }, [
+    createElement('h2', { textContent: '1. Answer The Question' }),
+    createElement('p', { class: 'question-text', textContent: data.skillQuestion.text }),
+    createElement('div', { class: 'answer-options' }, answers)
+  ]);
+
+  // Ticket Slider
+  const ticketsRemaining = data.totalTickets - (data.ticketsSold || 0);
+  const maxTickets = Math.min(ticketsRemaining, data.userEntryLimit || 75);
+  const basePricePerTicket = data.ticketTiers?.[0]?.price / data.ticketTiers?.[0]?.amount || 1;
+
+  const sliderContainer = createElement('div', { class: 'ticket-slider-container' });
+  if (maxTickets > 0) {
+    const sliderLabel = createElement('div', { class: 'ticket-slider-label' }, [
+      createElement('span', { textContent: 'Number of entries:' }),
+      createElement('span', { id: 'ticket-count-display', textContent: '1' })
+    ]);
+    const slider = createElement('input', { type: 'range', id: 'ticket-slider', min: '1', max: maxTickets.toString(), value: '1', class: 'ticket-slider' });
+    const priceDisplay = createElement('div', { class: 'ticket-price-display' }, [
+      createElement('span', { textContent: 'Total Price: ' }),
+      createElement('span', { id: 'ticket-price-display-value', textContent: `£${basePricePerTicket.toFixed(2)}` })
+    ]);
+    sliderContainer.append(sliderLabel, slider, priceDisplay);
+  } else {
+    sliderContainer.append(createElement('p', { textContent: 'No tickets available.' }));
+  }
+  const ticketsStep = createElement('div', { class: 'entry-step tickets-step' }, [
+    createElement('h2', { textContent: '2. Choose Your Tickets' }),
+    sliderContainer
+  ]);
+
+  return createElement('section', { class: 'hero-comp-entry-flow' }, [questionStep, ticketsStep]);
+}
+
+function createGlanceSection(data) {
+  const prizeSpecs = (data.prizeSpecs || []).map(spec => createElement('li', { textContent: spec }));
+  const glanceImage = data.imageSet.foreground;
+
+  return createElement('section', { class: 'hero-comp-glance-section' }, [
+    createElement('h2', { textContent: '3. Prize At a Glance' }),
+    createElement('div', { class: 'glance-content' }, [
+      createElement('img', { src: glanceImage, alt: 'Prize image' }),
+      createElement('ul', {}, prizeSpecs)
+    ])
+  ]);
+}
+
+function createTrustBadges() {
+  const badges = [
+    { icon: '🛡️', text: '100% Secure Payments' },
+    { icon: '⚖️', text: 'Licensed & Fully Compliant' },
+    { icon: '🏆', text: 'Real Winners Every Week' }
+  ];
+  const badgeElements = badges.map(badge =>
+    createElement('div', { class: 'trust-badge' }, [
+      createElement('span', { class: 'trust-icon', textContent: badge.icon }),
+      createElement('h3', { textContent: badge.text })
+    ])
+  );
+  return createElement('section', { class: 'hero-comp-trust-section' }, badgeElements);
 }
 
 // --- INSTANT WIN MODAL LOGIC ---

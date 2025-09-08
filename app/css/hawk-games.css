@@ -647,9 +647,40 @@ input:checked + .slider:before { transform: translateX(26px); }
     .instant-win-layout { grid-template-columns: 1fr; }
 }
 
+/* --- 28. COMPETITION PAGE LAYOUT REFINEMENTS --- */
+.main-comp-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: flex-start;
+    padding-top: 120px; /* Standard top padding */
+}
+
+.prize-visuals-panel {
+    position: sticky;
+    top: 120px; /* Stick below the header */
+}
+
+.intro-details-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.intro-details-panel h1 {
+    font-family: var(--font-heading);
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+.intro-details-panel .hero-comp-progress-section {
+    margin-top: auto; /* Pushes the progress bar to the bottom */
+    padding-top: 2rem;
+}
+
 @media (max-width: 768px) {
     .main-comp-layout {
-        flex-direction: column;
+        grid-template-columns: 1fr;
     }
     .main-nav-desktop { display: none; }
     .hero-home { background-image: url('../assets/hero-bg-mobile.png'); }

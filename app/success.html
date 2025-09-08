@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Payment Successful | The Hawk Games</title>
 
-  <!-- Fonts + Brand styling -->
+  <!-- Brand fonts / styles -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Keep this file aligned with your site look & feel -->
   <link rel="stylesheet" href="/app/css/checkout.css">
 
   <meta name="robots" content="noindex" />
@@ -22,7 +20,7 @@
     </div>
   </noscript>
 
-  <!-- subtle background shards -->
+  <!-- Subtle background shards (match site style) -->
   <div class="shards">
     <div class="shard"></div><div class="shard"></div><div class="shard"></div><div class="shard"></div>
   </div>
@@ -34,68 +32,103 @@
     </div>
 
     <h1 class="hawk-title" id="title">Confirming your payment…</h1>
-    <p class="hawk-sub" id="sub">We’re finalising your order with Trust Payments. This usually takes a moment.</p>
+    <p class="hawk-sub" id="sub">
+      We’re finalising your order with Trust Payments. This usually takes a moment.
+    </p>
     <div class="loader" id="loader" aria-hidden="false"></div>
 
     <p class="small">Do not close this tab. We’ll update as soon as your order is confirmed.</p>
   </main>
 
   <script type="module">
-  import { initializeApp, getApps, getApp }
-    from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-  import { getFirestore, doc, onSnapshot, getDoc }
-    from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-  import { firebaseConfig } from "./js/firebase-config.js"; // <-- correct relative path
+    // Firebase (CDN, v9 modules)
+    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    // Your config, exported as: export const firebaseConfig = { ... }
+    import { firebaseConfig } from "./js/firebase-config.js";
 
-  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+    // Init (idempotent)
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
 
-  const qs = new URLSearchParams(location.search);
-  const orderId = qs.get("orderId");
+    // Grab order id from multiple possible param names (Trust can rename things)
+    const qs = new URLSearchParams(location.search);
+    const orderId =
+      qs.get("orderId") ||          // our preferred param
+      qs.get("orderreference") ||   // Trust commonly returns this
+      qs.get("requestreference") || // sometimes this one appears
+      qs.get("orderid");            // rare fallback
 
-  const title  = document.getElementById("title");
-  const sub    = document.getElementById("sub");
-  const frame  = document.getElementById("frame");
-  const loader = document.getElementById("loader");
+    // Debug toggle: add ?debug=1 to the URL if you want console detail
+    const debug = qs.get("debug") === "1";
+    if (debug) {
+      console.log("[Success] URL:", location.href);
+      console.log("[Success] Resolved orderId:", orderId);
+      console.log("[Success] All params:", Object.fromEntries(qs.entries()));
+    }
 
-  if (!orderId) {
-    title.textContent = "Missing order reference";
-    sub.textContent   = "We couldn’t find your orderId in the URL.";
-    loader.remove();
-  } else {
-    const ref = doc(db, "orders", orderId);
+    // UI hooks
+    const title  = document.getElementById("title");
+    const sub    = document.getElementById("sub");
+    const frame  = document.getElementById("frame");
+    const loader = document.getElementById("loader");
 
-    onSnapshot(ref, (snap) => {
-      if (!snap.exists()) {
-        title.textContent = "Preparing your order…";
-        return;
-      }
+    function addCTA(text, href, altStyle = false) {
+      const a = document.createElement("a");
+      a.className = altStyle ? "hawk-btn alt" : "hawk-btn";
+      a.href = href;
+      a.textContent = text;
+      frame.appendChild(a);
+      return a;
+    }
 
-      const o = snap.data();
+    if (!orderId) {
+      title.textContent = "Missing order reference";
+      sub.textContent   = "We couldn’t find your orderId in the URL.";
+      loader?.remove();
+    } else {
+      const ref = doc(db, "orders", orderId);
 
-      if (o.status === "paid") {
-        title.textContent = "Payment complete — you're in! ✅";
-        sub.textContent   = "Your entries/spins are now active on your account.";
-        loader.remove();
+      onSnapshot(ref, (snap) => {
+        if (!snap.exists()) {
+          // Webhook may land a touch after redirect; keep spinner and friendly copy
+          title.textContent = "Preparing your order…";
+          sub.textContent   = "Hang tight while we finish up. This usually takes a moment.";
+          return;
+        }
 
-        const cta = document.createElement("a");
-        cta.className = "hawk-btn alt";
-        cta.href = "/app/index.html";
-        cta.textContent = "Back to Games";
-        frame.appendChild(cta);
-      } else if (o.status === "failed" || o.status === "cancelled") {
-        title.textContent = o.status === "failed" ? "Payment failed ❌" : "Payment cancelled ❌";
-        sub.textContent   = o.failureReason || "No funds were taken. You can try again.";
-        loader.remove();
+        const o = snap.data();
+        if (debug) console.log("[Success] Order doc:", o);
 
-        const retry = document.createElement("a");
-        retry.className = "hawk-btn";
-        retry.href = "/app/index.html";
-        retry.textContent = "Back to Games";
-        frame.appendChild(retry);
-      }
-    });
-  }
-</script>
+        if (o.status === "paid") {
+          title.textContent = "Payment complete — you're in! ✅";
+          sub.textContent   = "Your entries/spins are now active on your account. Good luck!";
+          loader?.remove();
+
+          addCTA("Back to Games", "/app/index.html", true);
+
+          const info = document.createElement("p");
+          info.className = "small";
+          info.textContent = `Order: ${orderId}${o.providerRef ? " • Ref: " + o.providerRef : ""}`;
+          frame.appendChild(info);
+        } else if (o.status === "failed" || o.status === "cancelled") {
+          title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
+          sub.textContent   = o.failureReason || "No funds were taken. You can safely try again.";
+          loader?.remove();
+          addCTA("Back to Games", "/app/index.html");
+        } else {
+          // created / processing → keep loader and copy
+          title.textContent = "Confirming your payment…";
+          sub.textContent   = "We’re just waiting for final confirmation.";
+        }
+      }, (err) => {
+        if (debug) console.error("[Success] onSnapshot error:", err);
+        title.textContent = "We hit a snag";
+        sub.textContent   = "Please refresh this page or return to the site.";
+        loader?.remove();
+        addCTA("Back to Games", "/app/index.html");
+      });
+    }
+  </script>
 </body>
 </html>

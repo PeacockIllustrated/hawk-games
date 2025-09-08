@@ -158,7 +158,16 @@ export const createTrustOrder = onCall(
   },
   async (req) => {
     try {
-      const { compId, qty = 1 } = req.data || {};
+      const d = req.data || {};
+      const compId = d.compId || d.competitionId || d.cid || d.id || "";
+      const qty = Number(d.qty ?? 1);
+
+      logger.info("createTrustOrder called", {
+        dataKeys: Object.keys(d),
+        hasCompId: !!compId,
+        qty,
+      });
+
       if (!compId) throw new HttpsError("invalid-argument", "compId required");
       if (!Number.isFinite(qty) || qty <= 0) throw new HttpsError("invalid-argument", "qty invalid");
 

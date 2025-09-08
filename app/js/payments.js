@@ -35,11 +35,14 @@ function postToHPP(endpoint, fields) {
 /**
  * Start a card checkout using Trust Payments Hosted Payment Page (HPP).
  * The server validates pricing and returns endpoint+fields.
- * @param {Object} intent - purchase intent (e.g. {type:'tickets', compId, ticketsBought})
+ * @param {object} params
+ * @param {string} params.compId - Competition ID
+ * @param {number} params.qty - Number of tickets
  */
-export async function payByCard(intent) {
+export async function payByCard({ compId, qty }) {
+  if (!compId) throw new Error("compId missing on client");
   const createTrustOrder = httpsCallable(functions, "createTrustOrder");
-  const { data } = await createTrustOrder({ intent });
+  const { data } = await createTrustOrder({ compId, qty });
 
   if (!data || !data.endpoint || !data.fields) {
     throw new Error("Unable to start payment: invalid response from server.");

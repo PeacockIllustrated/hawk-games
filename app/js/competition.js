@@ -268,12 +268,7 @@ async function handleEntryCard(ticketsBought) {
   ]));
 
   try {
-    const intent = {
-      type: 'tickets',
-      compId: competitionId,
-      ticketsBought
-    };
-    await payByCard(intent); // navigates to Trust HPP
+    await payByCard({ compId: competitionId, qty: ticketsBought }); // navigates to Trust HPP
   } catch (error) {
     console.error("Card checkout failed:", error);
     openModal(createElement('div', {}, [

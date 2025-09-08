@@ -98,6 +98,7 @@ const loadAllCompetitions = async () => {
     const mainGrid = document.getElementById('main-competition-grid');
     const instantWinGrid = document.getElementById('instant-win-grid');
     const spinnerGrid = document.getElementById('spinner-competition-grid');
+    const cashPrizesGrid = document.getElementById('cash-prizes-grid');
 
     try {
         const q = query(collection(db, "competitions"), where("status", "==", "live"), orderBy("createdAt", "desc"));
@@ -116,6 +117,10 @@ const loadAllCompetitions = async () => {
                 spinnerGrid.innerHTML = '';
                 spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active.'}));
             }
+            if (cashPrizesGrid) {
+                cashPrizesGrid.innerHTML = '';
+                cashPrizesGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Cash Prize competitions are live right now.'}));
+            }
             if (heroContainer) heroContainer.style.display = 'none';
             return;
         }
@@ -124,6 +129,7 @@ const loadAllCompetitions = async () => {
         const mainComps = [];
         const instantWinComps = [];
         const tokenComps = [];
+        const cashComps = [];
 
         querySnapshot.forEach((doc) => {
             const compData = { id: doc.id, ...doc.data() };
@@ -137,6 +143,9 @@ const loadAllCompetitions = async () => {
                         break;
                     case 'token':
                         tokenComps.push(compData);
+                        break;
+                    case 'cash':
+                        cashComps.push(compData);
                         break;
                     case 'main':
                     default:
@@ -176,6 +185,12 @@ const loadAllCompetitions = async () => {
             } else {
                 spinnerGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No Token competitions are active right now.'}));
             }
+        }
+
+        if (cashPrizesGrid) {
+            cashPrizesGrid.innerHTML = '';
+            if (cashComps.length > 0) cashComps.forEach(comp => cashPrizesGrid.append(createCompetitionCard(comp)));
+            else cashPrizesGrid.append(createElement('div', { class: 'hawk-card placeholder', textContent: 'No cash prize competitions are live right now.'}));
         }
 
         startAllCountdowns();

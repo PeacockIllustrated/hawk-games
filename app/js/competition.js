@@ -15,7 +15,6 @@ const auth = getAuth(app);
 // --- Module State ---
 let currentCompetitionData = null;
 let competitionId = null;
-let userMaxTickets = null;
 
 // --- PRIZE ANGLE CONFIGURATION ---
 const PRIZE_ANGLES = {
@@ -49,30 +48,6 @@ function createElement(tag, options = {}, children = []) {
   return el;
 }
 
-async function getUserMaxTickets(user, compId, defaultMax) {
-    if (!user) {
-        return defaultMax;
-    }
-
-    const userDocRef = doc(db, 'users', user.uid);
-    try {
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            const entries = userData.entries || {};
-            const userTicketsForComp = entries[compId] || 0;
-            return Math.max(0, defaultMax - userTicketsForComp);
-        } else {
-            // User document doesn't exist, so they have 0 tickets for this comp
-            return defaultMax;
-        }
-    } catch (error) {
-        console.error("Error fetching user ticket data:", error);
-        // On error, return the default max to not block the user
-        return defaultMax;
-    }
-}
-
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
@@ -103,10 +78,8 @@ async function loadCompetitionDetails(id) {
       currentCompetitionData = docSnap.data();
       document.title = `${currentCompetitionData.title} | The Hawk Games`;
 
-      userMaxTickets = await getUserMaxTickets(auth.currentUser, id, currentCompetitionData.maxTicketsPerUser);
-
       pageContent.innerHTML = '';
-      pageContent.append(...createHeroPageElements(currentCompetitionData, userMaxTickets));
+      pageContent.append(...createHeroPageElements(currentCompetitionData));
 
       if (currentCompetitionData.hasParallax) {
         initializeParallax();
@@ -155,6 +128,16 @@ function setupEntryLogic(correctAnswer) {
     });
   }
 
+  const ticketWrap = document.querySelector('.ticket-options');
+  if (ticketWrap) {
+    ticketWrap.addEventListener('click', (e) => {
+      const option = e.target.closest('.ticket-option');
+      if (!option) return;
+      document.querySelectorAll('.ticket-options .ticket-option').forEach(opt => opt.classList.remove('selected'));
+      option.classList.add('selected');
+      entryButton.disabled = false;
+    });
+  }
 
   if (entryButton) {
     entryButton.addEventListener('click', () => {
@@ -180,18 +163,18 @@ function setupEntryLogic(correctAnswer) {
 }
 
 function showConfirmationModal() {
-  const slider = document.getElementById('ticket-slider');
-  if (!slider) {
+  const selectedTicket = document.querySelector('.ticket-option.selected');
+  if (!selectedTicket) {
     openModal(createElement('div', {}, [
-      createElement('h2', { textContent: 'Error' }),
-      createElement('p', { textContent: 'Could not find ticket selector.' }),
+      createElement('h2', { textContent: 'Select Tickets' }),
+      createElement('p', { textContent: 'Please choose a ticket bundle.' }),
       createElement('button', { 'data-close-modal': true, class: 'btn' }, ['OK'])
     ]));
     return;
   }
 
-  const tickets = parseInt(slider.value, 10);
-  const price = getTieredPrice(currentCompetitionData.ticketTiers, tickets);
+  const tickets = parseInt(selectedTicket.dataset.amount);
+  const price = parseFloat(selectedTicket.dataset.price); // display only
 
   const payByCardBtn = createElement('button', { id: 'pay-card-btn', class: 'btn', disabled: true }, ['Pay by Card']);
   const payByCreditBtn = createElement('button', { id: 'pay-credit-btn', class: ['btn', 'btn-secondary'], disabled: true }, ['Pay with Credit']);
@@ -390,72 +373,8 @@ function initializeParallax() {
   });
 }
 
-function getTieredPrice(tiers, quantity) {
-    // Ensure tiers are sorted by amount, ascending
-    const sortedTiers = [...tiers].sort((a, b) => a.amount - b.amount);
-
-    let bestTier = sortedTiers[0]; // Default to the smallest tier
-
-    // Find the best applicable tier for the quantity
-    for (const tier of sortedTiers) {
-        if (quantity >= tier.amount) {
-            bestTier = tier;
-        } else {
-            // Since tiers are sorted, we can break early
-            break;
-        }
-    }
-
-    // The price of a single ticket is found in the first tier
-    const singleTicketPrice = sortedTiers[0].price / sortedTiers[0].amount;
-
-    // Calculate the price
-    if (bestTier) {
-        const numBundles = Math.floor(quantity / bestTier.amount);
-        const remainder = quantity % bestTier.amount;
-        return (numBundles * bestTier.price) + (remainder * singleTicketPrice);
-    }
-
-    // Fallback for safety, though the logic above should always find a tier
-    return quantity * singleTicketPrice;
-}
-
 // --- Page builder ---
-function createTicketSlider(tiers, maxTickets) {
-    const container = createElement('div', { class: 'ticket-slider-container' });
-
-    if (maxTickets === 0) {
-        container.append(createElement('p', { class: 'tickets-sold-out-text', textContent: 'You have reached the maximum number of entries for this competition.' }));
-        return container;
-    }
-
-    const slider = createElement('input', { type: 'range', id: 'ticket-slider', min: 1, max: maxTickets, value: 1 });
-    const display = createElement('div', { class: 'ticket-slider-display' });
-
-    const updateDisplay = () => {
-        const quantity = slider.value;
-        const price = getTieredPrice(tiers, quantity);
-        display.innerHTML = `
-            <span class="ticket-amount">${quantity}</span>
-            <span class="ticket-label">Entr${quantity > 1 ? 'ies' : 'y'}</span>
-            <span class="ticket-price">£${price.toFixed(2)}</span>
-        `;
-        // Enable entry button once slider is moved
-        const entryButton = document.getElementById('entry-button');
-        if(entryButton) entryButton.disabled = false;
-    };
-
-    slider.addEventListener('input', updateDisplay);
-
-    container.append(slider, display);
-
-    // Initial display update
-    setTimeout(updateDisplay, 0);
-
-    return container;
-}
-
-function createHeroPageElements(data, userMaxTickets) {
+function createHeroPageElements(data) {
   const answers = Object.entries(data.skillQuestion.answers).map(([key, value]) =>
     createElement('div', { class: 'answer-btn', 'data-answer': key, textContent: value })
   );
@@ -470,7 +389,19 @@ function createHeroPageElements(data, userMaxTickets) {
     bestValueAmount = bestTier.amount;
   }
 
-  const ticketSlider = createTicketSlider(data.ticketTiers, userMaxTickets);
+  const ticketTiers = data.ticketTiers.map(tier => {
+    const isBestValue = tier.amount === bestValueAmount;
+    return createElement('div', {
+      class: ['ticket-option', 'card-style-option', isBestValue ? 'best-value' : ''],
+      'data-amount': tier.amount,
+      'data-price': tier.price
+    }, [
+      isBestValue ? createElement('div', { class: 'best-value-badge', textContent: 'BEST VALUE' }) : null,
+      createElement('span', { class: 'ticket-amount', textContent: tier.amount }),
+      createElement('span', { class: 'ticket-label', textContent: `Entr${tier.amount > 1 ? 'ies' : 'y'}` }),
+      createElement('span', { class: 'ticket-price', textContent: `£${tier.price.toFixed(2)}` })
+    ]);
+  });
 
   const isTrueHero = data.isHeroComp && data.hasParallax;
   let header;
@@ -576,7 +507,7 @@ function createHeroPageElements(data, userMaxTickets) {
       ]),
       createElement('div', { class: 'entry-step tickets-step' }, [
         createElement('h2', { textContent: '2. Choose Your Tickets' }),
-        createElement('div', { class: 'ticket-options' }, [ticketSlider])
+        createElement('div', { class: 'ticket-options' }, ticketTiers)
       ])
     ]),
     createElement('section', { class: 'hero-comp-confirm-section' }, [

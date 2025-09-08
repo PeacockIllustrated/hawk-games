@@ -245,8 +245,12 @@ const assertIsAuthenticated = (context) => {
 const functionOptions = {
   region: "us-central1",
   enforceAppCheck: true,
-  cors: ["https://the-hawk-games-64239.web.app", "https://the-hawk-games.co.uk", /the-hawk-games\.co\.uk$/, "https://the-hawk-games-staging.netlify.app",
-    /netlify\.app$/, "http://localhost:5000", "http://127.0.0.1:5000"],
+  cors: [    "https://the-hawk-games-64239.web.app",
+    "https://the-hawk-games.co.uk",
+    "https://the-hawk-games-staging.netlify.app",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000"
+  ],
 };
 
 /* ============================
@@ -886,5 +890,26 @@ exports.weeklyTokenCompMaintenance = onSchedule({
     logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
   }
 
+  return null;
+});
+
+// Retry any 'paid' orders that haven't been fulfilled (safety net)
+exports.retryUnfulfilledPaidOrders = onSchedule({
+  schedule: "every 10 minutes",
+  timeZone: "Europe/London",
+}, async () => {
+  const snap = await db.collection("orders")
+    .where("status", "==", "paid")
+    .where("fulfilled", "==", false)
+    .limit(25)
+    .get();
+  if (snap.empty) return null;
+  for (const doc of snap.docs) {
+    try {
+      await fulfilOrderTickets(doc.id);
+    } catch (e) {
+      logger.error("retryUnfulfilledPaidOrders error", { orderId: doc.id, err: e?.message || e });
+    }
+  }
   return null;
 });

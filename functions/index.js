@@ -35,6 +35,7 @@ const RETURN_URL_SUCCESS = defineSecret("RETURN_URL_SUCCESS"); // required
 const RETURN_URL_CANCEL = defineSecret("RETURN_URL_CANCEL"); // required
 const NOTIFICATION_URL = defineSecret("NOTIFICATION_URL"); // required
 const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // required (we send + verify)
+const TRUST_SITE_SECURITY_PASSWORD = defineSecret("TRUST_SITE_SECURITY_PASSWORD"); // required for site security hash
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -77,6 +78,21 @@ const readUrlEncoded = (req) => {
   } catch {
     return {};
   }
+};
+
+/**
+ * Get a UTC timestamp in "YYYY-MM-DD HH:mm:ss" format for Trust Payments hashing.
+ * @returns {string}
+ */
+const getUtcTimestamp = () => {
+  const d = new Date();
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const min = String(d.getUTCMinutes()).padStart(2, "0");
+  const ss = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
 };
 
 // Auth helpers used by business functions
@@ -199,7 +215,8 @@ export const createTrustOrder = onCall(
       RETURN_URL_SUCCESS,
       RETURN_URL_CANCEL,
       NOTIFICATION_URL,
-      TRUST_NOTIFY_PASSWORD, // IMPORTANT: declared here because we read it below
+      TRUST_NOTIFY_PASSWORD,
+      TRUST_SITE_SECURITY_PASSWORD,
     ],
   },
   async (req) => {
@@ -240,6 +257,10 @@ export const createTrustOrder = onCall(
         TRUST_NOTIFY_PASSWORD,
         "TRUST_NOTIFY_PASSWORD"
       ).trim();
+      const siteSecurityPwd = readSecret(
+        TRUST_SITE_SECURITY_PASSWORD,
+        "TRUST_SITE_SECURITY_PASSWORD"
+      ).trim();
 
       // --- Price discovery ---
       const compSnap = await db.collection("competitions").doc(compId).get();
@@ -259,6 +280,7 @@ export const createTrustOrder = onCall(
 
       const amountPence = unitPricePence * qty;
       const mainamount = (amountPence / 100).toFixed(2); // "12.99"
+      const currencyiso3a = "GBP";
 
       // --- Create order doc ---
       const orderRef = db.collection("orders").doc();
@@ -268,7 +290,7 @@ export const createTrustOrder = onCall(
         type: "tickets",
         items: [{ kind: "tickets", compId, qty }],
         amountPence,
-        currency: "GBP",
+        currency: currencyiso3a,
         status: "created",
         provider: "trust",
         isTest,
@@ -276,12 +298,28 @@ export const createTrustOrder = onCall(
         updatedAt: nowServer(),
       });
 
+      // --- Site Security Hashing ---
+      const sitesecuritytimestamp = getUtcTimestamp();
+      const hashString = [
+        currencyiso3a,
+        mainamount,
+        siteRef,
+        orderRef.id,
+        sitesecuritytimestamp,
+        siteSecurityPwd,
+      ].join("");
+
+      const sitesecurity =
+        "h" + crypto.createHash("sha256").update(hashString).digest("hex");
+
       // --- HPP fields ---
       const fields = {
         sitereference: siteRef,
         orderreference: orderRef.id,
-        currencyiso3a: "GBP",
+        currencyiso3a,
         mainamount, // decimal string
+        sitesecurity,
+        sitesecuritytimestamp,
         // Advanced Redirects (force GET so querystring is preserved)
         successfulurlredirect: `${successUrl}?orderId=${orderRef.id}`,
         declinedurlredirect: `${cancelUrl}?orderId=${orderRef.id}`,
@@ -323,7 +361,12 @@ export const trustWebhook = onRequest(
   {
     region: REGION,
     enforceAppCheck: false, // server-to-server from Trust
-    secrets: [TRUST_NOTIFY_PASSWORD, TRUST_SITEREFERENCE, TRUST_TEST_SITEREFERENCE],
+    secrets: [
+      TRUST_NOTIFY_PASSWORD,
+      TRUST_SITEREFERENCE,
+      TRUST_TEST_SITEREFERENCE,
+      TRUST_SITE_SECURITY_PASSWORD,
+    ],
   },
   async (req, res) => {
     try {
@@ -333,7 +376,7 @@ export const trustWebhook = onRequest(
           ? readUrlEncoded(req)
           : (typeof req.body === "object" && req.body) || readUrlEncoded(req);
 
-      // Password: accept both variants + optional URL token, trim both sides
+      // --- Auth check 1: Notification Password ---
       const providedPwd = (
         body.notification_password ||
         body.notificationpassword ||
@@ -341,26 +384,81 @@ export const trustWebhook = onRequest(
         ""
       ).toString().trim();
       const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
-
       if (!providedPwd || providedPwd !== expectedPwd) {
         logger.warn("Webhook rejected: bad password", { ip: req.ip, havePwd: !!providedPwd });
         res.status(401).send("unauthorised");
         return;
       }
 
-      // Optional: restrict by known site references if provided
+      // --- Auth check 2: Site Reference ---
       const postSiteRef = String(body.sitereference || "");
+      if (!postSiteRef) {
+        logger.warn("Webhook rejected: missing sitereference");
+        res.status(401).send("unauthorised");
+        return;
+      }
       const allowedSites = new Set(
         [readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"), trySecret(TRUST_TEST_SITEREFERENCE)]
           .filter(Boolean)
           .map((s) => s.trim())
       );
-      if (postSiteRef && !allowedSites.has(postSiteRef)) {
+      if (!allowedSites.has(postSiteRef)) {
         logger.warn("Webhook rejected: unknown sitereference", { postSiteRef });
         res.status(401).send("unauthorised");
         return;
       }
 
+      // --- Auth check 3: Site Security Hash ---
+      const siteSecurityPwd = readSecret(
+        TRUST_SITE_SECURITY_PASSWORD,
+        "TRUST_SITE_SECURITY_PASSWORD"
+      ).trim();
+
+      const responseSiteSecurity = String(body.responsesitesecurity || "");
+      const responseSiteSecurityTimestamp = String(
+        body.responsesitesecuritytimestamp || ""
+      );
+
+      // Only perform hash check if a hash is provided.
+      // This maintains backward compatibility if Site Security is not enabled on all orders.
+      if (responseSiteSecurity && responseSiteSecurityTimestamp) {
+        const orderIdForHash = body.orderreference || body.order_reference || "";
+        const orderSnapForHash = await db.collection("orders").doc(orderIdForHash).get();
+
+        if (orderSnapForHash.exists) {
+          const orderData = orderSnapForHash.data() || {};
+          const currencyiso3a = String(orderData.currency || "GBP");
+          const mainamount = (Number(orderData.amountPence || 0) / 100).toFixed(2);
+
+          const hashString = [
+            currencyiso3a,
+            mainamount,
+            postSiteRef,
+            orderIdForHash,
+            responseSiteSecurityTimestamp,
+            siteSecurityPwd,
+          ].join("");
+
+          const expectedHash =
+            "h" + crypto.createHash("sha256").update(hashString).digest("hex");
+
+          if (responseSiteSecurity !== expectedHash) {
+            logger.warn("Webhook rejected: bad response hash", {
+              orderId: orderIdForHash,
+              have: responseSiteSecurity,
+              want: expectedHash,
+            });
+            res.status(401).send("unauthorised");
+            return;
+          }
+        } else {
+          logger.warn("Webhook rejected: cannot verify hash for unknown order", { orderId: orderIdForHash });
+          res.status(401).send("unauthorised");
+          return;
+        }
+      }
+
+      // --- Process request ---
       const orderId = body.orderreference || body.order_reference || "";
       if (!orderId) {
         logger.warn("Webhook missing orderreference", { bodyKeys: Object.keys(body || {}) });
@@ -404,6 +502,8 @@ export const trustWebhook = onRequest(
           settlestatus,
           paymenttypedescription,
           transactionreference,
+          responsesitesecurity, // store for auditing
+          responsesitesecuritytimestamp, // store for auditing
         },
       };
 

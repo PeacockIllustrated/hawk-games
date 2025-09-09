@@ -50,6 +50,28 @@ const readSecret = (secret, name, { allowEmpty = false } = {}) => {
   }
 };
 
+const resolveUnitPricePence = (comp) => {
+  // Preferred explicit fields
+  if (typeof comp?.ticketPricePence === "number") return comp.ticketPricePence;
+  if (typeof comp?.pricePence === "number") return comp.pricePence;
+
+  // Fallback to tiers: first tier price ÷ amount -> per-ticket, then to pence
+  if (Array.isArray(comp?.ticketTiers) && comp.ticketTiers.length > 0) {
+    const t0 = comp.ticketTiers[0];
+    const amount = Number(t0?.amount);
+    const price = Number(t0?.price); // GBP decimal for the whole bundle
+    if (Number.isFinite(amount) && amount > 0 && Number.isFinite(price)) {
+      return Math.round((price / amount) * 100); // pence per ticket
+    }
+  }
+
+  // Last resort (if you happen to store a GBP decimal somewhere):
+  if (typeof comp?.ticketPrice === "number") return Math.round(comp.ticketPrice * 100);
+
+  return null;
+};
+
+
 const getMode = () => {
   const v = (readSecret(TRUST_MODE, "TRUST_MODE", { allowEmpty: true }) || "live").toLowerCase();
   return v === "test" ? "test" : "live";
@@ -176,12 +198,8 @@ export const createTrustOrder = onCall(
       if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
       const comp = compSnap.data();
 
-      const unitPricePence =
-        typeof comp?.ticketPricePence === "number"
-          ? comp.ticketPricePence
-          : typeof comp?.pricePence === "number"
-          ? comp.pricePence
-          : null;
+      const unitPricePence = resolveUnitPricePence(comp);
+
 
       if (unitPricePence === null)
         throw new HttpsError("failed-precondition", "Competition missing ticket price (ticketPricePence/pricePence).");

@@ -1,5 +1,9 @@
 // functions/index.js
-// Pure ESM. Ensure functions/package.json has: { "type": "module", "engines": { "node": "20" } }
+// Pure ESM. Ensure functions/package.json has:
+// {
+//   "type": "module",
+//   "engines": { "node": "20" }
+// }
 
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -28,13 +32,17 @@ const functionOptions = {
 };
 
 // -------------------- Secrets --------------------
+// IMPORTANT: TRUST_SITE_PASSWORD and TRUST_NOTIFY_PASSWORD MUST be the same value
+// (as requested by Trust Payments) — one for site security hash, one for webhook auth.
+const TRUST_SITE_PASSWORD = defineSecret("TRUST_SITE_PASSWORD");
+const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD");
+
 const TRUST_MODE = defineSecret("TRUST_MODE"); // "test" | "live" (default live)
 const TRUST_SITEREFERENCE = defineSecret("TRUST_SITEREFERENCE");
 const TRUST_TEST_SITEREFERENCE = defineSecret("TRUST_TEST_SITEREFERENCE"); // optional
 const RETURN_URL_SUCCESS = defineSecret("RETURN_URL_SUCCESS");
 const RETURN_URL_CANCEL = defineSecret("RETURN_URL_CANCEL");
 const NOTIFICATION_URL = defineSecret("NOTIFICATION_URL");
-const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // Site Security password (NOT an API user PW)
 
 // -------------------- Small helpers --------------------
 const nowServer = () => FieldValue.serverTimestamp();
@@ -71,7 +79,6 @@ const resolveUnitPricePence = (comp) => {
   return null;
 };
 
-
 const getMode = () => {
   const v = (readSecret(TRUST_MODE, "TRUST_MODE", { allowEmpty: true }) || "live").toLowerCase();
   return v === "test" ? "test" : "live";
@@ -87,6 +94,28 @@ const readUrlEncoded = (req) => {
   } catch {
     return {};
   }
+};
+
+// UTC timestamp in the format Trust requires: "YYYY-MM-DD hh:mm:ss"
+const utcTimestamp = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
+         `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+};
+
+// Build Trust Site Security (SHA-256) based on the exact field order agreed with Trust:
+// fields = currencyiso3a, mainamount, sitereference, sitesecuritytimestamp, password
+const buildSiteSecurity = ({ currencyiso3a, mainamount, sitereference, password }) => {
+  const ts = utcTimestamp();
+  const toHash =
+    String(currencyiso3a ?? "") +
+    String(mainamount ?? "") +
+    String(sitereference ?? "") +
+    ts +
+    String(password ?? "");
+  const hash = crypto.createHash("sha256").update(toHash, "utf8").digest("hex");
+  return { ts, hash: "h" + hash }; // MUST prefix with 'h'
 };
 
 // -------------------- Auth/Admin guards (stubs you can replace) --------------------
@@ -169,6 +198,7 @@ export const createTrustOrder = onCall(
     region: "us-central1",
     enforceAppCheck: true,
     secrets: [
+      TRUST_SITE_PASSWORD,
       TRUST_MODE,
       TRUST_SITEREFERENCE,
       TRUST_TEST_SITEREFERENCE,
@@ -186,9 +216,10 @@ export const createTrustOrder = onCall(
       const mode = getMode();
       const isTest = mode === "test";
 
-      const siteRef = isTest
-        ? (TRUST_TEST_SITEREFERENCE.value() || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
-        : readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
+      // Safe retrieval of site references (test can fall back to live)
+      const testRef = readSecret(TRUST_TEST_SITEREFERENCE, "TRUST_TEST_SITEREFERENCE", { allowEmpty: true });
+      const liveRef = readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
+      const siteRef = isTest ? (testRef || liveRef) : liveRef;
 
       const successUrl = readSecret(RETURN_URL_SUCCESS, "RETURN_URL_SUCCESS");
       const cancelUrl = readSecret(RETURN_URL_CANCEL, "RETURN_URL_CANCEL");
@@ -199,10 +230,12 @@ export const createTrustOrder = onCall(
       const comp = compSnap.data();
 
       const unitPricePence = resolveUnitPricePence(comp);
-
-
-      if (unitPricePence === null)
-        throw new HttpsError("failed-precondition", "Competition missing ticket price (ticketPricePence/pricePence).");
+      if (unitPricePence === null) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Competition missing ticket price (ticketPricePence/pricePence)."
+        );
+      }
 
       const amountPence = unitPricePence * qty;
       const mainamount = (amountPence / 100).toFixed(2);
@@ -222,6 +255,7 @@ export const createTrustOrder = onCall(
         updatedAt: nowServer(),
       });
 
+      // Base HPP fields
       const fields = {
         sitereference: siteRef,
         orderreference: orderRef.id,
@@ -232,11 +266,24 @@ export const createTrustOrder = onCall(
         successfulurlredirectmethod: "GET",
         declinedurlredirectmethod: "GET",
         allurlnotification: notifyUrl,
-        // Optional HPP prefill
+
+        // Optional shopper details (nice to have on HPP)
         billingemail: req.auth?.token?.email || "",
         billingfirstname: (req.auth?.token?.name || "").split(" ")[0] || "",
         billinglastname: (req.auth?.token?.name || "").split(" ").slice(1).join(" ") || "",
       };
+
+      // --- Site Security (enabled by Trust) ---
+      // Order confirmed by Trust (email): currencyiso3a,mainamount,sitereference,sitesecuritytimestamp,password
+      const sitePwd = readSecret(TRUST_SITE_PASSWORD, "TRUST_SITE_PASSWORD");
+      const { ts, hash } = buildSiteSecurity({
+        currencyiso3a: fields.currencyiso3a,
+        mainamount: fields.mainamount,
+        sitereference: fields.sitereference,
+        password: sitePwd,
+      });
+      fields.sitesecuritytimestamp = ts;
+      fields.sitesecurity = hash;
 
       logger.info("createTrustOrder: HPP ready", {
         orderId: orderRef.id,

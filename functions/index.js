@@ -235,6 +235,7 @@ const siteRef = isTest
  
       const notifyPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
 
+
       const fields = {
         sitereference: siteRef,
         orderreference: orderRef.id,
@@ -306,14 +307,19 @@ export const trustWebhook = onRequest(
   (body.notification_password || body.notificationpassword || req.query?.t || "")
 ).toString().trim();
 const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
-
-
 if (!providedPwd || providedPwd !== expectedPwd) {
-  logger.warn("Webhook rejected: bad password", { ip: req.ip });
+  logger.warn("Webhook rejected: bad password", { ip: req.ip, havePwd: !!providedPwd });
   res.status(401).send("unauthorised");
   return;
 }
-      
+
+const siteRef = String(body.sitereference || "");
+const allowed = new Set([
+  readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"),
+  (()=>{ try { return TRUST_TEST_SITEREFERENCE.value() || ""; } catch { return ""; } })(),
+].filter(Boolean));
+if (!allowed.has(siteRef)) { res.status(401).send("unauthorised"); return; }
+     
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists) {

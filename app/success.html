@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Hawk Games — Order Confirmation</title>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/app/css/checkout.css">
   <meta name="robots" content="noindex">
 </head>
@@ -73,29 +72,20 @@
   </noscript>
 
   <script type="module">
-    // --- Configurable paths ---
     const ACCOUNT_URL = "/app/account.html";
     const HOME_URL    = "/app/";
-    // Optional: provide a read-only endpoint and set this globally:
-    //   window.__ORDER_STATUS_ENDPOINT__ = "/api/orders";
-    // It should return JSON: { status: "PENDING"|"FULFILLED"|"FAILED", tickets?: number[] }
-    // --------------------------
 
-    // Query parsing
     const qs = new URLSearchParams(location.search);
     const orderRef = qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || "—";
 
-    // Elements
-    const statusBadge  = document.getElementById("statusBadge");
+    const statusBadge   = document.getElementById("statusBadge");
     const orderRefBadge = document.getElementById("orderRefBadge");
-    const copyBtn = document.getElementById("copyBtn");
-    const reassure = document.getElementById("reassure");
+    const copyBtn       = document.getElementById("copyBtn");
+    const reassure      = document.getElementById("reassure");
 
-    // Links
     document.getElementById("accountLink").href = ACCOUNT_URL;
-    document.getElementById("homeLink").href = HOME_URL;
+    document.getElementById("homeLink").href    = HOME_URL;
 
-    // Show order reference + tidy URL
     orderRefBadge.textContent = "Ref: " + orderRef;
     try { if (orderRef !== "—") history.replaceState({}, "", location.pathname + "?orderRef=" + encodeURIComponent(orderRef)); } catch {}
 
@@ -107,11 +97,12 @@
       } catch {}
     });
 
-    // Celebration + reassurance
+    // Celebrate immediately (payment accepted)
     fireConfetti(900);
     setTimeout(()=> reassure.style.display = "block", 35000);
 
-    // Progressive enhancement: poll status endpoint if present
+    // Optional: wire this later to flip to “Tickets confirmed”
+    // window.__ORDER_STATUS_ENDPOINT__ = "/api/orders";
     const endpoint = window.__ORDER_STATUS_ENDPOINT__;
     if (endpoint && orderRef && orderRef !== "—") {
       const poll = async (tries=30) => {
@@ -124,7 +115,7 @@
           if (s === "FULFILLED") {
             statusBadge.textContent = "Tickets confirmed";
             statusBadge.className = "badge good";
-            // Optional: if you return tickets, you can render them:
+            // If you return numbers, you can render them:
             // renderTickets(o.tickets);
             return;
           }
@@ -141,7 +132,7 @@
       poll();
     }
 
-    // Minimal confetti (brand colours)
+    // Brand confetti (tiny, self-contained)
     function fireConfetti(duration=900){
       const c = document.getElementById("confetti");
       const ctx = c.getContext("2d");
@@ -176,7 +167,6 @@
       addEventListener("resize", ()=>{ W = c.width = innerWidth; H = c.height = innerHeight; });
     }
 
-    // Optional: ticket chips if your endpoint returns numbers later
     function renderTickets(arr){
       if (!Array.isArray(arr) || !arr.length) return;
       const sep = document.createElement("div"); sep.className = "hr";

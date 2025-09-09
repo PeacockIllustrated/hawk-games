@@ -5,92 +5,131 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Hawk Games — Order Confirmation</title>
   <style>
-    :root { --ink:#0f1115; --muted:#6b7280; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; --card:#161a22; --line:#232836; --fg:#e5e7eb; }
-    *{box-sizing:border-box} body{margin:0;background:#0b0f15;color:var(--fg);font:16px/1.5 system-ui,Segoe UI,Roboto,Inter,sans-serif}
-    .wrap{max-width:720px;margin:6vh auto;padding:24px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 10px 28px rgba(0,0,0,.35)}
-    h1{margin:0 0 12px;font-size:28px;letter-spacing:.2px}
-    p{margin:8px 0;color:#cdd3df}
+    :root { --ink:#0b0f15; --fg:#e8ecf4; --muted:#a3adc2; --line:#232836; --card:#161a22; --ok:#10b981; --cta:#111827; }
+    *{box-sizing:border-box} body{margin:0;background:var(--ink);color:var(--fg);font:16px/1.55 system-ui,Segoe UI,Inter,Roboto,sans-serif}
+    .wrap{max-width:760px;margin:6vh auto;padding:20px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 12px 28px rgba(0,0,0,.35)}
+
+    h1{margin:0 0 12px;font-size:28px}
+    p{margin:8px 0;color:#cfd6e6}
     .muted{color:var(--muted)}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .badge{padding:6px 10px;border-radius:999px;font-weight:600;font-size:12px;border:1px solid var(--line)}
+    .hr{height:1px;background:var(--line);margin:18px 0}
+
+    .badge{padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid var(--line)}
     .pending{background:#0b1020;color:#c8d3ff;border-color:#2a3570}
     .good{background:#0e1a14;color:#bff3d4;border-color:#1d503b}
-    .bad{background:#1c1012;color:#ffc9c9;border-color:#582326}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);text-decoration:none;color:var(--fg)}
+
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);text-decoration:none;color:var(--fg)}
     .btn:hover{border-color:#3a425c}
-    .btn.primary{background:#111827}
+    .btn.primary{background:var(--cta)}
+    .small{font-size:13px}
+
+    .copy{padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#101624;color:#e7ebf5;cursor:pointer}
     .tickets{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;margin-top:10px}
     .ticket{background:#0c1220;border:1px dashed #2a3570;border-radius:10px;padding:8px 10px;text-align:center;font-weight:700}
-    .hr{height:1px;background:var(--line);margin:18px 0}
-    .small{font-size:13px}
-    .skeleton{position:relative;overflow:hidden;background:#0e1422;border-radius:8px;height:14px}
-    .skeleton::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);animation:sh 1.2s infinite}
-    @keyframes sh{to{transform:translateX(100%)}}
+
+    /* Checkmark animation */
+    .checkwrap{display:flex;align-items:center;gap:14px;margin:8px 0 2px}
+    .tick{width:38px;height:38px}
+    .tick circle{stroke:#1d503b;stroke-width:4;fill:none;opacity:.65}
+    .tick path{stroke:var(--ok);stroke-width:4;fill:none;stroke-linecap:round;stroke-linejoin:round;
+      stroke-dasharray:48;stroke-dashoffset:48;animation:draw .9s ease forwards .2s}
+    @keyframes draw{to{stroke-dashoffset:0}}
+
+    /* Confetti (tiny, no lib) */
+    canvas#confetti{position:fixed;inset:0;pointer-events:none;opacity:.9}
+
+    /* Promo strip (future cross-sell) */
+    .promo{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+    .promo .tile{display:flex;justify-content:space-between;align-items:center;background:#0f1524;border:1px solid #273155;border-radius:12px;padding:12px 14px}
+    .promo .tile b{letter-spacing:.2px}
+    @media (min-width:640px){ .promo{grid-template-columns:1fr 1fr} }
   </style>
 </head>
 <body>
+  <canvas id="confetti"></canvas>
+
   <div class="wrap">
     <div class="card">
       <h1>Order confirmation</h1>
       <div class="row" id="statusRow">
-        <span class="badge pending" id="statusBadge">Checking payment…</span>
+        <span class="badge pending" id="statusBadge">Payment received — assigning tickets…</span>
         <span class="mono small" id="orderRefBadge"></span>
-        <button id="copyBtn" class="btn small" style="margin-left:auto">Copy ref</button>
+        <button id="copyBtn" class="copy">Copy ref</button>
       </div>
 
       <div class="hr"></div>
 
       <div id="content">
-        <p class="muted">We’re confirming your payment and assigning tickets. This usually completes within a few seconds.</p>
-        <div class="skeleton" style="width:70%;margin:10px 0;"></div>
-        <div class="skeleton" style="width:55%;margin:10px 0;"></div>
-        <div class="skeleton" style="width:40%;margin:10px 0;"></div>
+        <div class="checkwrap">
+          <svg class="tick" viewBox="0 0 48 48" aria-hidden="true">
+            <circle cx="24" cy="24" r="20"></circle>
+            <path d="M14 24l7 7 14-14"></path>
+          </svg>
+          <div>
+            <p style="margin:0"><strong>Thanks — your payment was successful.</strong></p>
+            <p class="muted" style="margin:2px 0 0">We’re assigning your tickets now. This usually finishes within a few seconds.</p>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <p class="small muted" id="reassure" style="display:none">
+          This is taking longer than usual. Your payment <em>has</em> been received — our system will finish assigning your tickets shortly.
+          You’ll get an email the moment it’s done. You can also find your entries any time on the button below.
+        </p>
+
+        <div class="row" style="margin-top:8px">
+          <a id="accountLink" class="btn primary" href="/app/account.html">View my entries</a>
+          <a id="homeLink" class="btn" href="/app/">Back to comps</a>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="promo">
+          <a class="tile" href="/app/">
+            <span><b>Try your luck on the Spinner</b><br><span class="small muted">Instant-win site credit & prizes</span></span>
+            <span class="btn">Play now</span>
+          </a>
+          <a class="tile" href="/app/">
+            <span><b>Explore current competitions</b><br><span class="small muted">Fresh prizes added regularly</span></span>
+            <span class="btn">Enter</span>
+          </a>
+        </div>
+
+        <p class="small muted" style="margin-top:12px">
+          Need help? Email <a href="mailto:support@the-hawk-games.co.uk">support@the-hawk-games.co.uk</a>.
+        </p>
       </div>
-
-      <div class="hr"></div>
-
-      <div class="row">
-        <a id="accountLink" class="btn primary" href="/app/account.html">View my entries</a>
-        <a id="homeLink" class="btn" href="/app/">Back to comps</a>
-      </div>
-
-      <p class="small muted" style="margin-top:12px">
-        If your tickets don’t appear after a minute, don’t panic — your order is safe. You’ll receive an email with your ticket numbers once fulfilment completes.
-        For help, email <a href="mailto:support@the-hawk-games.co.uk">support@the-hawk-games.co.uk</a>.
-      </p>
     </div>
   </div>
 
   <script type="module">
-    // --- Adjust these to your routes/brands if needed ---
-    const ACCOUNT_URL = "/app/account.html";   // where "My Entries" lives
-    const HOME_URL    = "/app/";               // comps listing
-    // ---------------------------------------------------
+    // --- Configurable paths ---
+    const ACCOUNT_URL = "/app/account.html";
+    const HOME_URL    = "/app/";
+    // Optional: if you add an order status endpoint later, set window.__ORDER_STATUS_ENDPOINT__ = "/api/orders";
+    // It should return JSON { status: "PENDING"|"FULFILLED"|"FAILED", tickets?: number[] }
+    // --------------------------
 
-    // 1) Read orderRef from Trust return url (support common variants)
     const qs = new URLSearchParams(location.search);
-    const orderRef = qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference");
+    const orderRef =
+      qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || "—";
+
     const statusBadge = document.getElementById("statusBadge");
     const orderRefBadge = document.getElementById("orderRefBadge");
-    const content = document.getElementById("content");
     const copyBtn = document.getElementById("copyBtn");
+    const reassure = document.getElementById("reassure");
 
     document.getElementById("accountLink").href = ACCOUNT_URL;
     document.getElementById("homeLink").href = HOME_URL;
 
-    if (!orderRef) {
-      statusBadge.textContent = "Missing order reference";
-      statusBadge.className = "badge bad";
-      content.innerHTML = `<p>We couldn’t detect your order reference in the URL.</p>
-      <p class="small muted">If you came from your bank page, use the link in your email receipt or go to <a href="${ACCOUNT_URL}">My Entries</a>.</p>`;
-      copyBtn.style.display = "none";
-      throw new Error("No orderRef in querystring");
-    }
-    orderRefBadge.textContent = `Ref: ${orderRef}`;
-    // Tidy the URL (remove query noise)
-    try { history.replaceState({}, "", location.pathname + "?orderRef=" + encodeURIComponent(orderRef)); } catch {}
+    // Show the reference and tidy URL
+    orderRefBadge.textContent = "Ref: " + orderRef;
+    try { if (orderRef !== "—") history.replaceState({}, "", location.pathname + "?orderRef=" + encodeURIComponent(orderRef)); } catch {}
 
     copyBtn.addEventListener("click", async () => {
       await navigator.clipboard.writeText(orderRef);
@@ -98,116 +137,84 @@
       setTimeout(()=> copyBtn.textContent = "Copy ref", 1200);
     });
 
-    // 2) Firestore read-only listener (no writes here, fulfilment is webhook-only)
-    // Import your existing Firebase init if you have one:
-    
-  import { auth, db } from "/app/js/firebase-init.js"; // <- your module
-  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    // Celebrate immediately (payment accepted)
+    fireConfetti(800); // duration ms
 
+    // Reassurance message if still here after 35s
+    setTimeout(()=> reassure.style.display = "block", 35000);
 
-    // 3) Render helpers
-    function renderPending(order) {
-      statusBadge.textContent = "Payment received — assigning tickets…";
-      statusBadge.className = "badge pending";
-      const eta = order?.createdAt ? "" : "";
-      content.innerHTML = `
-        <p><strong>Thanks — your payment was successful.</strong></p>
-        <p class="muted">We’re assigning your tickets now. This can take a few seconds if our payment provider is retrying a webhook.</p>
-        <div class="skeleton" style="width:70%;margin:10px 0;"></div>
-        <div class="skeleton" style="width:55%;margin:10px 0;"></div>
-      `;
-    }
-
-    function renderFulfilled(order) {
-      statusBadge.textContent = "Tickets confirmed";
-      statusBadge.className = "badge good";
-      const tickets = Array.isArray(order?.tickets) ? order.tickets : [];
-      const comp = order?.competitionTitle || order?.competitionId || "Competition";
-      const amount = formatMoney(order?.amount, order?.currency || "GBP");
-      content.innerHTML = `
-        <p><strong>You’re in!</strong> Here are your details:</p>
-        <div class="hr"></div>
-        <p><span class="muted">Competition:</span> ${escapeHtml(comp)}</p>
-        <p><span class="muted">Amount:</span> ${amount}</p>
-        <p><span class="muted">Tickets:</span></p>
-        <div class="tickets">${tickets.map(n => `<div class="ticket">#${n}</div>`).join("") || `<div class="ticket">Issued</div>`}</div>
-        <div class="hr"></div>
-        <p class="small muted">A receipt with your ticket numbers has been emailed to you.</p>
-      `;
-    }
-
-    function renderFailed(order, reason = "Payment failed or cancelled") {
-      statusBadge.textContent = "Order not completed";
-      statusBadge.className = "badge bad";
-      content.innerHTML = `
-        <p><strong>${escapeHtml(reason)}</strong></p>
-        <p class="muted">If money left your account, don’t worry — we’ll automatically reverse it if the transaction didn’t settle. You can also contact support with your order reference.</p>
-      `;
-    }
-
-    function renderStuck() {
-      // After ~30–45s without FULFILLED, reassure the user
-      content.insertAdjacentHTML("beforeend", `
-        <div class="hr"></div>
-        <p class="small muted">This is taking longer than usual. Your payment <em>has</em> been received — our system will finish assigning your tickets shortly. You’ll get an email the moment it’s done.</p>
-      `);
-    }
-
-    function formatMoney(pennies, currency) {
-      if (typeof pennies !== "number") return "—";
-      return new Intl.NumberFormat("en-GB", { style:"currency", currency }).format(pennies/100);
-    }
-    function escapeHtml(s){return (s??"").toString().replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;" }[m]))}
-
-    // 4) Start listening
-    // If rules require auth, this gracefully waits for the session. If not, it still proceeds.
-    let stuckTimer;
-    onAuthStateChanged(auth, () => start());
-
-    async function start() {
+    // Progressive enhancement: check status endpoint if provided (no dependency)
+    const endpoint = window.__ORDER_STATUS_ENDPOINT__;
+    if (endpoint && orderRef && orderRef !== "—") {
       try {
-        const ref = doc(db, "orders", orderRef);
-        // Prime: if doc missing initially, show pending UI and keep listening.
-        const snap0 = await getDoc(ref).catch(()=>null);
-        renderPending(snap0?.data());
-
-        // Realtime updates: webhook will flip status → FULFILLED and attach tickets[]
-        onSnapshot(ref, (snap) => {
-          if (!snap.exists()) {
-            // Keep showing pending; webhook will create/update shortly.
-            statusBadge.textContent = "Confirming payment…";
+        const poll = async (tries=30) => {
+          const u = `${endpoint.replace(/\/$/,'')}/${encodeURIComponent(orderRef)}`;
+          const res = await fetch(u, { headers: { "Accept":"application/json" }});
+          if (!res.ok) throw 0;
+          const o = await res.json().catch(()=> ({}));
+          const s = (o.status || "").toUpperCase();
+          if (s === "FULFILLED") {
+            statusBadge.textContent = "Tickets confirmed";
+            statusBadge.className = "badge good";
+            // Optional: render ticket numbers if provided
+            // renderTickets(o.tickets);
+            return;
+          }
+          if (s === "FAILED") {
+            statusBadge.textContent = "Order not completed";
             statusBadge.className = "badge pending";
             return;
           }
-          const o = snap.data();
-          const status = (o.status || "").toUpperCase();
+          if (tries > 0) setTimeout(()=>poll(tries-1), 1200);
+        };
+        poll();
+      } catch { /* silent — page remains in 'assigning' state */ }
+    }
 
-          if (!stuckTimer) stuckTimer = setTimeout(renderStuck, 35000);
-
-          if (status === "FULFILLED") {
-            clearTimeout(stuckTimer);
-            renderFulfilled(o);
-          } else if (status === "FAILED" || status === "DECLINED" || status === "CANCELLED") {
-            clearTimeout(stuckTimer);
-            renderFailed(o, o.failureReason || "Payment failed or cancelled");
-          } else {
-            renderPending(o); // PENDING / AUTHORISED
-          }
-        }, (err) => {
-          // Permission denied etc.
-          statusBadge.textContent = "Almost there — sign in required";
-          statusBadge.className = "badge pending";
-          content.innerHTML = `
-            <p><strong>Please sign in to view your order details.</strong></p>
-            <p class="small muted">Once signed in, come back to this page or visit <a href="${ACCOUNT_URL}">My Entries</a>. Your tickets are safe.</p>
-          `;
-          console.error(err);
+    // --- Minimal confetti (tiny, self-contained) ---
+    function fireConfetti(duration=800){
+      const c = document.getElementById("confetti");
+      const ctx = c.getContext("2d");
+      let W = c.width = innerWidth, H = c.height = innerHeight;
+      const N = Math.min(140, Math.floor(W/12));
+      const parts = Array.from({length:N}, () => ({
+        x: Math.random()*W, y: -10-Math.random()*40, r: 3+Math.random()*4,
+        vx: -1+Math.random()*2, vy: 2+Math.random()*3, rot: Math.random()*6.28, vr: -0.2+Math.random()*0.4,
+        s: Math.random()*0.6+0.4
+      }));
+      let t0 = performance.now();
+      const draw = (t)=>{
+        const dt = (t - t0); t0 = t;
+        ctx.clearRect(0,0,W,H);
+        parts.forEach(p=>{
+          p.x += p.vx * (dt/16);
+          p.y += p.vy * (dt/16);
+          p.rot += p.vr * (dt/16);
+          if (p.y > H+20) p.y = -10, p.x = Math.random()*W;
+          ctx.save();
+          ctx.translate(p.x,p.y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha = p.s;
+          // rectangles as shards
+          ctx.fillStyle = Math.random()<.33 ? "#bff3d4" : (Math.random()<.5 ? "#6ea4ff" : "#e8ecf4");
+          ctx.fillRect(-p.r, -p.r, p.r*2, p.r*0.6);
+          ctx.restore();
         });
-      } catch (e) {
-        renderFailed(null, "We hit a snag while loading your order");
-        console.error(e);
-      }
+        if (t - start < duration) requestAnimationFrame(draw); else ctx.clearRect(0,0,W,H);
+      };
+      const start = performance.now();
+      requestAnimationFrame(draw);
+      addEventListener("resize", ()=>{ W = c.width = innerWidth; H = c.height = innerHeight; });
+    }
+
+    // Optional: ticket rendering stub if you wire endpoint later
+    function renderTickets(arr){
+      if (!Array.isArray(arr) || !arr.length) return;
+      const div = document.createElement("div");
+      div.className = "tickets";
+      div.innerHTML = arr.map(n=>`<div class="ticket">#${n}</div>`).join("");
+      document.querySelector(".card").appendChild(document.createElement("div")).className="hr";
+      document.querySelector(".card").appendChild(div);
     }
   </script>
 </body>

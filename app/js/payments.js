@@ -6,7 +6,7 @@
 import {
   getFunctions,
   httpsCallable,
-} from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-functions.js";
 import { app } from "./auth.js";
 
 // Explicit region to match Functions v2 deployment ("us-central1")

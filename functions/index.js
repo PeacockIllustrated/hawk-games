@@ -1,45 +1,42 @@
 // functions/index.js
-// ESM build — ensure functions/package.json has: { "type": "module" }
+// Pure ESM. Ensure functions/package.json has: { "type": "module", "engines": { "node": "20" } }
 
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { defineSecret } from "firebase-functions/params";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { z } from "zod";
 
-// -----------------------------------------------------------------------------
-// Admin init (idempotent) + DB
-// -----------------------------------------------------------------------------
+// -------------------- Firebase Admin --------------------
 if (!getApps().length) initializeApp();
 const db = getFirestore();
 
-// -----------------------------------------------------------------------------
-// Global options
-// -----------------------------------------------------------------------------
-const REGION = "us-central1";
+// -------------------- Shared options --------------------
 const functionOptions = {
-  region: REGION,
+  region: "us-central1",
   enforceAppCheck: true,
+  cors: [
+    "https://the-hawk-games-64239.web.app",
+    "https://the-hawk-games.co.uk",
+    "https://the-hawk-games-staging.netlify.app",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+  ],
 };
 
-// -----------------------------------------------------------------------------
-// Secrets (declare once here; add to each function's `secrets:[…]` when used)
-// -----------------------------------------------------------------------------
-const TRUST_MODE = defineSecret("TRUST_MODE"); // "test" | "live" (defaults to live)
-const TRUST_SITEREFERENCE = defineSecret("TRUST_SITEREFERENCE"); // required
+// -------------------- Secrets --------------------
+const TRUST_MODE = defineSecret("TRUST_MODE"); // "test" | "live" (default live)
+const TRUST_SITEREFERENCE = defineSecret("TRUST_SITEREFERENCE");
 const TRUST_TEST_SITEREFERENCE = defineSecret("TRUST_TEST_SITEREFERENCE"); // optional
-const RETURN_URL_SUCCESS = defineSecret("RETURN_URL_SUCCESS"); // required
-const RETURN_URL_CANCEL = defineSecret("RETURN_URL_CANCEL"); // required
-const NOTIFICATION_URL = defineSecret("NOTIFICATION_URL"); // required
-const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // required (we send + verify)
-const TRUST_SITE_SECURITY_PASSWORD = defineSecret("TRUST_SITE_SECURITY_PASSWORD"); // required for site security hash
+const RETURN_URL_SUCCESS = defineSecret("RETURN_URL_SUCCESS");
+const RETURN_URL_CANCEL = defineSecret("RETURN_URL_CANCEL");
+const NOTIFICATION_URL = defineSecret("NOTIFICATION_URL");
+const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // Site Security password (NOT an API user PW)
 
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
+// -------------------- Small helpers --------------------
 const nowServer = () => FieldValue.serverTimestamp();
 
 const readSecret = (secret, name, { allowEmpty = false } = {}) => {
@@ -48,29 +45,16 @@ const readSecret = (secret, name, { allowEmpty = false } = {}) => {
     if (!allowEmpty && !v) throw new Error(`${name} empty`);
     return v || "";
   } catch (e) {
-    logger.error(`Secret ${name} unavailable/undeclared`, { err: e?.message || e });
+    logger.error(`Secret ${name} unavailable/undeclared`, e);
     throw new HttpsError("failed-precondition", `Missing or undeclared secret: ${name}`);
   }
 };
 
-// Safely read optional secret without throwing if undeclared
-const trySecret = (secret) => {
-  try {
-    return secret.value() || "";
-  } catch {
-    return "";
-  }
-};
-
 const getMode = () => {
-  const raw = trySecret(TRUST_MODE);
-  const v = (raw || "live").toLowerCase();
+  const v = (readSecret(TRUST_MODE, "TRUST_MODE", { allowEmpty: true }) || "live").toLowerCase();
   return v === "test" ? "test" : "live";
 };
 
-/**
- * Parse x-www-form-urlencoded body if received as raw bytes.
- */
 const readUrlEncoded = (req) => {
   try {
     const raw = req.rawBody?.toString("utf8") || "";
@@ -83,58 +67,17 @@ const readUrlEncoded = (req) => {
   }
 };
 
-/**
- * UTC timestamp in "YYYY-MM-DD HH:mm:ss" format for Trust Payments hashing.
- * @returns {string}
- */
-const getUtcTimestamp = () => {
-  const d = new Date();
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const min = String(d.getUTCMinutes()).padStart(2, "0");
-  const ss = String(d.getUTCSeconds()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
-};
-
-/**
- * Build Site Security hash per Trust docs (values only, omit blanks), SHA-256 hex lowercase, prefixed with "h".
- * @param {string[]} valuesInOrder - ordered, non-empty values to hash (timestamp must be last before password).
- * @param {string} password - site security password (shared secret)
- * @returns {string}
- */
-const buildSiteSecurityHash = (valuesInOrder, password) => {
-  const toHash = valuesInOrder.join("") + password;
-  const h = crypto.createHash("sha256").update(toHash, "utf8").digest("hex").toLowerCase();
-  return "h" + h;
-};
-
-// Auth helpers used by business functions
+// -------------------- Auth/Admin guards (stubs you can replace) --------------------
 const assertIsAuthenticated = (request) => {
-  const uid = request?.auth?.uid || null;
-  if (!uid) throw new HttpsError("unauthenticated", "Authentication required.");
-  return uid;
+  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Please sign in.");
 };
 
 const assertIsAdmin = async (request) => {
-  const uid = assertIsAuthenticated(request);
-  // Accept either a custom claim or users/{uid}.isAdmin flag
-  const fromClaims = request.auth?.token?.admin === true || request.auth?.token?.isAdmin === true;
-  if (fromClaims) return true;
-
-  try {
-    const snap = await db.collection("users").doc(uid).get();
-    if (snap.exists && snap.data()?.isAdmin === true) return true;
-  } catch (e) {
-    // fall through
-  }
-  throw new HttpsError("permission-denied", "Admin privileges required.");
+  const isAdmin = request.auth?.token?.admin === true || request.auth?.token?.role === "admin";
+  if (!isAdmin) throw new HttpsError("permission-denied", "Admin only.");
 };
 
-// -----------------------------------------------------------------------------
-// Ticket fulfilment (idempotent). Writes to both global & per-competition entries.
-// -----------------------------------------------------------------------------
+// -------------------- Fulfilment (tickets & counts) --------------------
 const fulfilOrderTickets = async (orderId) => {
   const orderRef = db.collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
@@ -150,12 +93,10 @@ const fulfilOrderTickets = async (orderId) => {
 
   const items = Array.isArray(order.items) ? order.items : [];
   const userId = order.userId || null;
-  const userDisplayName = order.userDisplayName || "N/A";
 
   await db.runTransaction(async (tx) => {
     for (const it of items) {
-      if (!it || it.kind !== "tickets") continue;
-
+      if (it?.kind !== "tickets") continue;
       const compId = it.compId;
       const qty = Number(it.qty || 0);
       if (!compId || qty <= 0) continue;
@@ -173,31 +114,15 @@ const fulfilOrderTickets = async (orderId) => {
       const allocated = [];
       for (let i = 1; i <= qty; i++) allocated.push(ticketsSold + i);
 
-      // Global entries collection (kept for analytics)
-      const entryRefGlobal = db.collection("entries").doc();
-      tx.set(entryRefGlobal, {
+      const entryRef = db.collection("entries").doc();
+      tx.set(entryRef, {
         orderId,
         userId,
-        userDisplayName,
         compId,
         qty,
         ticketNumbers: allocated,
         createdAt: nowServer(),
         source: "trust",
-        entryType: "paid",
-      });
-
-      // Legacy per-competition subcollection (kept for compatibility)
-      const entryRefLegacy = compRef.collection("entries").doc();
-      tx.set(entryRefLegacy, {
-        userId,
-        userDisplayName,
-        ticketsBought: qty,
-        ticketStart: ticketsSold,
-        ticketEnd: ticketsSold + qty - 1,
-        enteredAt: nowServer(),
-        entryType: "paid",
-        orderId,
       });
 
       tx.update(compRef, {
@@ -216,12 +141,10 @@ const fulfilOrderTickets = async (orderId) => {
   logger.info("fulfilOrderTickets: success", { orderId });
 };
 
-// -----------------------------------------------------------------------------
-// Trust Payments — createTrustOrder (Callable)
-// -----------------------------------------------------------------------------
+// -------------------- createTrustOrder (callable) --------------------
 export const createTrustOrder = onCall(
   {
-    region: REGION,
+    region: "us-central1",
     enforceAppCheck: true,
     secrets: [
       TRUST_MODE,
@@ -230,74 +153,42 @@ export const createTrustOrder = onCall(
       RETURN_URL_SUCCESS,
       RETURN_URL_CANCEL,
       NOTIFICATION_URL,
-      TRUST_NOTIFY_PASSWORD,
-      TRUST_SITE_SECURITY_PASSWORD,
     ],
   },
   async (req) => {
     try {
-      const data = req?.data || {};
-
-      // Accept both shapes: { compId, qty } or { intent: { type:'tickets', compId, ticketsBought } }
-      const rawCompId =
-        data.compId ||
-        data.competitionId ||
-        data.cid ||
-        data.id ||
-        data?.intent?.compId ||
-        data?.intent?.competitionId ||
-        data?.intent?.cid ||
-        data?.intent?.id ||
-        "";
-      const compId = String(rawCompId || "").trim();
-      const qty = Number(
-        data.qty ?? data.ticketsBought ?? data?.intent?.ticketsBought ?? 1
-      );
-
+      const { compId, qty = 1 } = req.data || {};
       if (!compId) throw new HttpsError("invalid-argument", "compId required");
-      if (!Number.isFinite(qty) || qty <= 0)
-        throw new HttpsError("invalid-argument", "qty invalid");
+      if (!Number.isFinite(qty) || qty <= 0) throw new HttpsError("invalid-argument", "qty invalid");
 
       const mode = getMode();
       const isTest = mode === "test";
-      const testSiteRef = trySecret(TRUST_TEST_SITEREFERENCE);
+
       const siteRef = isTest
-        ? (testSiteRef || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
+        ? (TRUST_TEST_SITEREFERENCE.value() || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
         : readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
 
       const successUrl = readSecret(RETURN_URL_SUCCESS, "RETURN_URL_SUCCESS");
       const cancelUrl = readSecret(RETURN_URL_CANCEL, "RETURN_URL_CANCEL");
       const notifyUrl = readSecret(NOTIFICATION_URL, "NOTIFICATION_URL");
-      const notifyPwd = readSecret(
-        TRUST_NOTIFY_PASSWORD,
-        "TRUST_NOTIFY_PASSWORD"
-      ).trim();
-      const siteSecurityPwd = readSecret(
-        TRUST_SITE_SECURITY_PASSWORD,
-        "TRUST_SITE_SECURITY_PASSWORD"
-      ).trim();
 
-      // --- Price discovery ---
       const compSnap = await db.collection("competitions").doc(compId).get();
       if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
       const comp = compSnap.data();
 
-      let unitPricePence = null;
-      const currencyiso3a = "GBP";
-      if (typeof comp?.ticketPricePence === "number") unitPricePence = comp.ticketPricePence;
-      else if (typeof comp?.pricePence === "number") unitPricePence = comp.pricePence;
-      else if (Array.isArray(comp?.ticketTiers) && comp.ticketTiers.length) {
-        const t0 = comp.ticketTiers[0];
-        if (t0?.price && t0?.amount) unitPricePence = Math.round((Number(t0.price) / Number(t0.amount)) * 100);
-      }
+      const unitPricePence =
+        typeof comp?.ticketPricePence === "number"
+          ? comp.ticketPricePence
+          : typeof comp?.pricePence === "number"
+          ? comp.pricePence
+          : null;
 
-      if (unitPricePence == null)
-        throw new HttpsError("failed-precondition", "Competition missing price (ticketPricePence/pricePence).");
+      if (unitPricePence === null)
+        throw new HttpsError("failed-precondition", "Competition missing ticket price (ticketPricePence/pricePence).");
 
       const amountPence = unitPricePence * qty;
-      const mainamount = (amountPence / 100).toFixed(2); // "12.99"
+      const mainamount = (amountPence / 100).toFixed(2);
 
-      // --- Create order doc ---
       const orderRef = db.collection("orders").doc();
       await orderRef.set({
         userId: req.auth?.uid || null,
@@ -305,7 +196,7 @@ export const createTrustOrder = onCall(
         type: "tickets",
         items: [{ kind: "tickets", compId, qty }],
         amountPence,
-        currency: currencyiso3a,
+        currency: "GBP",
         status: "created",
         provider: "trust",
         isTest,
@@ -313,38 +204,17 @@ export const createTrustOrder = onCall(
         updatedAt: nowServer(),
       });
 
-      // --- Site Security Hashing ---
-      const sitesecuritytimestamp = getUtcTimestamp();
-      const hashString = [
-        currencyiso3a,
-        mainamount,
-        siteRef,
-        orderRef.id,
-        sitesecuritytimestamp,
-        siteSecurityPwd,
-      ].join("");
-
-      const sitesecurity =
-        "h" + crypto.createHash("sha256").update(hashString).digest("hex");
-
-      // --- HPP fields ---
       const fields = {
         sitereference: siteRef,
         orderreference: orderRef.id,
-        currencyiso3a,
-        mainamount, // decimal string
-        sitesecurity,
-        sitesecuritytimestamp,
-        // Advanced Redirects (force GET so querystring is preserved)
+        currencyiso3a: "GBP",
+        mainamount, // "12.99"
         successfulurlredirect: `${successUrl}?orderId=${orderRef.id}`,
         declinedurlredirect: `${cancelUrl}?orderId=${orderRef.id}`,
         successfulurlredirectmethod: "GET",
         declinedurlredirectmethod: "GET",
-        // URL Advanced Notification target
         allurlnotification: notifyUrl,
-        // Explicit notification password so Trust echoes it back
-        notificationpassword: notifyPwd,
-        // Prefill (optional)
+        // Optional HPP prefill
         billingemail: req.auth?.token?.email || "",
         billingfirstname: (req.auth?.token?.name || "").split(" ")[0] || "",
         billinglastname: (req.auth?.token?.name || "").split(" ").slice(1).join(" ") || "",
@@ -369,19 +239,12 @@ export const createTrustOrder = onCall(
   }
 );
 
-// -----------------------------------------------------------------------------
-// Trust Payments — webhook (URL Advanced Notification)
-// -----------------------------------------------------------------------------
+// -------------------- trustWebhook (https) --------------------
 export const trustWebhook = onRequest(
   {
-    region: REGION,
-    enforceAppCheck: false, // server-to-server from Trust
-    secrets: [
-      TRUST_NOTIFY_PASSWORD,
-      TRUST_SITEREFERENCE,
-      TRUST_TEST_SITEREFERENCE,
-      TRUST_SITE_SECURITY_PASSWORD,
-    ],
+    ...functionOptions,
+    enforceAppCheck: false, // Trust calls this server-to-server
+    secrets: [TRUST_NOTIFY_PASSWORD],
   },
   async (req, res) => {
     try {
@@ -391,112 +254,48 @@ export const trustWebhook = onRequest(
           ? readUrlEncoded(req)
           : (typeof req.body === "object" && req.body) || readUrlEncoded(req);
 
-      // --- Auth check 1: allow URL token (?t=...) or a body password (notificationpassword / notification_password)
-      const providedPwd = String(
-        (req.query?.t || body.notificationpassword || body.notification_password || "")
-      ).trim();
-      const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
+      const providedPwd = body.notification_password || body.password || "";
+      const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD");
       if (!providedPwd || providedPwd !== expectedPwd) {
-        logger.warn("Webhook rejected: bad password", { ip: req.ip, havePwd: !!providedPwd });
+        logger.warn("Webhook rejected: bad password", { ip: req.ip });
         res.status(401).send("unauthorised");
         return;
       }
 
-      // --- Auth check 2: restrict site reference (if provided)
-      const postSiteRef = String(body.sitereference || "");
-      const allowedSites = new Set(
-        [readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"), trySecret(TRUST_TEST_SITEREFERENCE)]
-          .filter(Boolean)
-          .map((s) => s.trim())
-      );
-      if (!allowedSites.has(postSiteRef)) {
-        logger.warn("Webhook rejected: unknown sitereference", { postSiteRef });
-        res.status(401).send("unauthorised");
-        return;
-      }
-
-      // --- Auth check 3: Site Security Hash ---
-      const siteSecurityPwd = readSecret(
-        TRUST_SITE_SECURITY_PASSWORD,
-        "TRUST_SITE_SECURITY_PASSWORD"
-      ).trim();
-
-      const responseSiteSecurity = String(body.responsesitesecurity || "");
-      const responseSiteSecurityTimestamp = String(
-        body.responsesitesecuritytimestamp || ""
-      );
-
-      // Only perform hash check if a hash is provided.
-      // This maintains backward compatibility if Site Security is not enabled on all orders.
-      if (responseSiteSecurity && responseSiteSecurityTimestamp) {
-        const orderIdForHash = body.orderreference || body.order_reference || "";
-        const orderSnapForHash = await db.collection("orders").doc(orderIdForHash).get();
-        if (orderSnapForHash.exists) {
-          const orderForHash = orderSnapForHash.data();
-          const currencyiso3a = String(orderForHash.currency || body.currencyiso3a || "GBP");
-          const mainamount = (Number(orderForHash.amountPence || 0) / 100).toFixed(2);
-          const hashString = [
-            currencyiso3a,
-            mainamount,
-            postSiteRef,
-            orderIdForHash,
-            responseSiteSecurityTimestamp,
-            siteSecurityPwd,
-          ].join("");
-          const expectedHash =
-            "h" + crypto.createHash("sha256").update(hashString).digest("hex");
-
-          if (responseSiteSecurity !== expectedHash) {
-            logger.warn("Webhook rejected: bad response hash", {
-              orderId: orderIdForHash,
-              have: responseSiteSecurity,
-              want: expectedHash,
-            });
-            res.status(401).send("unauthorised");
-            return;
-          }
-        } else {
-          logger.warn("Webhook rejected: cannot verify hash for unknown order", { orderId: orderIdForHash });
-          res.status(401).send("unauthorised");
-          return;
-        }
-      }
-
-      // Parse core fields
       const orderId = body.orderreference || body.order_reference || "";
-      if (!orderId) {
-        logger.warn("Webhook missing orderreference", { bodyKeys: Object.keys(body || {}) });
-        res.status(400).send("bad request");
-        return;
-      }
-
       const errorcode = String(body.errorcode ?? "");
       const settlestatus = String(body.settlestatus ?? "");
       const paymenttypedescription = body.paymenttypedescription || "";
       const transactionreference = body.transactionreference || "";
+      const sitereference = body.sitereference || "";
+
+      if (!orderId) {
+        logger.warn("Webhook missing orderreference", { body });
+        res.status(400).send("bad request");
+        return;
+      }
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists) {
-        // Return 200 to stop Trust retries; we’ll never see this order
         logger.warn("Webhook order not found", { orderId });
-        res.status(200).send("ok");
+        res.status(200).send("ok"); // 200 so Trust doesn’t retry forever
         return;
       }
 
       const already = orderSnap.data() || {};
-      if (["paid", "failed", "cancelled"].includes(already.status)) {
+      if (already.status === "paid" || already.status === "failed" || already.status === "cancelled") {
         logger.info("Webhook idempotent short-circuit", { orderId, status: already.status });
         res.status(200).send("ok");
         return;
       }
 
-      const success = errorcode === "0"; // Trust: errorcode 0 = authorised
+      const success = errorcode === "0"; // Trust: 0 = authorised
       const baseUpdate = {
         updatedAt: nowServer(),
         provider: "trust",
         providerRef: transactionreference || null,
-        sitereference: postSiteRef || null,
+        sitereference: sitereference || null,
         settlestatus,
         errorcode,
         paymenttypedescription,
@@ -522,21 +321,19 @@ export const trustWebhook = onRequest(
 
       res.status(200).send("ok");
     } catch (err) {
-      // Always 200 to avoid retry storms; log details for triage
       logger.error("trustWebhook error", { msg: err?.message || err, stack: err?.stack });
+      // Always 200 to avoid retry storms; we log everything server-side.
       res.status(200).send("ok");
     }
   }
 );
 
-// -----------------------------------------------------------------------------
-// Safety net: retry any 'paid' orders that haven't been fulfilled
-// -----------------------------------------------------------------------------
+// -------------------- Safety net: retry fulfilment --------------------
 export const retryUnfulfilledPaidOrders = onSchedule(
   {
     schedule: "every 10 minutes",
     timeZone: "Europe/London",
-    region: REGION,
+    region: "us-central1",
   },
   async () => {
     const snap = await db
@@ -559,13 +356,11 @@ export const retryUnfulfilledPaidOrders = onSchedule(
   }
 );
 
-// ============================================================================
-// Existing business functions (ESM-converted, minor fixes only)
-// ============================================================================
+/* ============================
+   EXISTING BUSINESS FUNCTIONS
+   ============================ */
 
-// allocateTicketsAndAwardTokens
-// UPDATED: expectedPrice optional; for 'credit' we price server-side.
-// For 'card' we reject (card is now via Trust HPP).
+// allocateTicketsAndAwardTokens (credit path only)
 export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
   const schema = z.object({
     compId: z.string().min(1),
@@ -580,7 +375,8 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
   }
   const { compId, ticketsBought, expectedPrice, paymentMethod } = validation.data;
 
-  const uid = assertIsAuthenticated(request);
+  assertIsAuthenticated(request);
+  const uid = request.auth.uid;
   const compRef = db.collection("competitions").doc(compId);
   const userRef = db.collection("users").doc(uid);
 
@@ -593,9 +389,8 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
     const [compDoc, userDoc] = await Promise.all([transaction.get(compRef), transaction.get(userRef)]);
     if (!compDoc.exists) throw new HttpsError("not-found", "Competition not found.");
     if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-
-    const compData = compDoc.data() || {};
-    const userData = userDoc.data() || {};
+    const compData = compDoc.data();
+    const userData = userDoc.data();
 
     // Calculate price based on base price per ticket
     if (!Array.isArray(compData.ticketTiers) || compData.ticketTiers.length === 0) {
@@ -604,12 +399,13 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
     const basePricePerTicket = compData.ticketTiers[0].price / compData.ticketTiers[0].amount;
     const priceToCharge = ticketsBought * basePricePerTicket;
 
-    // Back-compat: if expectedPrice provided and mismatched, reject
+    // For backward compatibility, if expectedPrice is provided and mismatched, reject
     if (typeof expectedPrice === "number" && expectedPrice !== priceToCharge) {
       throw new HttpsError("invalid-argument", "Price mismatch. Please refresh and try again.");
     }
 
     // CREDIT flow
+    const entryType = "credit";
     const userCredit = Number(userData.creditBalance || 0);
     if (userCredit < priceToCharge) {
       throw new HttpsError("failed-precondition", "Insufficient credit balance.");
@@ -619,18 +415,15 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
     if (compData.status !== "live") throw new HttpsError("failed-precondition", "Competition is not live.");
     const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
     const limit = compData.userEntryLimit || 75;
-    if (userEntryCount + ticketsBought > limit) throw new HttpsError("failed-precondition", "Entry limit exceeded.");
+    if (userEntryCount + ticketsBought > limit) throw new HttpsError("failed-precondition", `Entry limit exceeded.`);
     const ticketsSoldBefore = compData.ticketsSold || 0;
-    if (ticketsSoldBefore + ticketsBought > compData.totalTickets) {
-      throw new HttpsError("failed-precondition", "Not enough tickets available.");
-    }
+    if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError("failed-precondition", `Not enough tickets available.`);
     const ticketStartNumber = ticketsSoldBefore;
 
     transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsBought) });
     transaction.update(userRef, { [`entryCount.${compId}`]: FieldValue.increment(ticketsBought) });
 
-    // Legacy per-competition subcollection (credit entry)
-    const entryRef = compRef.collection("entries").doc();
+    const entryRef = db.collection("competitions").doc(compId).collection("entries").doc();
     transaction.set(entryRef, {
       userId: uid,
       userDisplayName: userData.displayName || "N/A",
@@ -638,24 +431,9 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
       ticketStart: ticketStartNumber,
       ticketEnd: ticketStartNumber + ticketsBought - 1,
       enteredAt: nowServer(),
-      entryType: "credit",
+      entryType,
     });
 
-    // Optional: also mirror to global entries for consistency
-    const entryGlobal = db.collection("entries").doc();
-    transaction.set(entryGlobal, {
-      orderId: null,
-      userId: uid,
-      userDisplayName: userData.displayName || "N/A",
-      compId,
-      qty: ticketsBought,
-      ticketNumbers: Array.from({ length: ticketsBought }, (_, i) => ticketStartNumber + i + 1),
-      createdAt: nowServer(),
-      source: "credit",
-      entryType: "credit",
-    });
-
-    // Award tokens if configured
     let awardedTokens = [];
     if (compData.instantWinsConfig?.enabled === true) {
       const newTokens = [];
@@ -663,9 +441,9 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
       for (let i = 0; i < ticketsBought; i++) {
         newTokens.push({
           tokenId: crypto.randomBytes(16).toString("hex"),
-          compId: compId,
+          compId,
           compTitle: compData.title,
-          earnedAt: earnedAt,
+          earnedAt,
         });
       }
       transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
@@ -676,37 +454,43 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
   });
 });
 
-// getRevenueAnalytics (unchanged logic; ESM)
+// getRevenueAnalytics
 export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
   await assertIsAdmin(request);
 
   const competitionsSnapshot = await db.collection("competitions").get();
   let totalRevenue = 0;
 
-  for (const docSnap of competitionsSnapshot.docs) {
-    const compId = docSnap.id;
+  for (const doc of competitionsSnapshot.docs) {
+    const compId = doc.id;
     const entriesRef = db.collection("competitions").doc(compId).collection("entries");
     const entriesSnapshot = await entriesRef.where("entryType", "==", "paid").get();
 
     let competitionRevenue = 0;
     entriesSnapshot.forEach((entryDoc) => {
       const entryData = entryDoc.data();
-      const competitionData = docSnap.data();
-      const tier = (competitionData.ticketTiers || []).find((t) => t.amount === entryData.ticketsBought);
-      if (tier) competitionRevenue += tier.price;
+      const competitionData = doc.data();
+      const tier = competitionData.ticketTiers?.find((t) => t.amount === entryData.ticketsBought);
+      if (tier) {
+        competitionRevenue += tier.price;
+      }
     });
     totalRevenue += competitionRevenue;
   }
 
   const spinWinsSnapshot = await db.collection("spin_wins").where("prizeType", "==", "cash").get();
   let totalCost = 0;
-  spinWinsSnapshot.forEach((doc) => { totalCost += doc.data().prizeValue; });
+  spinWinsSnapshot.forEach((w) => {
+    totalCost += w.data().prizeValue;
+  });
 
   const netProfit = totalRevenue - totalCost;
 
   const creditAwardedSnapshot = await db.collection("spin_wins").where("prizeType", "==", "credit").get();
   let totalSiteCreditAwarded = 0;
-  creditAwardedSnapshot.forEach((doc) => { totalSiteCreditAwarded += doc.data().prizeValue; });
+  creditAwardedSnapshot.forEach((w) => {
+    totalSiteCreditAwarded += w.data().prizeValue;
+  });
 
   const creditSpentSnapshot = await db.collectionGroup("entries").where("entryType", "==", "credit").get();
   let totalSiteCreditSpent = 0;
@@ -714,8 +498,10 @@ export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
     const entryData = doc.data();
     const compDoc = await db.collection("competitions").doc(doc.ref.parent.parent.id).get();
     const competitionData = compDoc.data();
-    const tier = (competitionData.ticketTiers || []).find((t) => t.amount === entryData.ticketsBought);
-    if (tier) totalSiteCreditSpent += tier.price;
+    const tier = competitionData.ticketTiers?.find((t) => t.amount === entryData.ticketsBought);
+    if (tier) {
+      totalSiteCreditSpent += tier.price;
+    }
   }
 
   return { success: true, totalRevenue, totalCost, netProfit, totalSiteCreditAwarded, totalSiteCreditSpent };
@@ -725,27 +511,30 @@ export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
 export const spendSpinToken = onCall(functionOptions, async (request) => {
   const schema = z.object({ tokenId: z.string().min(1) });
   const validation = schema.safeParse(request.data);
-  if (!validation.success) throw new HttpsError("invalid-argument", "A valid tokenId is required.");
-
+  if (!validation.success) {
+    throw new HttpsError("invalid-argument", "A valid tokenId is required.");
+  }
   const { tokenId } = validation.data;
-  const uid = assertIsAuthenticated(request);
+  assertIsAuthenticated(request);
+  const uid = request.auth.uid;
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-
     const userData = userDoc.data();
     const userTokens = userData.spinTokens || [];
     const tokenIndex = userTokens.findIndex((t) => t.tokenId === tokenId);
-    if (tokenIndex === -1) throw new HttpsError("not-found", "Spin token not found or already spent.");
+    if (tokenIndex === -1) {
+      throw new HttpsError("not-found", "Spin token not found or already spent.");
+    }
     const updatedTokens = userTokens.filter((t) => t.tokenId !== tokenId);
     transaction.update(userRef, { spinTokens: updatedTokens });
-
     const settingsRef = db.collection("admin_settings").doc("spinnerPrizes");
     const settingsDoc = await settingsRef.get();
-    if (!settingsDoc.exists) throw new HttpsError("internal", "Spinner prize configuration is not available.");
-
+    if (!settingsDoc.exists) {
+      throw new HttpsError("internal", "Spinner prize configuration is not available.");
+    }
     const prizes = settingsDoc.data().prizes || [];
     const cumulativeProbabilities = [];
     let cumulative = 0;
@@ -761,7 +550,6 @@ export const spendSpinToken = onCall(functionOptions, async (request) => {
         break;
       }
     }
-
     if (finalPrize.won) {
       const winLogRef = db.collection("spin_wins").doc();
       transaction.set(winLogRef, {
@@ -777,30 +565,244 @@ export const spendSpinToken = onCall(functionOptions, async (request) => {
         transaction.update(userRef, { cashBalance: FieldValue.increment(finalPrize.value) });
       }
     }
-
     return finalPrize;
   });
 });
 
 // transferCashToCredit
 export const transferCashToCredit = onCall(functionOptions, async (request) => {
-  const schema = z.object({ amount: z.number().positive("Amount must be a positive number.") });
-  const validation = schema.safeParse(request.data);
-  if (!validation.success) throw new HttpsError("invalid-argument", validation.error.errors[0].message);
+  const schema = z.object({
+    amount: z.number().positive("Amount must be a positive number."),
+  });
 
+  const validation = schema.safeParse(request.data);
+  if (!validation.success) {
+    throw new HttpsError("invalid-argument", validation.error.errors[0].message);
+  }
   const { amount } = validation.data;
-  const uid = assertIsAuthenticated(request);
+
+  assertIsAuthenticated(request);
+  const uid = request.auth.uid;
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
+    if (!userDoc.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
 
     const userData = userDoc.data();
     const userCashBalance = userData.cashBalance || 0;
-    if (userCashBalance < amount) throw new HttpsError("failed-precondition", "Insufficient cash balance.");
+
+    if (userCashBalance < amount) {
+      throw new HttpsError("failed-precondition", "Insufficient cash balance.");
+    }
 
     const creditToAdd = amount * 1.5;
+
     transaction.update(userRef, {
       cashBalance: FieldValue.increment(-amount),
-      creditBalance: FieldValue.increment(cred
+      creditBalance: FieldValue.increment(creditToAdd),
+    });
+
+    return { success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd };
+  });
+});
+
+// requestCashPayout
+export const requestCashPayout = onCall(functionOptions, async (request) => {
+  const schema = z.object({
+    amount: z.number().positive("Amount must be a positive number."),
+  });
+
+  const validation = schema.safeParse(request.data);
+  if (!validation.success) {
+    throw new HttpsError("invalid-argument", validation.error.errors[0].message);
+  }
+  const { amount } = validation.data;
+
+  assertIsAuthenticated(request);
+  const uid = request.auth.uid;
+  const userRef = db.collection("users").doc(uid);
+
+  return db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    const userData = userDoc.data();
+    const userCashBalance = userData.cashBalance || 0;
+
+    if (userCashBalance < amount) {
+      throw new HttpsError("failed-precondition", "Insufficient cash balance.");
+    }
+
+    transaction.update(userRef, {
+      cashBalance: FieldValue.increment(-amount),
+    });
+
+    const payoutRequestRef = db.collection("payoutRequests").doc();
+    transaction.set(payoutRequestRef, {
+      userId: uid,
+      amount,
+      status: "pending",
+      requestedAt: nowServer(),
+      userDisplayName: userData.displayName || "N/A",
+      userEmail: userData.email || "N/A",
+    });
+
+    return { success: true, message: "Payout request submitted successfully." };
+  });
+});
+
+// playPlinko
+export const playPlinko = onCall(functionOptions, async (request) => {
+  const schema = z.object({ tokenId: z.string().min(1) });
+  const validation = schema.safeParse(request.data);
+  if (!validation.success) {
+    throw new HttpsError("invalid-argument", "A valid tokenId is required.");
+  }
+  const { tokenId } = validation.data;
+  assertIsAuthenticated(request);
+  const uid = request.auth.uid;
+  const userRef = db.collection("users").doc(uid);
+
+  return db.runTransaction(async (transaction) => {
+    const settingsRef = db.collection("admin_settings").doc("plinkoPrizes");
+    const [userDoc, settingsDoc] = await Promise.all([transaction.get(userRef), transaction.get(settingsRef)]);
+
+    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
+    if (!settingsDoc.exists) throw new HttpsError("internal", "Plinko prize configuration is not available.");
+
+    const userData = userDoc.data();
+    const settings = settingsDoc.data();
+    const PLINKO_ROWS = settings.rows || 12;
+    const payouts = settings.payouts || [];
+    const mode = settings.mode || "server";
+
+    const userTokens = userData.plinkoTokens || [];
+    const tokenIndex = userTokens.findIndex((t) => t.tokenId === tokenId);
+    if (tokenIndex === -1) {
+      throw new HttpsError("not-found", "Plinko token not found or already spent.");
+    }
+    const updatedTokens = userTokens.filter((t) => t.tokenId !== tokenId);
+    transaction.update(userRef, { plinkoTokens: updatedTokens });
+
+    let rights = 0;
+    const steps = [];
+    for (let i = 0; i < PLINKO_ROWS; i++) {
+      let step;
+      if (mode === "weighted") {
+        step = Math.random() < 0.55 ? 1 : -1;
+      } else {
+        step = Math.random() < 0.5 ? -1 : 1;
+      }
+      steps.push(step);
+      if (step === 1) rights++;
+    }
+    const finalSlotIndex = rights;
+
+    const prize = payouts[finalSlotIndex] || { type: "credit", value: 0 };
+    const finalPrize = {
+      won: prize.value > 0,
+      type: prize.type || "credit",
+      value: prize.value || 0,
+    };
+
+    if (finalPrize.won) {
+      const winLogRef = db.collection("plinko_wins").doc();
+      transaction.set(winLogRef, {
+        userId: uid,
+        prizeType: finalPrize.type,
+        prizeValue: finalPrize.value,
+        slotIndex: finalSlotIndex,
+        wonAt: nowServer(),
+        tokenIdUsed: tokenId,
+      });
+      if (finalPrize.type === "credit") {
+        transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
+      }
+    }
+
+    return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };
+  });
+});
+
+// drawWinner (manual)
+export const drawWinner = onCall(functionOptions, async (request) => {
+  const schema = z.object({ compId: z.string().min(1) });
+  const validation = schema.safeParse(request.data);
+  if (!validation.success) {
+    throw new HttpsError("invalid-argument", "Competition ID is required.");
+  }
+  const { compId } = validation.data;
+
+  await assertIsAdmin(request);
+
+  const compRef = db.collection("competitions").doc(compId);
+  const compDoc = await compRef.get();
+  if (!compDoc.exists || compDoc.data().status !== "ended") {
+    throw new HttpsError("failed-precondition", 'Competition must be in "ended" status to be drawn manually.');
+  }
+
+  try {
+    // NOTE: plug in your real draw implementation here
+    const result = { winnerDisplayName: "TBD" };
+    return { success: true, ...result };
+  } catch (error) {
+    logger.error(`Manual draw failed for compId: ${compId}`, error);
+    throw new HttpsError("internal", error.message || "An internal error occurred during the draw.");
+  }
+});
+
+// weeklyTokenCompMaintenance
+export const weeklyTokenCompMaintenance = onSchedule(
+  {
+    schedule: "every monday 12:00",
+    timeZone: "Europe/London",
+    region: "us-central1",
+  },
+  async () => {
+    logger.log("Starting weekly token competition maintenance...");
+
+    const compsRef = db.collection("competitions");
+    const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const snapshot = await compsRef
+      .where("competitionType", "==", "token")
+      .where("status", "==", "live")
+      .where("createdAt", "<=", oneWeekAgo)
+      .get();
+
+    if (snapshot.empty) {
+      logger.log("No old token competitions found needing cleanup. Exiting.");
+    } else {
+      logger.log(`Found ${snapshot.docs.length} old token competitions to process.`);
+    }
+
+    for (const doc of snapshot.docs) {
+      const compId = doc.id;
+      logger.log(`Processing competition ${compId}...`);
+      try {
+        await doc.ref.update({ status: "ended" });
+        logger.log(`Competition ${compId} status set to 'ended'.`);
+        // plug in draw if available
+        // const drawResult = await performDraw(compId);
+        // logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
+      } catch (error) {
+        logger.error(`Failed to process and draw winner for ${compId}`, error);
+      }
+    }
+
+    const liveTokenSnapshot = await compsRef.where("competitionType", "==", "token").where("status", "==", "live").get();
+
+    if (liveTokenSnapshot.size < 3) {
+      logger.warn(
+        `CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`
+      );
+    }
+
+    return null;
+  }
+);

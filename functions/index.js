@@ -1,55 +1,69 @@
 // functions/index.js
-// ESM build. Ensure functions/package.json has: { "type": "module" }
+// ESM build — ensure functions/package.json has: { "type": "module" }
 
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
-import { z } from "zod";
-import crypto from "node:crypto";
-import { defineSecret } from "firebase-functions/params";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
+import crypto from "crypto";
+import { z } from "zod";
 
-// -------------------- Firebase Admin (modular) --------------------
+// -----------------------------------------------------------------------------
+// Admin init (idempotent) + DB
+// -----------------------------------------------------------------------------
 if (!getApps().length) initializeApp();
 const db = getFirestore();
 
-// -------------------- Global options --------------------
+// -----------------------------------------------------------------------------
+// Global options
+// -----------------------------------------------------------------------------
+const REGION = "us-central1";
 const functionOptions = {
-  region: "us-central1",
+  region: REGION,
   enforceAppCheck: true,
-  cors: [
-    "https://the-hawk-games-64239.web.app",
-    "https://the-hawk-games.co.uk",
-    "https://the-hawk-games-staging.netlify.app",
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-  ],
 };
 
-// -------------------- Secrets --------------------
+// -----------------------------------------------------------------------------
+// Secrets (declare once here; add to each function's `secrets:[…]` when used)
+// -----------------------------------------------------------------------------
 const TRUST_MODE = defineSecret("TRUST_MODE"); // "test" | "live" (defaults to live)
-const TRUST_SITEREFERENCE = defineSecret("TRUST_SITEREFERENCE");
+const TRUST_SITEREFERENCE = defineSecret("TRUST_SITEREFERENCE"); // required
 const TRUST_TEST_SITEREFERENCE = defineSecret("TRUST_TEST_SITEREFERENCE"); // optional
-const RETURN_URL_SUCCESS = defineSecret("RETURN_URL_SUCCESS");
-const RETURN_URL_CANCEL = defineSecret("RETURN_URL_CANCEL");
-const NOTIFICATION_URL = defineSecret("NOTIFICATION_URL"); // HTTPS URL of trustWebhook
-const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // Trust "Use site security details" password
+const RETURN_URL_SUCCESS = defineSecret("RETURN_URL_SUCCESS"); // required
+const RETURN_URL_CANCEL = defineSecret("RETURN_URL_CANCEL"); // required
+const NOTIFICATION_URL = defineSecret("NOTIFICATION_URL"); // required
+const TRUST_NOTIFY_PASSWORD = defineSecret("TRUST_NOTIFY_PASSWORD"); // required (we send + verify)
 
-// -------------------- Helpers --------------------
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+const nowServer = () => FieldValue.serverTimestamp();
+
 const readSecret = (secret, name, { allowEmpty = false } = {}) => {
   try {
     const v = secret.value();
     if (!allowEmpty && !v) throw new Error(`${name} empty`);
     return v || "";
   } catch (e) {
-    logger.error(`Secret ${name} unavailable/undeclared`, e);
+    logger.error(`Secret ${name} unavailable/undeclared`, { err: e?.message || e });
     throw new HttpsError("failed-precondition", `Missing or undeclared secret: ${name}`);
   }
 };
 
+// Safely read optional secret without throwing if undeclared
+const trySecret = (secret) => {
+  try {
+    return secret.value() || "";
+  } catch {
+    return "";
+  }
+};
+
 const getMode = () => {
-  const v = (readSecret(TRUST_MODE, "TRUST_MODE", { allowEmpty: true }) || "live").toLowerCase();
+  const raw = trySecret(TRUST_MODE);
+  const v = (raw || "live").toLowerCase();
   return v === "test" ? "test" : "live";
 };
 
@@ -65,19 +79,31 @@ const readUrlEncoded = (req) => {
   }
 };
 
+// Auth helpers used by business functions
 const assertIsAuthenticated = (request) => {
-  if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Please sign in.");
+  const uid = request?.auth?.uid || null;
+  if (!uid) throw new HttpsError("unauthenticated", "Authentication required.");
+  return uid;
 };
 
 const assertIsAdmin = async (request) => {
-  const isAdmin = request.auth?.token?.admin === true || request.auth?.token?.role === "admin";
-  if (!isAdmin) throw new HttpsError("permission-denied", "Admin only.");
+  const uid = assertIsAuthenticated(request);
+  // Accept either a custom claim or users/{uid}.isAdmin flag
+  const fromClaims = request.auth?.token?.admin === true || request.auth?.token?.isAdmin === true;
+  if (fromClaims) return true;
+
+  try {
+    const snap = await db.collection("users").doc(uid).get();
+    if (snap.exists && snap.data()?.isAdmin === true) return true;
+  } catch (e) {
+    // fall through
+  }
+  throw new HttpsError("permission-denied", "Admin privileges required.");
 };
 
-
-const nowServer = () => FieldValue.serverTimestamp();
-
-// -------------------- Fulfilment --------------------
+// -----------------------------------------------------------------------------
+// Ticket fulfilment (idempotent). Writes to both global & per-competition entries.
+// -----------------------------------------------------------------------------
 const fulfilOrderTickets = async (orderId) => {
   const orderRef = db.collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
@@ -93,10 +119,11 @@ const fulfilOrderTickets = async (orderId) => {
 
   const items = Array.isArray(order.items) ? order.items : [];
   const userId = order.userId || null;
+  const userDisplayName = order.userDisplayName || "N/A";
 
   await db.runTransaction(async (tx) => {
     for (const it of items) {
-      if (it?.kind !== "tickets") continue;
+      if (!it || it.kind !== "tickets") continue;
 
       const compId = it.compId;
       const qty = Number(it.qty || 0);
@@ -115,15 +142,31 @@ const fulfilOrderTickets = async (orderId) => {
       const allocated = [];
       for (let i = 1; i <= qty; i++) allocated.push(ticketsSold + i);
 
-      const entryRef = db.collection("entries").doc();
-      tx.set(entryRef, {
+      // Global entries collection (kept for analytics)
+      const entryRefGlobal = db.collection("entries").doc();
+      tx.set(entryRefGlobal, {
         orderId,
         userId,
+        userDisplayName,
         compId,
         qty,
         ticketNumbers: allocated,
         createdAt: nowServer(),
         source: "trust",
+        entryType: "paid",
+      });
+
+      // Legacy per-competition subcollection (kept for compatibility)
+      const entryRefLegacy = compRef.collection("entries").doc();
+      tx.set(entryRefLegacy, {
+        userId,
+        userDisplayName,
+        ticketsBought: qty,
+        ticketStart: ticketsSold,
+        ticketEnd: ticketsSold + qty - 1,
+        enteredAt: nowServer(),
+        entryType: "paid",
+        orderId,
       });
 
       tx.update(compRef, {
@@ -142,10 +185,12 @@ const fulfilOrderTickets = async (orderId) => {
   logger.info("fulfilOrderTickets: success", { orderId });
 };
 
-// -------------------- createTrustOrder --------------------
+// -----------------------------------------------------------------------------
+// Trust Payments — createTrustOrder (Callable)
+// -----------------------------------------------------------------------------
 export const createTrustOrder = onCall(
   {
-    region: "us-central1",
+    region: REGION,
     enforceAppCheck: true,
     secrets: [
       TRUST_MODE,
@@ -154,70 +199,68 @@ export const createTrustOrder = onCall(
       RETURN_URL_SUCCESS,
       RETURN_URL_CANCEL,
       NOTIFICATION_URL,
-      TRUST_NOTIFY_PASSWORD,
+      TRUST_NOTIFY_PASSWORD, // IMPORTANT: declared here because we read it below
     ],
   },
   async (req) => {
     try {
-      const d = req.data || {};
-      const compId = d.compId || d.competitionId || d.cid || d.id || "";
-      const qty = Number(d.qty ?? 1);
+      const data = req?.data || {};
 
-      logger.info("createTrustOrder called", {
-        dataKeys: Object.keys(d),
-        hasCompId: !!compId,
-        qty,
-      });
+      // Accept both shapes: { compId, qty } or { intent: { type:'tickets', compId, ticketsBought } }
+      const rawCompId =
+        data.compId ||
+        data.competitionId ||
+        data.cid ||
+        data.id ||
+        data?.intent?.compId ||
+        data?.intent?.competitionId ||
+        data?.intent?.cid ||
+        data?.intent?.id ||
+        "";
+      const compId = String(rawCompId || "").trim();
+      const qty = Number(
+        data.qty ?? data.ticketsBought ?? data?.intent?.ticketsBought ?? 1
+      );
 
       if (!compId) throw new HttpsError("invalid-argument", "compId required");
-      if (!Number.isFinite(qty) || qty <= 0) throw new HttpsError("invalid-argument", "qty invalid");
+      if (!Number.isFinite(qty) || qty <= 0)
+        throw new HttpsError("invalid-argument", "qty invalid");
 
       const mode = getMode();
       const isTest = mode === "test";
-
-      // Safely read optional test site reference (no throw if unset)
-const testSiteRef = (() => {
-  try { return TRUST_TEST_SITEREFERENCE.value() || ""; } catch { return ""; }
-})();
-const siteRef = isTest
-  ? (testSiteRef || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
-  : readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
+      const testSiteRef = trySecret(TRUST_TEST_SITEREFERENCE);
+      const siteRef = isTest
+        ? (testSiteRef || readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"))
+        : readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE");
 
       const successUrl = readSecret(RETURN_URL_SUCCESS, "RETURN_URL_SUCCESS");
       const cancelUrl = readSecret(RETURN_URL_CANCEL, "RETURN_URL_CANCEL");
       const notifyUrl = readSecret(NOTIFICATION_URL, "NOTIFICATION_URL");
+      const notifyPwd = readSecret(
+        TRUST_NOTIFY_PASSWORD,
+        "TRUST_NOTIFY_PASSWORD"
+      ).trim();
 
+      // --- Price discovery ---
       const compSnap = await db.collection("competitions").doc(compId).get();
       if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
       const comp = compSnap.data();
 
       let unitPricePence = null;
-
-      // New logic: determine price from ticketTiers, like the credit function and client do.
-      if (Array.isArray(comp?.ticketTiers) && comp.ticketTiers.length > 0) {
-        const tier = comp.ticketTiers[0];
-        if (typeof tier.price === 'number' && typeof tier.amount === 'number' && tier.amount > 0) {
-            // Price is in pounds, convert to pence.
-            unitPricePence = Math.round((tier.price / tier.amount) * 100);
-        }
+      if (typeof comp?.ticketPricePence === "number") unitPricePence = comp.ticketPricePence;
+      else if (typeof comp?.pricePence === "number") unitPricePence = comp.pricePence;
+      else if (Array.isArray(comp?.ticketTiers) && comp.ticketTiers.length) {
+        const t0 = comp.ticketTiers[0];
+        if (t0?.price && t0?.amount) unitPricePence = Math.round((Number(t0.price) / Number(t0.amount)) * 100);
       }
 
-      // Fallback to old logic for legacy competitions
-      if (unitPricePence === null) {
-        unitPricePence =
-          typeof comp?.ticketPricePence === "number"
-            ? comp.ticketPricePence
-            : typeof comp?.pricePence === "number"
-            ? comp.pricePence
-            : null;
-      }
-
-      if (unitPricePence === null || !Number.isFinite(unitPricePence))
-        throw new HttpsError("failed-precondition", "Competition missing ticket price (ticketPricePence/pricePence or valid ticketTiers).");
+      if (unitPricePence == null)
+        throw new HttpsError("failed-precondition", "Competition missing price (ticketPricePence/pricePence).");
 
       const amountPence = unitPricePence * qty;
-      const mainamount = (amountPence / 100).toFixed(2);
+      const mainamount = (amountPence / 100).toFixed(2); // "12.99"
 
+      // --- Create order doc ---
       const orderRef = db.collection("orders").doc();
       await orderRef.set({
         userId: req.auth?.uid || null,
@@ -232,22 +275,23 @@ const siteRef = isTest
         createdAt: nowServer(),
         updatedAt: nowServer(),
       });
- 
-      const notifyPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
 
-
+      // --- HPP fields ---
       const fields = {
         sitereference: siteRef,
         orderreference: orderRef.id,
         currencyiso3a: "GBP",
-        mainamount, // "12.99"
+        mainamount, // decimal string
+        // Advanced Redirects (force GET so querystring is preserved)
         successfulurlredirect: `${successUrl}?orderId=${orderRef.id}`,
         declinedurlredirect: `${cancelUrl}?orderId=${orderRef.id}`,
         successfulurlredirectmethod: "GET",
         declinedurlredirectmethod: "GET",
+        // URL Advanced Notification target
         allurlnotification: notifyUrl,
+        // Explicit notification password so Trust echoes it back
         notificationpassword: notifyPwd,
-        // Optional prefill
+        // Prefill (optional)
         billingemail: req.auth?.token?.email || "",
         billingfirstname: (req.auth?.token?.name || "").split(" ")[0] || "",
         billinglastname: (req.auth?.token?.name || "").split(" ").slice(1).join(" ") || "",
@@ -272,12 +316,14 @@ const siteRef = isTest
   }
 );
 
-// -------------------- trustWebhook --------------------
+// -----------------------------------------------------------------------------
+// Trust Payments — webhook (URL Advanced Notification)
+// -----------------------------------------------------------------------------
 export const trustWebhook = onRequest(
   {
-    ...functionOptions,
-    enforceAppCheck: false, // Trust calls this server-to-server
-    secrets: [TRUST_NOTIFY_PASSWORD],
+    region: REGION,
+    enforceAppCheck: false, // server-to-server from Trust
+    secrets: [TRUST_NOTIFY_PASSWORD, TRUST_SITEREFERENCE, TRUST_TEST_SITEREFERENCE],
   },
   async (req, res) => {
     try {
@@ -287,60 +333,68 @@ export const trustWebhook = onRequest(
           ? readUrlEncoded(req)
           : (typeof req.body === "object" && req.body) || readUrlEncoded(req);
 
-      
-     
+      // Password: accept both variants + optional URL token, trim both sides
+      const providedPwd = (
+        body.notification_password ||
+        body.notificationpassword ||
+        req.query?.t ||
+        ""
+      ).toString().trim();
+      const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
+
+      if (!providedPwd || providedPwd !== expectedPwd) {
+        logger.warn("Webhook rejected: bad password", { ip: req.ip, havePwd: !!providedPwd });
+        res.status(401).send("unauthorised");
+        return;
+      }
+
+      // Optional: restrict by known site references if provided
+      const postSiteRef = String(body.sitereference || "");
+      const allowedSites = new Set(
+        [readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"), trySecret(TRUST_TEST_SITEREFERENCE)]
+          .filter(Boolean)
+          .map((s) => s.trim())
+      );
+      if (postSiteRef && !allowedSites.has(postSiteRef)) {
+        logger.warn("Webhook rejected: unknown sitereference", { postSiteRef });
+        res.status(401).send("unauthorised");
+        return;
+      }
 
       const orderId = body.orderreference || body.order_reference || "";
-      const errorcode = String(body.errorcode ?? "");
-      const settlestatus = String(body.settlestatus ?? "");
-      const paymenttypedescription = body.paymenttypedescription || "";
-      const transactionreference = body.transactionreference || "";
-      const sitereference = body.sitereference || "";
-
       if (!orderId) {
-        logger.warn("Webhook missing orderreference", { body });
+        logger.warn("Webhook missing orderreference", { bodyKeys: Object.keys(body || {}) });
         res.status(400).send("bad request");
         return;
       }
 
-      const providedPwd = (
-  (body.notification_password || body.notificationpassword || req.query?.t || "")
-).toString().trim();
-const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
-if (!providedPwd || providedPwd !== expectedPwd) {
-  logger.warn("Webhook rejected: bad password", { ip: req.ip, havePwd: !!providedPwd });
-  res.status(401).send("unauthorised");
-  return;
-}
+      const errorcode = String(body.errorcode ?? "");
+      const settlestatus = String(body.settlestatus ?? "");
+      const paymenttypedescription = body.paymenttypedescription || "";
+      const transactionreference = body.transactionreference || "";
 
-const siteRef = String(body.sitereference || "");
-const allowed = new Set([
-  readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"),
-  (()=>{ try { return TRUST_TEST_SITEREFERENCE.value() || ""; } catch { return ""; } })(),
-].filter(Boolean));
-if (!allowed.has(siteRef)) { res.status(401).send("unauthorised"); return; }
-     
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       if (!orderSnap.exists) {
+        // Return 200 to stop Trust retries; we’ll never see this order
         logger.warn("Webhook order not found", { orderId });
-        res.status(200).send("ok"); // 200 so Trust doesn’t retry forever
+        res.status(200).send("ok");
         return;
       }
 
       const already = orderSnap.data() || {};
-      if (already.status === "paid" || already.status === "failed" || already.status === "cancelled") {
+      if (["paid", "failed", "cancelled"].includes(already.status)) {
         logger.info("Webhook idempotent short-circuit", { orderId, status: already.status });
         res.status(200).send("ok");
         return;
       }
 
-      const success = errorcode === "0"; // Trust: 0 = authorised
+      const success = errorcode === "0"; // Trust: errorcode 0 = authorised
       const baseUpdate = {
         updatedAt: nowServer(),
         provider: "trust",
         providerRef: transactionreference || null,
-        sitereference: sitereference || null,
+        sitereference: postSiteRef || null,
         settlestatus,
         errorcode,
         paymenttypedescription,
@@ -366,18 +420,21 @@ if (!allowed.has(siteRef)) { res.status(401).send("unauthorised"); return; }
 
       res.status(200).send("ok");
     } catch (err) {
+      // Always 200 to avoid retry storms; log details for triage
       logger.error("trustWebhook error", { msg: err?.message || err, stack: err?.stack });
-      res.status(200).send("ok"); // always 200 to avoid retry storms
+      res.status(200).send("ok");
     }
   }
 );
 
-// -------------------- Safety net: retry fulfilment --------------------
+// -----------------------------------------------------------------------------
+// Safety net: retry any 'paid' orders that haven't been fulfilled
+// -----------------------------------------------------------------------------
 export const retryUnfulfilledPaidOrders = onSchedule(
   {
     schedule: "every 10 minutes",
     timeZone: "Europe/London",
-    region: "us-central1",
+    region: REGION,
   },
   async () => {
     const snap = await db
@@ -400,13 +457,12 @@ export const retryUnfulfilledPaidOrders = onSchedule(
   }
 );
 
-
-/* ============================
-   EXISTING BUSINESS FUNCTIONS
-   ============================ */
+// ============================================================================
+// Existing business functions (ESM-converted, minor fixes only)
+// ============================================================================
 
 // allocateTicketsAndAwardTokens
-// UPDATED: expectedPrice now optional; for 'credit' we price server-side.
+// UPDATED: expectedPrice optional; for 'credit' we price server-side.
 // For 'card' we reject (card is now via Trust HPP).
 export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (request) => {
   const schema = z.object({
@@ -420,10 +476,9 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
   if (!validation.success) {
     throw new HttpsError("invalid-argument", "Invalid or malformed request data.");
   }
-  const {compId, ticketsBought, expectedPrice, paymentMethod} = validation.data;
+  const { compId, ticketsBought, expectedPrice, paymentMethod } = validation.data;
 
-  assertIsAuthenticated(request);
-  const uid = request.auth.uid;
+  const uid = assertIsAuthenticated(request);
   const compRef = db.collection("competitions").doc(compId);
   const userRef = db.collection("users").doc(uid);
 
@@ -436,8 +491,9 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
     const [compDoc, userDoc] = await Promise.all([transaction.get(compRef), transaction.get(userRef)]);
     if (!compDoc.exists) throw new HttpsError("not-found", "Competition not found.");
     if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-    const compData = compDoc.data();
-    const userData = userDoc.data();
+
+    const compData = compDoc.data() || {};
+    const userData = userDoc.data() || {};
 
     // Calculate price based on base price per ticket
     if (!Array.isArray(compData.ticketTiers) || compData.ticketTiers.length === 0) {
@@ -446,38 +502,58 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
     const basePricePerTicket = compData.ticketTiers[0].price / compData.ticketTiers[0].amount;
     const priceToCharge = ticketsBought * basePricePerTicket;
 
-    // For backward compatibility, if expectedPrice is provided and mismatched, reject
+    // Back-compat: if expectedPrice provided and mismatched, reject
     if (typeof expectedPrice === "number" && expectedPrice !== priceToCharge) {
       throw new HttpsError("invalid-argument", "Price mismatch. Please refresh and try again.");
     }
 
     // CREDIT flow
-    const entryType = "credit";
     const userCredit = Number(userData.creditBalance || 0);
     if (userCredit < priceToCharge) {
       throw new HttpsError("failed-precondition", "Insufficient credit balance.");
     }
-    transaction.update(userRef, {creditBalance: FieldValue.increment(-priceToCharge)});
+    transaction.update(userRef, { creditBalance: FieldValue.increment(-priceToCharge) });
 
     if (compData.status !== "live") throw new HttpsError("failed-precondition", "Competition is not live.");
     const userEntryCount = (userData.entryCount && userData.entryCount[compId]) ? userData.entryCount[compId] : 0;
     const limit = compData.userEntryLimit || 75;
-    if (userEntryCount + ticketsBought > limit) throw new HttpsError("failed-precondition", `Entry limit exceeded.`);
+    if (userEntryCount + ticketsBought > limit) throw new HttpsError("failed-precondition", "Entry limit exceeded.");
     const ticketsSoldBefore = compData.ticketsSold || 0;
-    if (ticketsSoldBefore + ticketsBought > compData.totalTickets) throw new HttpsError("failed-precondition", `Not enough tickets available.`);
+    if (ticketsSoldBefore + ticketsBought > compData.totalTickets) {
+      throw new HttpsError("failed-precondition", "Not enough tickets available.");
+    }
     const ticketStartNumber = ticketsSoldBefore;
 
-    transaction.update(compRef, {ticketsSold: FieldValue.increment(ticketsBought)});
-    transaction.update(userRef, {[`entryCount.${compId}`]: FieldValue.increment(ticketsBought)});
+    transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsBought) });
+    transaction.update(userRef, { [`entryCount.${compId}`]: FieldValue.increment(ticketsBought) });
 
+    // Legacy per-competition subcollection (credit entry)
     const entryRef = compRef.collection("entries").doc();
     transaction.set(entryRef, {
-      userId: uid, userDisplayName: userData.displayName || "N/A",
-      ticketsBought, ticketStart: ticketStartNumber, ticketEnd: ticketStartNumber + ticketsBought - 1,
-      enteredAt: FieldValue.serverTimestamp(),
-      entryType: entryType,
+      userId: uid,
+      userDisplayName: userData.displayName || "N/A",
+      ticketsBought,
+      ticketStart: ticketStartNumber,
+      ticketEnd: ticketStartNumber + ticketsBought - 1,
+      enteredAt: nowServer(),
+      entryType: "credit",
     });
 
+    // Optional: also mirror to global entries for consistency
+    const entryGlobal = db.collection("entries").doc();
+    transaction.set(entryGlobal, {
+      orderId: null,
+      userId: uid,
+      userDisplayName: userData.displayName || "N/A",
+      compId,
+      qty: ticketsBought,
+      ticketNumbers: Array.from({ length: ticketsBought }, (_, i) => ticketStartNumber + i + 1),
+      createdAt: nowServer(),
+      source: "credit",
+      entryType: "credit",
+    });
+
+    // Award tokens if configured
     let awardedTokens = [];
     if (compData.instantWinsConfig?.enabled === true) {
       const newTokens = [];
@@ -490,51 +566,45 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
           earnedAt: earnedAt,
         });
       }
-      transaction.update(userRef, {spinTokens: FieldValue.arrayUnion(...newTokens)});
+      transaction.update(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) });
       awardedTokens = newTokens;
     }
 
-    return {success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens};
+    return { success: true, ticketStart: ticketStartNumber, ticketsBought, awardedTokens };
   });
 });
 
-// getRevenueAnalytics (unchanged)
+// getRevenueAnalytics (unchanged logic; ESM)
 export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
   await assertIsAdmin(request);
 
   const competitionsSnapshot = await db.collection("competitions").get();
   let totalRevenue = 0;
 
-  for (const doc of competitionsSnapshot.docs) {
-    const compId = doc.id;
+  for (const docSnap of competitionsSnapshot.docs) {
+    const compId = docSnap.id;
     const entriesRef = db.collection("competitions").doc(compId).collection("entries");
     const entriesSnapshot = await entriesRef.where("entryType", "==", "paid").get();
 
     let competitionRevenue = 0;
     entriesSnapshot.forEach((entryDoc) => {
       const entryData = entryDoc.data();
-      const competitionData = doc.data();
-      const tier = competitionData.ticketTiers.find((t) => t.amount === entryData.ticketsBought);
-      if (tier) {
-        competitionRevenue += tier.price;
-      }
+      const competitionData = docSnap.data();
+      const tier = (competitionData.ticketTiers || []).find((t) => t.amount === entryData.ticketsBought);
+      if (tier) competitionRevenue += tier.price;
     });
     totalRevenue += competitionRevenue;
   }
 
   const spinWinsSnapshot = await db.collection("spin_wins").where("prizeType", "==", "cash").get();
   let totalCost = 0;
-  spinWinsSnapshot.forEach((doc) => {
-    totalCost += doc.data().prizeValue;
-  });
+  spinWinsSnapshot.forEach((doc) => { totalCost += doc.data().prizeValue; });
 
   const netProfit = totalRevenue - totalCost;
 
   const creditAwardedSnapshot = await db.collection("spin_wins").where("prizeType", "==", "credit").get();
   let totalSiteCreditAwarded = 0;
-  creditAwardedSnapshot.forEach((doc) => {
-    totalSiteCreditAwarded += doc.data().prizeValue;
-  });
+  creditAwardedSnapshot.forEach((doc) => { totalSiteCreditAwarded += doc.data().prizeValue; });
 
   const creditSpentSnapshot = await db.collectionGroup("entries").where("entryType", "==", "credit").get();
   let totalSiteCreditSpent = 0;
@@ -542,174 +612,144 @@ export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
     const entryData = doc.data();
     const compDoc = await db.collection("competitions").doc(doc.ref.parent.parent.id).get();
     const competitionData = compDoc.data();
-    const tier = competitionData.ticketTiers.find((t) => t.amount === entryData.ticketsBought);
-    if (tier) {
-      totalSiteCreditSpent += tier.price;
-    }
+    const tier = (competitionData.ticketTiers || []).find((t) => t.amount === entryData.ticketsBought);
+    if (tier) totalSiteCreditSpent += tier.price;
   }
 
-  return {success: true, totalRevenue, totalCost, netProfit, totalSiteCreditAwarded, totalSiteCreditSpent};
+  return { success: true, totalRevenue, totalCost, netProfit, totalSiteCreditAwarded, totalSiteCreditSpent };
 });
 
-// spendSpinToken (unchanged)
+// spendSpinToken
 export const spendSpinToken = onCall(functionOptions, async (request) => {
-  const schema = z.object({tokenId: z.string().min(1)});
+  const schema = z.object({ tokenId: z.string().min(1) });
   const validation = schema.safeParse(request.data);
-  if (!validation.success) {
-    throw new HttpsError("invalid-argument", "A valid tokenId is required.");
-  }
-  const {tokenId} = validation.data;
-  assertIsAuthenticated(request);
-  const uid = request.auth.uid;
+  if (!validation.success) throw new HttpsError("invalid-argument", "A valid tokenId is required.");
+
+  const { tokenId } = validation.data;
+  const uid = assertIsAuthenticated(request);
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
+
     const userData = userDoc.data();
     const userTokens = userData.spinTokens || [];
     const tokenIndex = userTokens.findIndex((t) => t.tokenId === tokenId);
-    if (tokenIndex === -1) {
-      throw new HttpsError("not-found", "Spin token not found or already spent.");
-    }
+    if (tokenIndex === -1) throw new HttpsError("not-found", "Spin token not found or already spent.");
     const updatedTokens = userTokens.filter((t) => t.tokenId !== tokenId);
-    transaction.update(userRef, {spinTokens: updatedTokens});
+    transaction.update(userRef, { spinTokens: updatedTokens });
+
     const settingsRef = db.collection("admin_settings").doc("spinnerPrizes");
     const settingsDoc = await settingsRef.get();
-    if (!settingsDoc.exists) {
-      throw new HttpsError("internal", "Spinner prize configuration is not available.");
-    }
-    const prizes = settingsDoc.data().prizes;
+    if (!settingsDoc.exists) throw new HttpsError("internal", "Spinner prize configuration is not available.");
+
+    const prizes = settingsDoc.data().prizes || [];
     const cumulativeProbabilities = [];
     let cumulative = 0;
     for (const prize of prizes) {
-      cumulative += (1 / prize.odds);
-      cumulativeProbabilities.push({...prize, cumulativeProb: cumulative});
+      cumulative += 1 / prize.odds;
+      cumulativeProbabilities.push({ ...prize, cumulativeProb: cumulative });
     }
     const random = Math.random();
-    let finalPrize = {won: false, prizeType: "none", value: 0};
+    let finalPrize = { won: false, prizeType: "none", value: 0 };
     for (const prize of cumulativeProbabilities) {
       if (random < prize.cumulativeProb) {
-        finalPrize = {won: true, prizeType: prize.type, value: prize.value};
+        finalPrize = { won: true, prizeType: prize.type, value: prize.value };
         break;
       }
     }
+
     if (finalPrize.won) {
       const winLogRef = db.collection("spin_wins").doc();
       transaction.set(winLogRef, {
         userId: uid,
         prizeType: finalPrize.prizeType,
         prizeValue: finalPrize.value,
-        wonAt: FieldValue.serverTimestamp(),
+        wonAt: nowServer(),
         tokenIdUsed: tokenId,
       });
       if (finalPrize.prizeType === "credit") {
-        transaction.update(userRef, {creditBalance: FieldValue.increment(finalPrize.value)});
+        transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
       } else if (finalPrize.prizeType === "cash") {
-        transaction.update(userRef, {cashBalance: FieldValue.increment(finalPrize.value)});
+        transaction.update(userRef, { cashBalance: FieldValue.increment(finalPrize.value) });
       }
     }
+
     return finalPrize;
   });
 });
 
-// transferCashToCredit (unchanged)
+// transferCashToCredit
 export const transferCashToCredit = onCall(functionOptions, async (request) => {
-  const schema = z.object({
-    amount: z.number().positive("Amount must be a positive number."),
-  });
-
+  const schema = z.object({ amount: z.number().positive("Amount must be a positive number.") });
   const validation = schema.safeParse(request.data);
-  if (!validation.success) {
-    throw new HttpsError("invalid-argument", validation.error.errors[0].message);
-  }
-  const {amount} = validation.data;
+  if (!validation.success) throw new HttpsError("invalid-argument", validation.error.errors[0].message);
 
-  assertIsAuthenticated(request);
-  const uid = request.auth.uid;
+  const { amount } = validation.data;
+  const uid = assertIsAuthenticated(request);
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) {
-      throw new HttpsError("not-found", "User profile not found.");
-    }
+    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
 
     const userData = userDoc.data();
     const userCashBalance = userData.cashBalance || 0;
-
-    if (userCashBalance < amount) {
-      throw new HttpsError("failed-precondition", "Insufficient cash balance.");
-    }
+    if (userCashBalance < amount) throw new HttpsError("failed-precondition", "Insufficient cash balance.");
 
     const creditToAdd = amount * 1.5;
-
     transaction.update(userRef, {
       cashBalance: FieldValue.increment(-amount),
       creditBalance: FieldValue.increment(creditToAdd),
     });
 
-    return {success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd};
+    return { success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd };
   });
 });
 
-// requestCashPayout (unchanged)
+// requestCashPayout
 export const requestCashPayout = onCall(functionOptions, async (request) => {
-  const schema = z.object({
-    amount: z.number().positive("Amount must be a positive number."),
-  });
-
+  const schema = z.object({ amount: z.number().positive("Amount must be a positive number.") });
   const validation = schema.safeParse(request.data);
-  if (!validation.success) {
-    throw new HttpsError("invalid-argument", validation.error.errors[0].message);
-  }
-  const {amount} = validation.data;
+  if (!validation.success) throw new HttpsError("invalid-argument", validation.error.errors[0].message);
 
-  assertIsAuthenticated(request);
-  const uid = request.auth.uid;
+  const { amount } = validation.data;
+  const uid = assertIsAuthenticated(request);
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) {
-      throw new HttpsError("not-found", "User profile not found.");
-    }
+    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
 
     const userData = userDoc.data();
     const userCashBalance = userData.cashBalance || 0;
+    if (userCashBalance < amount) throw new HttpsError("failed-precondition", "Insufficient cash balance.");
 
-    if (userCashBalance < amount) {
-      throw new HttpsError("failed-precondition", "Insufficient cash balance.");
-    }
-
-    transaction.update(userRef, {
-      cashBalance: FieldValue.increment(-amount),
-    });
+    transaction.update(userRef, { cashBalance: FieldValue.increment(-amount) });
 
     const payoutRequestRef = db.collection("payoutRequests").doc();
     transaction.set(payoutRequestRef, {
       userId: uid,
-      amount: amount,
+      amount,
       status: "pending",
-      requestedAt: FieldValue.serverTimestamp(),
+      requestedAt: nowServer(),
       userDisplayName: userData.displayName || "N/A",
       userEmail: userData.email || "N/A",
     });
 
-    return {success: true, message: "Payout request submitted successfully."};
+    return { success: true, message: "Payout request submitted successfully." };
   });
 });
 
-// playPlinko (unchanged)
+// playPlinko
 export const playPlinko = onCall(functionOptions, async (request) => {
-  const schema = z.object({tokenId: z.string().min(1)});
+  const schema = z.object({ tokenId: z.string().min(1) });
   const validation = schema.safeParse(request.data);
-  if (!validation.success) {
-    throw new HttpsError("invalid-argument", "A valid tokenId is required.");
-  }
-  const {tokenId} = validation.data;
-  assertIsAuthenticated(request);
-  const uid = request.auth.uid;
+  if (!validation.success) throw new HttpsError("invalid-argument", "A valid tokenId is required.");
+
+  const { tokenId } = validation.data;
+  const uid = assertIsAuthenticated(request);
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (transaction) => {
@@ -727,32 +767,21 @@ export const playPlinko = onCall(functionOptions, async (request) => {
 
     const userTokens = userData.plinkoTokens || [];
     const tokenIndex = userTokens.findIndex((t) => t.tokenId === tokenId);
-    if (tokenIndex === -1) {
-      throw new HttpsError("not-found", "Plinko token not found or already spent.");
-    }
+    if (tokenIndex === -1) throw new HttpsError("not-found", "Plinko token not found or already spent.");
     const updatedTokens = userTokens.filter((t) => t.tokenId !== tokenId);
-    transaction.update(userRef, {plinkoTokens: updatedTokens});
+    transaction.update(userRef, { plinkoTokens: updatedTokens });
 
     let rights = 0;
     const steps = [];
     for (let i = 0; i < PLINKO_ROWS; i++) {
-      let step;
-      if (mode === "weighted") {
-        step = Math.random() < 0.55 ? 1 : -1;
-      } else {
-        step = Math.random() < 0.5 ? -1 : 1;
-      }
+      const step = mode === "weighted" ? (Math.random() < 0.55 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
       steps.push(step);
       if (step === 1) rights++;
     }
     const finalSlotIndex = rights;
 
-    const prize = payouts[finalSlotIndex] || {type: "credit", value: 0};
-    const finalPrize = {
-      won: prize.value > 0,
-      type: prize.type || "credit",
-      value: prize.value || 0,
-    };
+    const prize = payouts[finalSlotIndex] || { type: "credit", value: 0 };
+    const finalPrize = { won: prize.value > 0, type: prize.type || "credit", value: prize.value || 0 };
 
     if (finalPrize.won) {
       const winLogRef = db.collection("plinko_wins").doc();
@@ -761,87 +790,120 @@ export const playPlinko = onCall(functionOptions, async (request) => {
         prizeType: finalPrize.type,
         prizeValue: finalPrize.value,
         slotIndex: finalSlotIndex,
-        wonAt: FieldValue.serverTimestamp(),
+        wonAt: nowServer(),
         tokenIdUsed: tokenId,
       });
       if (finalPrize.type === "credit") {
-        transaction.update(userRef, {creditBalance: FieldValue.increment(finalPrize.value)});
+        transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
       }
     }
 
-    return {prize: finalPrize, path: {steps, slotIndex: finalSlotIndex}};
+    return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };
   });
 });
 
-// drawWinner (unchanged)
-export const drawWinner = onCall(functionOptions, async (request) => {
-  const schema = z.object({compId: z.string().min(1)});
-  const validation = schema.safeParse(request.data);
-  if (!validation.success) {
-    throw new HttpsError("invalid-argument", "Competition ID is required.");
+// ----------------------------------------------------------------------------
+// Simple draw helper (kept minimal and defensive)
+// ----------------------------------------------------------------------------
+const performDraw = async (compId) => {
+  // Prefer per-competition subcollection
+  const compRef = db.collection("competitions").doc(compId);
+  const subSnap = await compRef.collection("entries").get();
+
+  let entries = [];
+  if (!subSnap.empty) {
+    entries = subSnap.docs.map((d) => ({ uid: d.data().userId, displayName: d.data().userDisplayName || "N/A" }));
+  } else {
+    // Fallback: global entries with compId
+    const globalSnap = await db.collection("entries").where("compId", "==", compId).get();
+    entries = globalSnap.docs.map((d) => ({ uid: d.data().userId, displayName: d.data().userDisplayName || "N/A" }));
   }
-  const {compId} = validation.data;
+
+  if (!entries.length) throw new Error("No entries to draw.");
+
+  const idx = Math.floor(Math.random() * entries.length);
+  const winner = entries[idx];
+
+  await compRef.update({
+    winnerUserId: winner.uid || null,
+    winnerDisplayName: winner.displayName || "N/A",
+    drawnAt: nowServer(),
+  });
+
+  return { winnerUserId: winner.uid, winnerDisplayName: winner.displayName };
+};
+
+// drawWinner (manual)
+export const drawWinner = onCall(functionOptions, async (request) => {
+  const schema = z.object({ compId: z.string().min(1) });
+  const validation = schema.safeParse(request.data);
+  if (!validation.success) throw new HttpsError("invalid-argument", "Competition ID is required.");
+  const { compId } = validation.data;
 
   await assertIsAdmin(request);
 
   const compRef = db.collection("competitions").doc(compId);
   const compDoc = await compRef.get();
   if (!compDoc.exists || compDoc.data().status !== "ended") {
-    throw new HttpsError("failed-precondition", "Competition must be in \"ended\" status to be drawn manually.");
+    throw new HttpsError("failed-precondition", 'Competition must be in "ended" status to be drawn manually.');
   }
 
   try {
     const result = await performDraw(compId);
-    return {success: true, ...result};
+    return { success: true, ...result };
   } catch (error) {
     logger.error(`Manual draw failed for compId: ${compId}`, error);
     throw new HttpsError("internal", error.message || "An internal error occurred during the draw.");
   }
 });
 
-// weeklyTokenCompMaintenance (FIXED: admin SDK query chaining)
-export const weeklyTokenCompMaintenance = onSchedule({
-  schedule: "every monday 12:00",
-  timeZone: "Europe/London",
-}, async () => {
-  logger.log("Starting weekly token competition maintenance...");
+// weeklyTokenCompMaintenance (fix: use admin Timestamp + query chaining)
+export const weeklyTokenCompMaintenance = onSchedule(
+  {
+    schedule: "every monday 12:00",
+    timeZone: "Europe/London",
+    region: REGION,
+  },
+  async () => {
+    logger.log("Starting weekly token competition maintenance...");
 
-  const compsRef = db.collection("competitions");
-  const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const compsRef = db.collection("competitions");
+    const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const snapshot = await compsRef
+    const snapshot = await compsRef
       .where("competitionType", "==", "token")
       .where("status", "==", "live")
       .where("createdAt", "<=", oneWeekAgo)
       .get();
 
-  if (snapshot.empty) {
-    logger.log("No old token competitions found needing cleanup. Exiting.");
-  } else {
-    logger.log(`Found ${snapshot.docs.length} old token competitions to process.`);
-  }
-
-  for (const doc of snapshot.docs) {
-    const compId = doc.id;
-    logger.log(`Processing competition ${compId}...`);
-    try {
-      await doc.ref.update({status: "ended"});
-      logger.log(`Competition ${compId} status set to 'ended'.`);
-      const drawResult = await performDraw(compId);
-      logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
-    } catch (error) {
-      logger.error(`Failed to process and draw winner for ${compId}`, error);
+    if (snapshot.empty) {
+      logger.log("No old token competitions found needing cleanup. Exiting.");
+    } else {
+      logger.log(`Found ${snapshot.docs.length} old token competitions to process.`);
     }
-  }
 
-  const liveTokenSnapshot = await compsRef
+    for (const doc of snapshot.docs) {
+      const compId = doc.id;
+      logger.log(`Processing competition ${compId}...`);
+      try {
+        await doc.ref.update({ status: "ended" });
+        logger.log(`Competition ${compId} status set to 'ended'.`);
+        const drawResult = await performDraw(compId);
+        logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
+      } catch (error) {
+        logger.error(`Failed to process and draw winner for ${compId}`, error);
+      }
+    }
+
+    const liveTokenSnapshot = await compsRef
       .where("competitionType", "==", "token")
       .where("status", "==", "live")
       .get();
 
-  if (liveTokenSnapshot.size < 3) {
-    logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
-  }
+    if (liveTokenSnapshot.size < 3) {
+      logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
+    }
 
-  return null;
-});
+    return null;
+  }
+);

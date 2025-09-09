@@ -139,6 +139,7 @@ const fulfilOrderTickets = async (orderId) => {
   }
 
   const order = orderSnap.data() || {};
+  logger.info("fulfilOrderTickets: processing order", { orderId, order });
   if (order.fulfilled === true) {
     logger.info("fulfilOrderTickets: already fulfilled", { orderId });
     return;
@@ -252,6 +253,7 @@ export const createTrustOrder = onCall(
   },
   async (req) => {
     try {
+      assertIsAuthenticated(req);
       const { compId, qty = 1 } = req.data || {};
       if (!compId) throw new HttpsError("invalid-argument", "compId required");
       if (!Number.isFinite(qty) || qty <= 0) throw new HttpsError("invalid-argument", "qty invalid");

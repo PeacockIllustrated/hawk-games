@@ -4,223 +4,34 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>The Hawk Games — Order Confirmation</title>
-  <style>
-    /* ===== Hawk Games — Success Page Skin ===== */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Inter:wght@400;500;600&display=swap');
-
-:root{
-  /* Core palette */
-  --bg:#0a0c10;               /* deep charcoal */
-  --surface:#11151d;          /* card base */
-  --surface-2:#0e131b;        /* hover/alt */
-  --line:#1c2230;             /* hairline */
-  --text:#e9edf6;             /* main text */
-  --muted:#99a3b5;            /* secondary */
-
-  /* Brand accents */
-  --gold:#E0A94A;             /* premium gold */
-  --gold-2:#f6d58e;           /* soft gold highlight */
-  --orange:#ff7a1a;           /* lightning orange */
-  --teal:#00ccb3;             /* subtle cool accent for depth */
-
-  /* Effects */
-  --ring: 0 0 0 3px rgba(224,169,74,.18), 0 0 0 1px rgba(224,169,74,.55);
-  --glow: 0 12px 34px rgba(0,0,0,.55), 0 0 48px rgba(224,169,74,.10);
-}
-
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;
-  color:var(--text);
-  background:
-    radial-gradient(1200px 600px at 60% -10%, rgba(224,169,74,.08), transparent 65%),
-    radial-gradient(900px 500px at 10% 10%, rgba(255,122,26,.06), transparent 60%),
-    linear-gradient(180deg, #0a0c10 0%, #0a0c10 40%, #0c1016 100%);
-  font:16px/1.55 Inter, system-ui, Segoe UI, Roboto, sans-serif;
-  letter-spacing:.2px;
-}
-
-/* Subtle animated shard grid behind content */
-body::before{
-  content:"";
-  position:fixed; inset:0;
-  background:
-    linear-gradient(115deg, rgba(224,169,74,.06) 1px, transparent 1px) 0 0/22px 22px,
-    linear-gradient( 65deg, rgba(255,122,26,.05) 1px, transparent 1px) 0 0/28px 28px;
-  mask: linear-gradient(#000 75%, transparent);
-  pointer-events:none;
-  animation: drift 40s linear infinite;
-}
-@keyframes drift{to{background-position:2000px 0, -1500px 0}}
-
-.wrap{max-width:860px;margin:6vh auto;padding:20px}
-.card{
-  position:relative;
-  background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)) , var(--surface);
-  border:1px solid var(--line);
-  border-radius:20px;
-  padding:26px 24px;
-  box-shadow:var(--glow);
-  overflow:hidden;
-}
-
-/* Shard edge accent */
-.card::before{
-  content:"";
-  position:absolute; top:-2px; right:-80px;
-  width:220px; height:220px;
-  transform:skew(-18deg) rotate(24deg);
-  background:linear-gradient(90deg, rgba(224,169,74,.0), rgba(224,169,74,.6), rgba(255,122,26,.0));
-  filter:blur(14px);
-  pointer-events:none;
-  opacity:.55;
-}
-
-/* Heading + microtypography */
-h1{
-  margin:0 0 10px;
-  font:800 30px/1.15 Montserrat, system-ui, sans-serif;
-  letter-spacing:.3px;
-  text-shadow:0 0 22px rgba(224,169,74,.10);
-}
-p{margin:8px 0;color:#d6dce9}
-.muted{color:var(--muted)}
-.small{font-size:13px}
-
-/* Dividers */
-.hr{height:1px;margin:18px 0;background:
-  linear-gradient(90deg, transparent, rgba(224,169,74,.22), transparent);
-  border:0}
-
-/* Top status row */
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfd7ea}
-
-.badge{
-  padding:7px 12px;border-radius:999px;
-  font-weight:700;font-size:12px;letter-spacing:.3px;
-  border:1px solid var(--line);
-  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00));
-  position:relative;
-}
-.pending{
-  color:#f0f5ff;
-  border-color:#2a3570;
-  box-shadow:0 0 0 1px rgba(42,53,112,.25) inset;
-}
-.pending::after{
-  content:""; display:inline-block; width:6px; height:6px; margin-left:8px;
-  border-radius:50%; background:linear-gradient(180deg, #8fb1ff, #4b7cff);
-  box-shadow:0 0 0 4px rgba(75,124,255,.15);
-  animation:pulse 1.2s ease-in-out infinite;
-}
-@keyframes pulse{0%,100%{transform:scale(.9);opacity:.8}50%{transform:scale(1.12);opacity:1}}
-
-.good{
-  color:#09130f;background:linear-gradient(180deg, #f7e5b6, #e0a94a);
-  border-color:#f0d082;
-  box-shadow:0 2px 14px rgba(224,169,74,.35), inset 0 0 0 1px rgba(0,0,0,.12);
-}
-
-/* Copy ref button */
-.copy{
-  padding:8px 12px;border-radius:10px;
-  border:1px solid var(--line);
-  background:linear-gradient(180deg, var(--surface-2), #0d121a);
-  color:#e7ebf5; cursor:pointer; transition:.18s ease;
-}
-.copy:hover{border-color:#2a3346; transform:translateY(-1px)}
-.copy:active{transform:translateY(0)}
-.copy:focus-visible{outline:none; box-shadow:var(--ring)}
-
-/* Call-to-action buttons */
-.btn{
-  display:inline-flex;align-items:center;gap:10px;
-  padding:12px 16px;border-radius:12px;border:1px solid var(--line);
-  text-decoration:none;color:var(--text);
-  transition:transform .16s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
-  will-change:transform;
-}
-.btn:hover{border-color:#2b3348;background:var(--surface-2);transform:translateY(-1px)}
-.btn:focus-visible{outline:none; box-shadow:var(--ring)}
-.btn.primary{
-  border:1px solid rgba(224,169,74,.55);
-  background:
-   linear-gradient(180deg, rgba(224,169,74,.20), rgba(224,169,74,.08)),
-   linear-gradient(90deg, rgba(224,169,74,.25), rgba(255,122,26,.20));
-  box-shadow:0 6px 22px rgba(224,169,74,.22);
-}
-.btn.primary:hover{
-  background:
-    linear-gradient(180deg, rgba(224,169,74,.26), rgba(224,169,74,.12)),
-    linear-gradient(90deg, rgba(224,169,74,.35), rgba(255,122,26,.28));
-  box-shadow:0 10px 28px rgba(224,169,74,.28);
-}
-
-/* Checkmark animation restyled to gold theme */
-.checkwrap{display:flex;align-items:center;gap:14px;margin:8px 0 2px}
-.tick{width:42px;height:42px;filter:drop-shadow(0 0 18px rgba(224,169,74,.25))}
-.tick circle{stroke:#2a2f3e;stroke-width:4;fill:none;opacity:.8}
-.tick path{
-  stroke:var(--gold); stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round;
-  stroke-dasharray:48; stroke-dashoffset:48; animation:draw .9s ease forwards .15s;
-}
-@keyframes draw{to{stroke-dashoffset:0}}
-
-/* Ticket chips (when you render later) */
-.tickets{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-top:12px}
-.ticket{
-  background:linear-gradient(180deg, rgba(224,169,74,.10), rgba(224,169,74,.04));
-  border:1px dashed rgba(224,169,74,.45);
-  color:#f6edd3;
-  border-radius:12px;padding:8px 10px;text-align:center;font-weight:800;font-family:Montserrat,Inter,sans-serif;
-}
-
-/* Promo tiles (cross-sell) */
-.promo{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
-@media (min-width:640px){ .promo{grid-template-columns:1fr 1fr} }
-.promo .tile{
-  background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)), #0f1420;
-  border:1px solid #252c3e;border-radius:14px;padding:14px 16px;
-  display:flex;align-items:center;justify-content:space-between;gap:14px;
-  transition:transform .16s ease, box-shadow .18s ease, border-color .18s ease;
-}
-.promo .tile:hover{transform:translateY(-2px);border-color:rgba(224,169,74,.55);box-shadow:0 10px 28px rgba(224,169,74,.15)}
-.promo .tile b{font:700 16px/1.2 Montserrat,Inter,sans-serif;letter-spacing:.2px}
-
-/* Links */
-a{color:#cfe0ff}
-a:hover{color:#e6f0ff}
-
-/* Accessibility: focus rings everywhere */
-:where(button,a,.copy).focus-visible{outline:none;box-shadow:var(--ring)}
-
-  </style>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/app/css/checkout.css">
+  <meta name="robots" content="noindex">
 </head>
 <body>
-  <canvas id="confetti"></canvas>
+  <canvas id="confetti" aria-hidden="true"></canvas>
 
   <div class="wrap">
     <div class="card">
       <h1>Order confirmation</h1>
+
       <div class="row" id="statusRow">
         <span class="badge pending" id="statusBadge">Payment received — assigning tickets…</span>
         <span class="mono small" id="orderRefBadge"></span>
-        <button id="copyBtn" class="copy">Copy ref</button>
+        <button id="copyBtn" class="copy" type="button">Copy ref</button>
       </div>
 
       <div class="hr"></div>
 
       <div id="content">
-        <div class="checkwrap">
-          <svg class="tick" viewBox="0 0 48 48" aria-hidden="true">
+        <div class="checkwrap" aria-live="polite">
+          <svg class="tick" viewBox="0 0 48 48" role="img" aria-label="Payment successful">
             <circle cx="24" cy="24" r="20"></circle>
             <path d="M14 24l7 7 14-14"></path>
           </svg>
           <div>
-            <p style="margin:0"><strong>Thanks — your payment was successful.</strong></p>
-            <p class="muted" style="margin:2px 0 0">We’re assigning your tickets now. This usually finishes within a few seconds.</p>
+            <p class="lead"><strong>Thanks — your payment was successful.</strong></p>
+            <p class="muted">We’re assigning your tickets now. This usually finishes within a few seconds.</p>
           </div>
         </div>
 
@@ -228,84 +39,92 @@ a:hover{color:#e6f0ff}
 
         <p class="small muted" id="reassure" style="display:none">
           This is taking longer than usual. Your payment <em>has</em> been received — our system will finish assigning your tickets shortly.
-          You’ll get an email the moment it’s done. You can also find your entries any time on the button below.
+          You’ll get an email the moment it’s done. You can also find your entries any time below.
         </p>
 
-        <div class="row" style="margin-top:8px">
+        <div class="row ctas">
           <a id="accountLink" class="btn primary" href="/app/account.html">View my entries</a>
           <a id="homeLink" class="btn" href="/app/">Back to comps</a>
         </div>
 
         <div class="hr"></div>
 
-        <div class="promo">
+        <!-- Cross-sell (static for now; can be hydrated later) -->
+        <div class="promo" aria-label="More to explore">
           <a class="tile" href="/app/">
-            <span><b>Try your luck on the Spinner</b><br><span class="small muted">Instant-win site credit & prizes</span></span>
+            <span><b>Spin for instant wins</b><br><span class="small muted">Site credit & prizes — instant</span></span>
             <span class="btn">Play now</span>
           </a>
           <a class="tile" href="/app/">
-            <span><b>Explore current competitions</b><br><span class="small muted">Fresh prizes added regularly</span></span>
+            <span><b>Browse live competitions</b><br><span class="small muted">Fresh prizes added regularly</span></span>
             <span class="btn">Enter</span>
           </a>
         </div>
 
-        <p class="small muted" style="margin-top:12px">
+        <p class="small muted help">
           Need help? Email <a href="mailto:support@the-hawk-games.co.uk">support@the-hawk-games.co.uk</a>.
         </p>
       </div>
     </div>
   </div>
 
+  <noscript>
+    <div class="noscript">Payment received. Please visit <a href="/app/account.html">My Entries</a> to view your tickets.</div>
+  </noscript>
+
   <script type="module">
     // --- Configurable paths ---
     const ACCOUNT_URL = "/app/account.html";
     const HOME_URL    = "/app/";
-    // Optional: if you add an order status endpoint later, set window.__ORDER_STATUS_ENDPOINT__ = "/api/orders";
-    // It should return JSON { status: "PENDING"|"FULFILLED"|"FAILED", tickets?: number[] }
+    // Optional: provide a read-only endpoint and set this globally:
+    //   window.__ORDER_STATUS_ENDPOINT__ = "/api/orders";
+    // It should return JSON: { status: "PENDING"|"FULFILLED"|"FAILED", tickets?: number[] }
     // --------------------------
 
+    // Query parsing
     const qs = new URLSearchParams(location.search);
-    const orderRef =
-      qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || "—";
+    const orderRef = qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || "—";
 
-    const statusBadge = document.getElementById("statusBadge");
+    // Elements
+    const statusBadge  = document.getElementById("statusBadge");
     const orderRefBadge = document.getElementById("orderRefBadge");
     const copyBtn = document.getElementById("copyBtn");
     const reassure = document.getElementById("reassure");
 
+    // Links
     document.getElementById("accountLink").href = ACCOUNT_URL;
     document.getElementById("homeLink").href = HOME_URL;
 
-    // Show the reference and tidy URL
+    // Show order reference + tidy URL
     orderRefBadge.textContent = "Ref: " + orderRef;
     try { if (orderRef !== "—") history.replaceState({}, "", location.pathname + "?orderRef=" + encodeURIComponent(orderRef)); } catch {}
 
     copyBtn.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(orderRef);
-      copyBtn.textContent = "Copied";
-      setTimeout(()=> copyBtn.textContent = "Copy ref", 1200);
+      try {
+        await navigator.clipboard.writeText(orderRef);
+        copyBtn.textContent = "Copied";
+        setTimeout(()=> copyBtn.textContent = "Copy ref", 1200);
+      } catch {}
     });
 
-    // Celebrate immediately (payment accepted)
-    fireConfetti(800); // duration ms
-
-    // Reassurance message if still here after 35s
+    // Celebration + reassurance
+    fireConfetti(900);
     setTimeout(()=> reassure.style.display = "block", 35000);
 
-    // Progressive enhancement: check status endpoint if provided (no dependency)
+    // Progressive enhancement: poll status endpoint if present
     const endpoint = window.__ORDER_STATUS_ENDPOINT__;
     if (endpoint && orderRef && orderRef !== "—") {
-      try {
-        const poll = async (tries=30) => {
-          const u = `${endpoint.replace(/\/$/,'')}/${encodeURIComponent(orderRef)}`;
-          const res = await fetch(u, { headers: { "Accept":"application/json" }});
+      const poll = async (tries=30) => {
+        try {
+          const url = `${endpoint.replace(/\/$/,'')}/${encodeURIComponent(orderRef)}`;
+          const res = await fetch(url, { headers: { "Accept":"application/json" }});
           if (!res.ok) throw 0;
           const o = await res.json().catch(()=> ({}));
           const s = (o.status || "").toUpperCase();
           if (s === "FULFILLED") {
             statusBadge.textContent = "Tickets confirmed";
             statusBadge.className = "badge good";
-            // Optional: render ticket numbers if provided
+            // Optional: if you return tickets, you can render them:
             // renderTickets(o.tickets);
             return;
           }
@@ -315,13 +134,15 @@ a:hover{color:#e6f0ff}
             return;
           }
           if (tries > 0) setTimeout(()=>poll(tries-1), 1200);
-        };
-        poll();
-      } catch { /* silent — page remains in 'assigning' state */ }
+        } catch {
+          if (tries > 0) setTimeout(()=>poll(tries-1), 1500);
+        }
+      };
+      poll();
     }
 
-    // --- Minimal confetti (tiny, self-contained) ---
-    function fireConfetti(duration=800){
+    // Minimal confetti (brand colours)
+    function fireConfetti(duration=900){
       const c = document.getElementById("confetti");
       const ctx = c.getContext("2d");
       let W = c.width = innerWidth, H = c.height = innerHeight;
@@ -332,6 +153,7 @@ a:hover{color:#e6f0ff}
         s: Math.random()*0.6+0.4
       }));
       let t0 = performance.now();
+      const start = t0;
       const draw = (t)=>{
         const dt = (t - t0); t0 = t;
         ctx.clearRect(0,0,W,H);
@@ -344,26 +166,24 @@ a:hover{color:#e6f0ff}
           ctx.translate(p.x,p.y);
           ctx.rotate(p.rot);
           ctx.globalAlpha = p.s;
-          // rectangles as shards
-          ctx.fillStyle = Math.random()<.33 ? "#bff3d4" : (Math.random()<.5 ? "#6ea4ff" : "#e8ecf4");
+          ctx.fillStyle = Math.random()<.5 ? "#E0A94A" : (Math.random()<.75 ? "#FF7A1A" : "#FFFFFF");
           ctx.fillRect(-p.r, -p.r, p.r*2, p.r*0.6);
           ctx.restore();
         });
         if (t - start < duration) requestAnimationFrame(draw); else ctx.clearRect(0,0,W,H);
       };
-      const start = performance.now();
       requestAnimationFrame(draw);
       addEventListener("resize", ()=>{ W = c.width = innerWidth; H = c.height = innerHeight; });
     }
 
-    // Optional: ticket rendering stub if you wire endpoint later
+    // Optional: ticket chips if your endpoint returns numbers later
     function renderTickets(arr){
       if (!Array.isArray(arr) || !arr.length) return;
-      const div = document.createElement("div");
-      div.className = "tickets";
-      div.innerHTML = arr.map(n=>`<div class="ticket">#${n}</div>`).join("");
-      document.querySelector(".card").appendChild(document.createElement("div")).className="hr";
-      document.querySelector(".card").appendChild(div);
+      const sep = document.createElement("div"); sep.className = "hr";
+      const grid = document.createElement("div"); grid.className = "tickets";
+      grid.innerHTML = arr.map(n=>`<div class="ticket">#${n}</div>`).join("");
+      const card = document.querySelector(".card");
+      card.appendChild(sep); card.appendChild(grid);
     }
   </script>
 </body>

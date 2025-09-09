@@ -48,17 +48,37 @@
 
         <div class="hr"></div>
 
-        <!-- Cross-sell (static for now; can be hydrated later) -->
-        <div class="promo" aria-label="More to explore">
-          <a class="tile" href="/app/">
-            <span><b>Spin for instant wins</b><br><span class="small muted">Site credit & prizes — instant</span></span>
-            <span class="btn">Play now</span>
-          </a>
-          <a class="tile" href="/app/">
-            <span><b>Browse live competitions</b><br><span class="small muted">Fresh prizes added regularly</span></span>
-            <span class="btn">Enter</span>
-          </a>
-        </div>
+        <!-- Cash Competitions (uses homepage styles) -->
+        <section aria-label="Cash competitions" class="cash-section">
+          <h2 class="section-title">Cash <span style="color:var(--primary-gold)">Competitions</span></h2>
+          <div id="cashGrid" class="competition-grid-container">
+            <!-- Static fallback cards (will be replaced if Firestore loads) -->
+            <a class="hawk-card" href="/app/">
+              <img class="hawk-card__image" src="/app/assets/cash-1k.jpg" alt="Win £1,000 cash">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Win £1,000 Cash</h3>
+                <div class="progress-bar"><div class="progress-bar-fill" style="width:40%"></div></div>
+                <div class="hawk-card__progress-text">40% sold</div>
+                <div class="hawk-card__footer">
+                  <span class="hawk-card__price">£0.99</span>
+                  <span class="btn btn-small">Enter</span>
+                </div>
+              </div>
+            </a>
+            <a class="hawk-card" href="/app/">
+              <img class="hawk-card__image" src="/app/assets/cash-5k.jpg" alt="Win £5,000 cash">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Win £5,000 Cash</h3>
+                <div class="progress-bar"><div class="progress-bar-fill" style="width:22%"></div></div>
+                <div class="hawk-card__progress-text">22% sold</div>
+                <div class="hawk-card__footer">
+                  <span class="hawk-card__price">£1.99</span>
+                  <span class="btn btn-small">Enter</span>
+                </div>
+              </div>
+            </a>
+          </div>
+        </section>
 
         <p class="small muted help">
           Need help? Email <a href="mailto:support@the-hawk-games.co.uk">support@the-hawk-games.co.uk</a>.
@@ -97,12 +117,11 @@
       } catch {}
     });
 
-    // Celebrate immediately (payment accepted)
+    // Celebrate + reassure
     fireConfetti(900);
     setTimeout(()=> reassure.style.display = "block", 35000);
 
-    // Optional: wire this later to flip to “Tickets confirmed”
-    // window.__ORDER_STATUS_ENDPOINT__ = "/api/orders";
+    // Optional status flip (if you wire an endpoint later)
     const endpoint = window.__ORDER_STATUS_ENDPOINT__;
     if (endpoint && orderRef && orderRef !== "—") {
       const poll = async (tries=30) => {
@@ -115,8 +134,6 @@
           if (s === "FULFILLED") {
             statusBadge.textContent = "Tickets confirmed";
             statusBadge.className = "badge good";
-            // If you return numbers, you can render them:
-            // renderTickets(o.tickets);
             return;
           }
           if (s === "FAILED") {
@@ -132,7 +149,77 @@
       poll();
     }
 
-    // Brand confetti (tiny, self-contained)
+    // Load Cash Comps from Firestore if available (progressive enhancement)
+    (async () => {
+      try {
+        const { db } = await import("/app/js/firebase-init.js");
+        const { collection, query, where, orderBy, limit, getDocs } =
+          await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        const grid = document.getElementById("cashGrid");
+
+        // Prefer explicit category/type, fall back to title match
+        // (adjust field names to your schema)
+        let q1;
+        try {
+          q1 = query(
+            collection(db, "competitions"),
+            where("isLive", "==", true),
+            where("category", "in", ["cash","Cash","CASH"]),
+            orderBy("priority", "desc"),
+            limit(4)
+          );
+        } catch { /* Firestore 'in' might require index; will fall back */ }
+
+        let snaps = q1 ? await getDocs(q1) : null;
+
+        if (!snaps || snaps.empty) {
+          const q2 = query(
+            collection(db, "competitions"),
+            where("isLive", "==", true),
+            where("type", "==", "cash"),
+            orderBy("priority", "desc"),
+            limit(4)
+          );
+          snaps = await getDocs(q2);
+        }
+
+        if (!snaps.empty) {
+          grid.innerHTML = "";
+          snaps.forEach(docSnap => {
+            const c = docSnap.data();
+            // Field guesses — adjust to your schema
+            const href  = c.path || `/app/competition.html?id=${docSnap.id}`;
+            const img   = c.image || c.coverImage || "/app/assets/cash-generic.jpg";
+            const title = c.title || "Cash Competition";
+            const price = (typeof c.ticketPrice === "number" ? c.ticketPrice/100 : c.price) || 0.99;
+            const sold  = typeof c.soldCount === "number" && typeof c.capacity === "number"
+                          ? Math.max(0, Math.min(100, Math.round((c.soldCount / c.capacity) * 100))) : null;
+
+            const a = document.createElement("a");
+            a.className = "hawk-card";
+            a.href = href;
+            a.innerHTML = `
+              <img class="hawk-card__image" src="${img}" alt="${escapeHtml(title)}">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">${escapeHtml(title)}</h3>
+                ${sold!=null ? `
+                  <div class="progress-bar"><div class="progress-bar-fill" style="width:${sold}%"></div></div>
+                  <div class="hawk-card__progress-text">${sold}% sold</div>` : ``}
+                <div class="hawk-card__footer">
+                  <span class="hawk-card__price">£${Number(price).toFixed(2)}</span>
+                  <span class="btn btn-small">Enter</span>
+                </div>
+              </div>
+            `;
+            grid.appendChild(a);
+          });
+        }
+      } catch { /* no firebase on this page → keep static fallbacks */ }
+
+      function escapeHtml(s){return (s??"").toString().replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;" }[m]))}
+    })();
+
+    // Confetti (brand)
     function fireConfetti(duration=900){
       const c = document.getElementById("confetti");
       const ctx = c.getContext("2d");
@@ -165,15 +252,6 @@
       };
       requestAnimationFrame(draw);
       addEventListener("resize", ()=>{ W = c.width = innerWidth; H = c.height = innerHeight; });
-    }
-
-    function renderTickets(arr){
-      if (!Array.isArray(arr) || !arr.length) return;
-      const sep = document.createElement("div"); sep.className = "hr";
-      const grid = document.createElement("div"); grid.className = "tickets";
-      grid.innerHTML = arr.map(n=>`<div class="ticket">#${n}</div>`).join("");
-      const card = document.querySelector(".card");
-      card.appendChild(sep); card.appendChild(grid);
     }
   </script>
 </body>

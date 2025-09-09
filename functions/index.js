@@ -308,77 +308,113 @@ export const createTrustOrder = onCall(
 export const trustWebhook = onRequest(
   {
     ...functionOptions,
-    enforceAppCheck: false, // Trust calls this server-to-server
+    enforceAppCheck: false, // Trust posts server-to-server
     secrets: [TRUST_NOTIFY_PASSWORD],
   },
   async (req, res) => {
     try {
+      // Parse x-www-form-urlencoded safely
       const ct = (req.get("content-type") || "").toLowerCase();
       const body =
         ct.includes("application/x-www-form-urlencoded")
           ? readUrlEncoded(req)
           : (typeof req.body === "object" && req.body) || readUrlEncoded(req);
 
-      const providedPwd = body.notification_password || body.password || "";
-      const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD");
-      if (!providedPwd || providedPwd !== expectedPwd) {
-        logger.warn("Webhook rejected: bad password", { ip: req.ip });
+      // Extract fields (many can be blank; we will omit blanks in the hash)
+      const errorcode = body.errorcode ?? "";
+      const orderreference = body.orderreference ?? "";
+      const paymenttypedescription = body.paymenttypedescription ?? "";
+      const requestreference = body.requestreference ?? "";
+      const settlestatus = body.settlestatus ?? "";
+      const sitereference = body.sitereference ?? "";
+      const transactionreference = body.transactionreference ?? "";
+      const responsesitesecurityRaw = (body.responsesitesecurity || "").toLowerCase();
+
+      // Build the string in EXACT order, omitting blank values (per Trust guidance),
+      // and EXPLICITLY IGNORING `notificationreference`.
+      const parts = [
+        errorcode,
+        orderreference,
+        paymenttypedescription,
+        requestreference,
+        settlestatus,
+        sitereference,
+        transactionreference,
+      ].filter(v => typeof v === "string" && v.length > 0);
+
+      const notifySecret = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD");
+      const concatenated = parts.join("") + notifySecret;
+
+      // Compute SHA-256 (lowercase hex). Trust does NOT prefix 'h' for responsesitesecurity.
+      const computed = crypto.createHash("sha256").update(concatenated, "utf8").digest("hex");
+
+      // Accept if exact match. (Also tolerate accidental leading 'h' on inbound, just in case.)
+      const inbound = responsesitesecurityRaw.startsWith("h")
+        ? responsesitesecurityRaw.slice(1)
+        : responsesitesecurityRaw;
+
+      if (!inbound || inbound !== computed) {
+        logger.warn("Webhook rejected: responsesitesecurity mismatch", {
+          hasInbound: Boolean(responsesitesecurityRaw),
+          orderreference,
+          expectedHashSample: computed.slice(0, 8) + "...",
+        });
+        // 401 so Trust retries until we fix secrets / ordering
         res.status(401).send("unauthorised");
         return;
       }
 
-      const orderId = body.orderreference || body.order_reference || "";
-      const errorcode = String(body.errorcode ?? "");
-      const settlestatus = String(body.settlestatus ?? "");
-      const paymenttypedescription = body.paymenttypedescription || "";
-      const transactionreference = body.transactionreference || "";
-      const sitereference = body.sitereference || "";
-
-      if (!orderId) {
+      if (!orderreference) {
         logger.warn("Webhook missing orderreference", { body });
         res.status(400).send("bad request");
         return;
       }
 
-      const orderRef = db.collection("orders").doc(orderId);
+      // Load order
+      const orderRef = db.collection("orders").doc(orderreference);
       const orderSnap = await orderRef.get();
-      if (!orderSnap.exists) {
-        logger.warn("Webhook order not found", { orderId });
-        res.status(200).send("ok"); // 200 so Trust doesn’t retry forever
-        return;
-      }
 
-      const already = orderSnap.data() || {};
-      if (already.status === "paid" || already.status === "failed" || already.status === "cancelled") {
-        logger.info("Webhook idempotent short-circuit", { orderId, status: already.status });
+      if (!orderSnap.exists) {
+        // Still return 200 to avoid retry storms; we’ll see the log to investigate.
+        logger.warn("Webhook order not found", { orderreference });
         res.status(200).send("ok");
         return;
       }
 
-      const success = errorcode === "0"; // Trust: 0 = authorised
+      const existing = orderSnap.data() || {};
+      if (["paid", "failed", "cancelled"].includes(existing.status)) {
+        logger.info("Webhook idempotent short-circuit", { orderreference, status: existing.status });
+        res.status(200).send("ok");
+        return;
+      }
+
+      const success = String(errorcode) === "0";
       const baseUpdate = {
         updatedAt: nowServer(),
         provider: "trust",
         providerRef: transactionreference || null,
         sitereference: sitereference || null,
-        settlestatus,
-        errorcode,
-        paymenttypedescription,
+        settlestatus: String(settlestatus ?? ""),
+        errorcode: String(errorcode ?? ""),
+        paymenttypedescription: paymenttypedescription || "",
+        requestreference: requestreference || "",
         webhookReceivedAt: nowServer(),
         trustPayload: {
-          errorcode,
-          settlestatus,
-          paymenttypedescription,
-          transactionreference,
+          errorcode: String(errorcode ?? ""),
+          settlestatus: String(settlestatus ?? ""),
+          paymenttypedescription: paymenttypedescription || "",
+          transactionreference: transactionreference || "",
+          requestreference: requestreference || "",
+          // we purposefully DO NOT store the secret or responsesitesecurity in DB
         },
       };
 
       if (success) {
         await orderRef.update({ ...baseUpdate, status: "paid" });
         try {
-          await fulfilOrderTickets(orderId);
+          await fulfilOrderTickets(orderreference);
         } catch (e) {
-          logger.error("Fulfilment error after webhook", { orderId, err: e?.message || e });
+          logger.error("Fulfilment error after webhook", { orderreference, err: e?.message || e });
         }
       } else {
         await orderRef.update({ ...baseUpdate, status: "failed", failureReason: `errorcode:${errorcode}` });
@@ -387,7 +423,7 @@ export const trustWebhook = onRequest(
       res.status(200).send("ok");
     } catch (err) {
       logger.error("trustWebhook error", { msg: err?.message || err, stack: err?.stack });
-      // Always 200 to avoid retry storms; we log everything server-side.
+      // Return 200 to prevent retry storms on unexpected errors; we have logs.
       res.status(200).send("ok");
     }
   }

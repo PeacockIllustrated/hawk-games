@@ -100,16 +100,11 @@
 
     // 2) Firestore read-only listener (no writes here, fulfilment is webhook-only)
     // Import your existing Firebase init if you have one:
-    //   import { app, auth, db } from "/assets/js/firebase-init.js";
-    // If not, this lightweight init expects window.__FIREBASE_CONFIG__ to exist (avoid hardcoding keys here).
-    import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    
+  import { auth, db } from "/assets/js/firebase-init.js"; // <- your module
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { doc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    const cfg = window.__FIREBASE_CONFIG__;
-    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
 
     // 3) Render helpers
     function renderPending(order) {

@@ -130,6 +130,7 @@ const assertIsAdmin = async (request) => {
 
 // -------------------- Fulfilment (tickets & counts) --------------------
 const fulfilOrderTickets = async (orderId) => {
+  logger.info("fulfil start", { orderId });
   const orderRef = db.collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
   if (!orderSnap.exists) {
@@ -166,11 +167,13 @@ const fulfilOrderTickets = async (orderId) => {
       }
 
       const comp = compSnap.data() || {};
-      const ticketsSold = Number(comp.ticketsSold || 0);
+      const before = Number(comp.ticketsSold || 0);
+      const allocated = Array.from({length: qty}, (_, i) => before + i + 1);
+      logger.info("alloc", { compId, before, qty, allocated });
 
-      // allocate contiguous numbers [ticketsSold, ticketsSold+qty-1]
-      const ticketStart = ticketsSold;
-      const ticketEnd = ticketsSold + qty - 1;
+      // allocate contiguous numbers
+      const ticketStart = before + 1;
+      const ticketEnd = before + qty;
 
       // 1) Write to the competition subcollection (what the UI reads)
       const entrySubRef = compRef.collection("entries").doc();
@@ -193,7 +196,7 @@ const fulfilOrderTickets = async (orderId) => {
         userDisplayName,
         compId,
         ticketsBought: qty,
-        ticketNumbers: Array.from({ length: qty }, (_, i) => ticketStart + i),
+        ticketNumbers: allocated,
         orderId,
         entryType: "paid",
         createdAt: nowServer(),
@@ -229,7 +232,7 @@ const fulfilOrderTickets = async (orderId) => {
     });
   });
 
-  logger.info("fulfilOrderTickets: success", { orderId });
+  logger.info("fulfil done", { orderId });
 };
 
 // -------------------- createTrustOrder (callable) --------------------
@@ -369,6 +372,8 @@ export const trustWebhook = onRequest(
       const sitereference = body.sitereference ?? "";
       const transactionreference = body.transactionreference ?? "";
       const responsesitesecurityRaw = (body.responsesitesecurity || "").toLowerCase();
+
+      logger.info("webhook received", { orderId: orderreference, errorcode, settlestatus, transactionreference });
 
       // Build the string in EXACT order, omitting blank values (per Trust guidance),
       // and EXPLICITLY IGNORING `notificationreference`.

@@ -74,8 +74,8 @@ export async function payByCard({ compId, qty }) {
 
 /**
  * Checkout using site credit balance.
- * Calls allocateTicketsAndAwardTokens (credit flow).
- * @param {Object} intent - purchase intent, e.g. { compId, ticketsBought }
+ * Calls allocateTicketsAndAwardTokens (or other relevant credit flow).
+ * @param {{compId:string,ticketsBought:number}} intent
  */
 export async function payByCredit(intent) {
   const allocateTicketsAndAwardTokens = httpsCallable(

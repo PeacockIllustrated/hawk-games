@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Payment Successful | The Hawk Games</title>
 
-  <!-- Brand fonts / styles -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/app/css/checkout.css">
-
   <meta name="robots" content="noindex" />
 </head>
 <body>
@@ -43,38 +41,41 @@
   <script type="module">
     // Firebase (CDN, v9 modules)
     import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import {
-      getFirestore,
-      doc,
-      onSnapshot,
-      getDoc,
-      // If you ever want to avoid WebChannel, you could switch to longPolling:
-      // initializeFirestore
-    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check.js";
     // Your config, exported as: export const firebaseConfig = { ... }
     import { firebaseConfig } from "./js/firebase-config.js";
 
-    // --- Firebase init (idempotent) ---
+    // Init (idempotent)
     const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    // If you truly want to kill WebChannel noise, uncomment below and use `db = initializeFirestore(...)`:
-    // const db = initializeFirestore(app, { experimentalForceLongPolling: true, useFetchStreams: false });
+
+    // 🔐 App Check (REQUIRED for Firestore if enforcement is on)
+    // Same key you use in /app/js/auth.js
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider('6LdkDqgrAAAAAAuWtoK941myjHGZd8vka_Q3JhKg'),
+      isTokenAutoRefreshEnabled: true
+    });
+
     const db  = getFirestore(app);
     const auth = getAuth(app);
 
-    // --- Parse orderId from multiple possible param names ---
+    // Grab order id from multiple possible param names (Trust can rename things)
     const qs = new URLSearchParams(location.search);
     const orderId =
-      qs.get("orderId") ||           // our preferred param (we add ?orderId=… on redirect)
-      qs.get("orderreference") ||    // Trust commonly returns this
-      qs.get("requestreference") ||  // sometimes appears
-      qs.get("orderid");             // rare fallback
+      qs.get("orderId") ||          // our preferred param
+      qs.get("orderreference") ||   // Trust commonly returns this
+      qs.get("requestreference") || // sometimes this one appears
+      qs.get("orderid");            // rare fallback
 
+    // Debug toggle: add ?debug=1 to the URL if you want console detail
     const debug = qs.get("debug") === "1";
+    const log = (...args) => debug && console.log("[Success]", ...args);
+
     if (debug) {
-      console.log("[success] URL:", location.href);
-      console.log("[success] orderId:", orderId);
-      console.log("[success] params:", Object.fromEntries(qs.entries()));
+      log("URL:", location.href);
+      log("Resolved orderId:", orderId);
+      log("All params:", Object.fromEntries(qs.entries()));
     }
 
     // UI hooks
@@ -92,82 +93,99 @@
       return a;
     }
 
-    // --- Ensure user auth before listening (so Firestore rules don’t bite) ---
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
+    function showInfoLine(text) {
+      const p = document.createElement("p");
+      p.className = "small";
+      p.textContent = text;
+      frame.appendChild(p);
+      return p;
+    }
+
+    function showErrorUI(msg, ctaText, ctaHref) {
+      title.textContent = "We hit a snag";
+      sub.textContent = msg || "There was a problem confirming your order.";
+      loader?.remove();
+      if (ctaText && ctaHref) addCTA(ctaText, ctaHref, true);
+    }
+
+    // Wait for auth state before trying to read from Firestore
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        log("User authenticated:", user.uid);
+
+        if (!orderId) {
+          title.textContent = "Missing order reference";
+          sub.textContent = "We couldn’t find your orderId in the URL.";
+          loader?.remove();
+          addCTA("Go to My Account", "/app/account.html");
+          return;
+        }
+
+        const ref = doc(db, "orders", orderId);
+
+        // Listen for order status changes
+        const unsubscribe = onSnapshot(ref, (snap) => {
+          if (!snap.exists()) {
+            // Webhook may land just after redirect; keep spinner and friendly copy
+            title.textContent = "Preparing your order…";
+            sub.textContent = "Hang tight. This usually takes just a moment.";
+            return;
+          }
+
+          const o = snap.data();
+          log("Order doc update:", o);
+
+          // Terminal statuses => stop listening
+          if (o.status === "paid" || o.status === "fulfilled") {
+            unsubscribe();
+            title.textContent = "Payment complete — you're in! ✅";
+            sub.textContent = "Your entries are now active on your account. Good luck!";
+            loader?.remove();
+
+            addCTA("Back to Games", "/app/index.html");
+            showInfoLine(`Order: ${orderId}${o.providerRef ? " • Ref: " + o.providerRef : ""}`);
+
+          } else if (o.status === "failed" || o.status === "cancelled") {
+            unsubscribe();
+            title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
+            sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
+            loader?.remove();
+            addCTA("Back to Games", "/app/index.html", true);
+
+          } else {
+            // 'created' or 'processing' — just wait
+            title.textContent = "Confirming your payment…";
+            sub.textContent = "We’re waiting for final confirmation from the payment provider.";
+          }
+        }, (err) => {
+          // Permission / App Check / connectivity errors arrive here
+          log("onSnapshot error:", err);
+
+          // try to give a helpful message
+          if (err?.code === "permission-denied") {
+            showErrorUI(
+              "We can’t access this order. Make sure you’re signed in with the same account you used to pay.",
+              "Go to My Account",
+              "/app/account.html"
+            );
+          } else if (String(err?.message || "").toLowerCase().includes("app check")) {
+            showErrorUI(
+              "Security check failed. Please refresh the page. If this keeps happening, try disabling content blockers."
+            );
+          } else {
+            showErrorUI("There was a problem checking your order status. Please check your account page for your entries.",
+                        "Go to My Account",
+                        "/app/account.html");
+          }
+        });
+
+      } else {
+        log("No authenticated user found.");
         title.textContent = "Please sign in";
         sub.textContent = "To confirm your order status, please sign in to your account.";
         loader?.remove();
         addCTA("Sign In", `/app/login.html?redirect=${encodeURIComponent(location.pathname + location.search)}`);
-        return;
       }
-
-      if (!orderId) {
-        title.textContent = "Missing order reference";
-        sub.textContent = "We couldn’t find your orderId in the URL.";
-        loader?.remove();
-        addCTA("Go to My Account", "/app/account.html");
-        return;
-      }
-
-      // First, try to read once — if not there yet, keep listening
-      try {
-        const once = await getDoc(doc(db, "orders", orderId));
-        if (once.exists() && once.data()?.status === "paid") {
-          title.textContent = "Payment complete — you're in! ✅";
-          sub.textContent = "Your entries are now active on your account. Good luck!";
-          loader?.remove();
-          addCTA("Back to Games", "/app/index.html");
-          const info = document.createElement("p");
-          info.className = "small";
-          info.textContent = `Order: ${orderId}${once.data()?.providerRef ? " • Ref: " + once.data().providerRef : ""}`;
-          frame.appendChild(info);
-          return;
-        }
-      } catch {}
-
-      // Live-listen for updates (Trust webhook flips the doc)
-      let finished = false;
-      const unsub = onSnapshot(
-        doc(db, "orders", orderId),
-        (snap) => {
-          const order = snap.exists() ? snap.data() : null;
-          if (!order) return;
-          if (debug) console.log("[success] order update:", order?.status, order);
-
-          if (order.status === "paid" || order.status === "fulfilled") {
-            finished = true;
-            try { unsub?.(); } catch {}
-            title.textContent = "Payment complete — you're in! ✅";
-            sub.textContent = "Your entries are now active on your account. Good luck!";
-            loader?.remove();
-            addCTA("Back to Games", "/app/index.html");
-            const info = document.createElement("p");
-            info.className = "small";
-            info.textContent = `Order: ${orderId}${order.providerRef ? " • Ref: " + order.providerRef : ""}`;
-            frame.appendChild(info);
-          } else if (order.status === "failed" || order.status === "cancelled") {
-            finished = true;
-            try { unsub?.(); } catch {}
-            title.textContent = (order.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
-            sub.textContent = order.failureReason || "No funds were taken. You can safely try again.";
-            loader?.remove();
-            addCTA("Back to Games", "/app/index.html", true);
-          } else {
-            title.textContent = "Confirming your payment…";
-            sub.textContent = "We’re waiting for final confirmation from the payment provider.";
-          }
-        },
-        (err) => {
-          if (finished) return;
-          try { unsub?.(); } catch {}
-          if (debug) console.error("[success] onSnapshot error:", err);
-          title.textContent = "We hit a snag";
-          sub.textContent = "There was a problem checking your order status. Please check your account page for your entries.";
-          loader?.remove();
-          addCTA("Go to My Account", "/app/account.html");
-        }
-      );
     });
   </script>
 </body>

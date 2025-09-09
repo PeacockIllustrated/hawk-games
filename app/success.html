@@ -67,10 +67,9 @@
     const orderId =
       qs.get("orderId") ||           // our preferred param (we add ?orderId=… on redirect)
       qs.get("orderreference") ||    // Trust commonly returns this
-      qs.get("requestreference") ||  // sometimes this one appears
+      qs.get("requestreference") ||  // sometimes appears
       qs.get("orderid");             // rare fallback
 
-    // Debug toggle: add ?debug=1 to the URL if you want console detail
     const debug = qs.get("debug") === "1";
     if (debug) {
       console.log("[success] URL:", location.href);
@@ -78,127 +77,98 @@
       console.log("[success] params:", Object.fromEntries(qs.entries()));
     }
 
-    // --- UI hooks ---
+    // UI hooks
     const title  = document.getElementById("title");
     const sub    = document.getElementById("sub");
     const frame  = document.getElementById("frame");
     const loader = document.getElementById("loader");
-    const addCTA = (text, href, alt = false) => {
+
+    function addCTA(text, href, altStyle = false) {
       const a = document.createElement("a");
-      a.className = alt ? "hawk-btn alt" : "hawk-btn";
+      a.className = altStyle ? "hawk-btn alt" : "hawk-btn";
       a.href = href;
       a.textContent = text;
       frame.appendChild(a);
       return a;
-    };
-
-    // --- Safety: missing orderId ---
-    if (!orderId) {
-      title.textContent = "Missing order reference";
-      sub.textContent = "We couldn’t find your order in the URL. No funds were taken.";
-      loader?.remove();
-      addCTA("Back to Games", "/app/index.html", true);
-      throw new Error("Missing orderId");
     }
 
-    // --- Live listening with fallbacks and clean unsubscribe ---
-    let unsub = null;
-    let sawDoc = false;
-    let finished = false;
-
-    function resolveUI(order) {
-      if (!order) return;
-      if (debug) console.log("[success] order update:", order?.status, order);
-
-      if (order.status === "paid" || order.status === "fulfilled") {
-        finished = true;
-        try { unsub?.(); } catch {}
-        title.textContent = "Payment complete — you're in! ✅";
-        sub.textContent = "Your entries are now active on your account. Good luck!";
+    // --- Ensure user auth before listening (so Firestore rules don’t bite) ---
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        title.textContent = "Please sign in";
+        sub.textContent = "To confirm your order status, please sign in to your account.";
         loader?.remove();
-        addCTA("Back to Games", "/app/index.html");
-
-        const info = document.createElement("p");
-        info.className = "small";
-        info.textContent = `Order: ${orderId}${order.providerRef ? " • Ref: " + order.providerRef : ""}`;
-        frame.appendChild(info);
+        addCTA("Sign In", `/app/login.html?redirect=${encodeURIComponent(location.pathname + location.search)}`);
         return;
       }
 
-      if (order.status === "failed" || order.status === "cancelled") {
-        finished = true;
-        try { unsub?.(); } catch {}
-        title.textContent = order.status === "failed" ? "Payment failed ❌" : "Payment cancelled ❌";
-        sub.textContent = order.failureReason || "No funds were taken. You can safely try again.";
+      if (!orderId) {
+        title.textContent = "Missing order reference";
+        sub.textContent = "We couldn’t find your orderId in the URL.";
         loader?.remove();
-        addCTA("Back to Games", "/app/index.html", true);
+        addCTA("Go to My Account", "/app/account.html");
         return;
       }
 
-      // created/processing — keep waiting
-      title.textContent = "Confirming your payment…";
-      sub.textContent = "We’re waiting for final confirmation from the payment provider.";
-    }
+      // First, try to read once — if not there yet, keep listening
+      try {
+        const once = await getDoc(doc(db, "orders", orderId));
+        if (once.exists() && once.data()?.status === "paid") {
+          title.textContent = "Payment complete — you're in! ✅";
+          sub.textContent = "Your entries are now active on your account. Good luck!";
+          loader?.remove();
+          addCTA("Back to Games", "/app/index.html");
+          const info = document.createElement("p");
+          info.className = "small";
+          info.textContent = `Order: ${orderId}${once.data()?.providerRef ? " • Ref: " + once.data().providerRef : ""}`;
+          frame.appendChild(info);
+          return;
+        }
+      } catch {}
 
-    function startListening() {
-      const ref = doc(db, "orders", orderId);
-
-      unsub = onSnapshot(
-        ref,
+      // Live-listen for updates (Trust webhook flips the doc)
+      let finished = false;
+      const unsub = onSnapshot(
+        doc(db, "orders", orderId),
         (snap) => {
-          if (!snap.exists()) {
-            // Webhook may land after redirect; keep spinner + friendly copy
-            title.textContent = "Preparing your order…";
-            sub.textContent = "Hang tight. This usually takes just a moment.";
-            return;
+          const order = snap.exists() ? snap.data() : null;
+          if (!order) return;
+          if (debug) console.log("[success] order update:", order?.status, order);
+
+          if (order.status === "paid" || order.status === "fulfilled") {
+            finished = true;
+            try { unsub?.(); } catch {}
+            title.textContent = "Payment complete — you're in! ✅";
+            sub.textContent = "Your entries are now active on your account. Good luck!";
+            loader?.remove();
+            addCTA("Back to Games", "/app/index.html");
+            const info = document.createElement("p");
+            info.className = "small";
+            info.textContent = `Order: ${orderId}${order.providerRef ? " • Ref: " + order.providerRef : ""}`;
+            frame.appendChild(info);
+          } else if (order.status === "failed" || order.status === "cancelled") {
+            finished = true;
+            try { unsub?.(); } catch {}
+            title.textContent = (order.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
+            sub.textContent = order.failureReason || "No funds were taken. You can safely try again.";
+            loader?.remove();
+            addCTA("Back to Games", "/app/index.html", true);
+          } else {
+            title.textContent = "Confirming your payment…";
+            sub.textContent = "We’re waiting for final confirmation from the payment provider.";
           }
-          sawDoc = true;
-          resolveUI(snap.data());
         },
         (err) => {
-          if (debug) console.warn("[success] onSnapshot error (non-fatal):", err);
-          // Keep waiting; fallbacks below will backstop us
+          if (finished) return;
+          try { unsub?.(); } catch {}
+          if (debug) console.error("[success] onSnapshot error:", err);
+          title.textContent = "We hit a snag";
+          sub.textContent = "There was a problem checking your order status. Please check your account page for your entries.";
+          loader?.remove();
+          addCTA("Go to My Account", "/app/account.html");
         }
       );
-
-      // Fallback #1: single read after 8s if no snapshot yet
-      setTimeout(async () => {
-        if (sawDoc || finished) return;
-        try {
-          const s = await getDoc(ref);
-          if (s.exists()) {
-            resolveUI(s.data());
-          } else {
-            title.textContent = "Preparing your order…";
-            sub.textContent = "Hang tight. This usually takes just a moment.";
-          }
-        } catch (e) {
-          if (debug) console.error("[success] getDoc fallback failed:", e);
-        }
-      }, 8000);
-
-      // Fallback #2: after 90s, show a gentle message but keep listening
-      setTimeout(() => {
-        if (!finished) {
-          title.textContent = "We hit a snag";
-          sub.textContent = "We’ll update this page as soon as your order is confirmed.";
-        }
-      }, 90_000);
-    }
-
-    // Clean up the listener when leaving the page (don’t call Firestore terminate; it’s noisy and unnecessary)
-    function cleanup() { try { unsub?.(); } catch {} }
-    window.addEventListener("beforeunload", cleanup);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") cleanup();
     });
-
-    // Optional: wait for auth to satisfy rules; if your rules allow reading a specific order without auth, you can call startListening() immediately.
-    onAuthStateChanged(
-      auth,
-      () => { if (!unsub) startListening(); },
-      () => { if (!unsub) startListening(); }
-    );
   </script>
 </body>
 </html>

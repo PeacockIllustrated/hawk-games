@@ -136,6 +136,7 @@ const fulfilOrderTickets = async (orderId) => {
     logger.error("fulfilOrderTickets: order not found", { orderId });
     return;
   }
+
   const order = orderSnap.data() || {};
   if (order.fulfilled === true) {
     logger.info("fulfilOrderTickets: already fulfilled", { orderId });
@@ -144,10 +145,15 @@ const fulfilOrderTickets = async (orderId) => {
 
   const items = Array.isArray(order.items) ? order.items : [];
   const userId = order.userId || null;
+  const userDisplayName = order.userDisplayName || "N/A";
 
   await db.runTransaction(async (tx) => {
+    // We’ll accumulate total tickets to bump user entryCount once.
+    const perCompetitionAdds = new Map();
+
     for (const it of items) {
       if (it?.kind !== "tickets") continue;
+
       const compId = it.compId;
       const qty = Number(it.qty || 0);
       if (!compId || qty <= 0) continue;
@@ -158,32 +164,66 @@ const fulfilOrderTickets = async (orderId) => {
         logger.warn("Competition missing during fulfil", { compId, orderId });
         continue;
       }
+
       const comp = compSnap.data() || {};
       const ticketsSold = Number(comp.ticketsSold || 0);
 
-      // Simple contiguous allocation
-      const allocated = [];
-      for (let i = 1; i <= qty; i++) allocated.push(ticketsSold + i);
+      // allocate contiguous numbers [ticketsSold, ticketsSold+qty-1]
+      const ticketStart = ticketsSold;
+      const ticketEnd = ticketsSold + qty - 1;
 
-      const entryRef = db.collection("entries").doc();
-      tx.set(entryRef, {
-        orderId,
+      // 1) Write to the competition subcollection (what the UI reads)
+      const entrySubRef = compRef.collection("entries").doc();
+      tx.set(entrySubRef, {
         userId,
+        userDisplayName,
+        ticketsBought: qty,
+        ticketStart,
+        ticketEnd,
+        orderId,
+        entryType: "paid",
+        enteredAt: nowServer(),
+        source: "trust",
+      });
+
+      // (Optional) keep a global log if you want analytics
+      const entryGlobalRef = db.collection("entries").doc();
+      tx.set(entryGlobalRef, {
+        userId,
+        userDisplayName,
         compId,
-        qty,
-        ticketNumbers: allocated,
+        ticketsBought: qty,
+        ticketNumbers: Array.from({ length: qty }, (_, i) => ticketStart + i),
+        orderId,
+        entryType: "paid",
         createdAt: nowServer(),
         source: "trust",
       });
 
+      // 2) Update the competition counters
       tx.update(compRef, {
         ticketsSold: FieldValue.increment(qty),
         updatedAt: nowServer(),
       });
+
+      // Aggregate per-comp increments for the user entryCount
+      perCompetitionAdds.set(compId, (perCompetitionAdds.get(compId) || 0) + qty);
     }
 
+    // 3) Update user entryCount.{compId} for all comps in this order
+    if (userId && perCompetitionAdds.size > 0) {
+      const userRef = db.collection("users").doc(userId);
+      const inc = {};
+      for (const [compId, qty] of perCompetitionAdds.entries()) {
+        inc[`entryCount.${compId}`] = FieldValue.increment(qty);
+      }
+      tx.set(userRef, inc, { merge: true });
+    }
+
+    // 4) Mark order fulfilled (and set status to 'fulfilled' for the success page)
     tx.update(orderRef, {
       fulfilled: true,
+      status: "fulfilled",
       fulfilledAt: nowServer(),
       updatedAt: nowServer(),
     });

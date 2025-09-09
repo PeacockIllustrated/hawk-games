@@ -68,6 +68,9 @@ const getMode = () => {
   return v === "test" ? "test" : "live";
 };
 
+/**
+ * Parse x-www-form-urlencoded body if received as raw bytes.
+ */
 const readUrlEncoded = (req) => {
   try {
     const raw = req.rawBody?.toString("utf8") || "";
@@ -81,7 +84,7 @@ const readUrlEncoded = (req) => {
 };
 
 /**
- * Get a UTC timestamp in "YYYY-MM-DD HH:mm:ss" format for Trust Payments hashing.
+ * UTC timestamp in "YYYY-MM-DD HH:mm:ss" format for Trust Payments hashing.
  * @returns {string}
  */
 const getUtcTimestamp = () => {
@@ -93,6 +96,18 @@ const getUtcTimestamp = () => {
   const min = String(d.getUTCMinutes()).padStart(2, "0");
   const ss = String(d.getUTCSeconds()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+};
+
+/**
+ * Build Site Security hash per Trust docs (values only, omit blanks), SHA-256 hex lowercase, prefixed with "h".
+ * @param {string[]} valuesInOrder - ordered, non-empty values to hash (timestamp must be last before password).
+ * @param {string} password - site security password (shared secret)
+ * @returns {string}
+ */
+const buildSiteSecurityHash = (valuesInOrder, password) => {
+  const toHash = valuesInOrder.join("") + password;
+  const h = crypto.createHash("sha256").update(toHash, "utf8").digest("hex").toLowerCase();
+  return "h" + h;
 };
 
 // Auth helpers used by business functions
@@ -268,6 +283,7 @@ export const createTrustOrder = onCall(
       const comp = compSnap.data();
 
       let unitPricePence = null;
+      const currencyiso3a = "GBP";
       if (typeof comp?.ticketPricePence === "number") unitPricePence = comp.ticketPricePence;
       else if (typeof comp?.pricePence === "number") unitPricePence = comp.pricePence;
       else if (Array.isArray(comp?.ticketTiers) && comp.ticketTiers.length) {
@@ -280,7 +296,6 @@ export const createTrustOrder = onCall(
 
       const amountPence = unitPricePence * qty;
       const mainamount = (amountPence / 100).toFixed(2); // "12.99"
-      const currencyiso3a = "GBP";
 
       // --- Create order doc ---
       const orderRef = db.collection("orders").doc();
@@ -376,13 +391,10 @@ export const trustWebhook = onRequest(
           ? readUrlEncoded(req)
           : (typeof req.body === "object" && req.body) || readUrlEncoded(req);
 
-      // --- Auth check 1: Notification Password ---
-      const providedPwd = (
-        body.notification_password ||
-        body.notificationpassword ||
-        req.query?.t ||
-        ""
-      ).toString().trim();
+      // --- Auth check 1: allow URL token (?t=...) or a body password (notificationpassword / notification_password)
+      const providedPwd = String(
+        (req.query?.t || body.notificationpassword || body.notification_password || "")
+      ).trim();
       const expectedPwd = readSecret(TRUST_NOTIFY_PASSWORD, "TRUST_NOTIFY_PASSWORD").trim();
       if (!providedPwd || providedPwd !== expectedPwd) {
         logger.warn("Webhook rejected: bad password", { ip: req.ip, havePwd: !!providedPwd });
@@ -390,13 +402,8 @@ export const trustWebhook = onRequest(
         return;
       }
 
-      // --- Auth check 2: Site Reference ---
+      // --- Auth check 2: restrict site reference (if provided)
       const postSiteRef = String(body.sitereference || "");
-      if (!postSiteRef) {
-        logger.warn("Webhook rejected: missing sitereference");
-        res.status(401).send("unauthorised");
-        return;
-      }
       const allowedSites = new Set(
         [readSecret(TRUST_SITEREFERENCE, "TRUST_SITEREFERENCE"), trySecret(TRUST_TEST_SITEREFERENCE)]
           .filter(Boolean)
@@ -424,12 +431,10 @@ export const trustWebhook = onRequest(
       if (responseSiteSecurity && responseSiteSecurityTimestamp) {
         const orderIdForHash = body.orderreference || body.order_reference || "";
         const orderSnapForHash = await db.collection("orders").doc(orderIdForHash).get();
-
         if (orderSnapForHash.exists) {
-          const orderData = orderSnapForHash.data() || {};
-          const currencyiso3a = String(orderData.currency || "GBP");
-          const mainamount = (Number(orderData.amountPence || 0) / 100).toFixed(2);
-
+          const orderForHash = orderSnapForHash.data();
+          const currencyiso3a = String(orderForHash.currency || body.currencyiso3a || "GBP");
+          const mainamount = (Number(orderForHash.amountPence || 0) / 100).toFixed(2);
           const hashString = [
             currencyiso3a,
             mainamount,
@@ -438,7 +443,6 @@ export const trustWebhook = onRequest(
             responseSiteSecurityTimestamp,
             siteSecurityPwd,
           ].join("");
-
           const expectedHash =
             "h" + crypto.createHash("sha256").update(hashString).digest("hex");
 
@@ -458,7 +462,7 @@ export const trustWebhook = onRequest(
         }
       }
 
-      // --- Process request ---
+      // Parse core fields
       const orderId = body.orderreference || body.order_reference || "";
       if (!orderId) {
         logger.warn("Webhook missing orderreference", { bodyKeys: Object.keys(body || {}) });
@@ -502,8 +506,6 @@ export const trustWebhook = onRequest(
           settlestatus,
           paymenttypedescription,
           transactionreference,
-          responsesitesecurity, // store for auditing
-          responsesitesecuritytimestamp, // store for auditing
         },
       };
 
@@ -801,209 +803,4 @@ export const transferCashToCredit = onCall(functionOptions, async (request) => {
     const creditToAdd = amount * 1.5;
     transaction.update(userRef, {
       cashBalance: FieldValue.increment(-amount),
-      creditBalance: FieldValue.increment(creditToAdd),
-    });
-
-    return { success: true, newCreditBalance: (userData.creditBalance || 0) + creditToAdd };
-  });
-});
-
-// requestCashPayout
-export const requestCashPayout = onCall(functionOptions, async (request) => {
-  const schema = z.object({ amount: z.number().positive("Amount must be a positive number.") });
-  const validation = schema.safeParse(request.data);
-  if (!validation.success) throw new HttpsError("invalid-argument", validation.error.errors[0].message);
-
-  const { amount } = validation.data;
-  const uid = assertIsAuthenticated(request);
-  const userRef = db.collection("users").doc(uid);
-
-  return db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-
-    const userData = userDoc.data();
-    const userCashBalance = userData.cashBalance || 0;
-    if (userCashBalance < amount) throw new HttpsError("failed-precondition", "Insufficient cash balance.");
-
-    transaction.update(userRef, { cashBalance: FieldValue.increment(-amount) });
-
-    const payoutRequestRef = db.collection("payoutRequests").doc();
-    transaction.set(payoutRequestRef, {
-      userId: uid,
-      amount,
-      status: "pending",
-      requestedAt: nowServer(),
-      userDisplayName: userData.displayName || "N/A",
-      userEmail: userData.email || "N/A",
-    });
-
-    return { success: true, message: "Payout request submitted successfully." };
-  });
-});
-
-// playPlinko
-export const playPlinko = onCall(functionOptions, async (request) => {
-  const schema = z.object({ tokenId: z.string().min(1) });
-  const validation = schema.safeParse(request.data);
-  if (!validation.success) throw new HttpsError("invalid-argument", "A valid tokenId is required.");
-
-  const { tokenId } = validation.data;
-  const uid = assertIsAuthenticated(request);
-  const userRef = db.collection("users").doc(uid);
-
-  return db.runTransaction(async (transaction) => {
-    const settingsRef = db.collection("admin_settings").doc("plinkoPrizes");
-    const [userDoc, settingsDoc] = await Promise.all([transaction.get(userRef), transaction.get(settingsRef)]);
-
-    if (!userDoc.exists) throw new HttpsError("not-found", "User profile not found.");
-    if (!settingsDoc.exists) throw new HttpsError("internal", "Plinko prize configuration is not available.");
-
-    const userData = userDoc.data();
-    const settings = settingsDoc.data();
-    const PLINKO_ROWS = settings.rows || 12;
-    const payouts = settings.payouts || [];
-    const mode = settings.mode || "server";
-
-    const userTokens = userData.plinkoTokens || [];
-    const tokenIndex = userTokens.findIndex((t) => t.tokenId === tokenId);
-    if (tokenIndex === -1) throw new HttpsError("not-found", "Plinko token not found or already spent.");
-    const updatedTokens = userTokens.filter((t) => t.tokenId !== tokenId);
-    transaction.update(userRef, { plinkoTokens: updatedTokens });
-
-    let rights = 0;
-    const steps = [];
-    for (let i = 0; i < PLINKO_ROWS; i++) {
-      const step = mode === "weighted" ? (Math.random() < 0.55 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
-      steps.push(step);
-      if (step === 1) rights++;
-    }
-    const finalSlotIndex = rights;
-
-    const prize = payouts[finalSlotIndex] || { type: "credit", value: 0 };
-    const finalPrize = { won: prize.value > 0, type: prize.type || "credit", value: prize.value || 0 };
-
-    if (finalPrize.won) {
-      const winLogRef = db.collection("plinko_wins").doc();
-      transaction.set(winLogRef, {
-        userId: uid,
-        prizeType: finalPrize.type,
-        prizeValue: finalPrize.value,
-        slotIndex: finalSlotIndex,
-        wonAt: nowServer(),
-        tokenIdUsed: tokenId,
-      });
-      if (finalPrize.type === "credit") {
-        transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
-      }
-    }
-
-    return { prize: finalPrize, path: { steps, slotIndex: finalSlotIndex } };
-  });
-});
-
-// ----------------------------------------------------------------------------
-// Simple draw helper (kept minimal and defensive)
-// ----------------------------------------------------------------------------
-const performDraw = async (compId) => {
-  // Prefer per-competition subcollection
-  const compRef = db.collection("competitions").doc(compId);
-  const subSnap = await compRef.collection("entries").get();
-
-  let entries = [];
-  if (!subSnap.empty) {
-    entries = subSnap.docs.map((d) => ({ uid: d.data().userId, displayName: d.data().userDisplayName || "N/A" }));
-  } else {
-    // Fallback: global entries with compId
-    const globalSnap = await db.collection("entries").where("compId", "==", compId).get();
-    entries = globalSnap.docs.map((d) => ({ uid: d.data().userId, displayName: d.data().userDisplayName || "N/A" }));
-  }
-
-  if (!entries.length) throw new Error("No entries to draw.");
-
-  const idx = Math.floor(Math.random() * entries.length);
-  const winner = entries[idx];
-
-  await compRef.update({
-    winnerUserId: winner.uid || null,
-    winnerDisplayName: winner.displayName || "N/A",
-    drawnAt: nowServer(),
-  });
-
-  return { winnerUserId: winner.uid, winnerDisplayName: winner.displayName };
-};
-
-// drawWinner (manual)
-export const drawWinner = onCall(functionOptions, async (request) => {
-  const schema = z.object({ compId: z.string().min(1) });
-  const validation = schema.safeParse(request.data);
-  if (!validation.success) throw new HttpsError("invalid-argument", "Competition ID is required.");
-  const { compId } = validation.data;
-
-  await assertIsAdmin(request);
-
-  const compRef = db.collection("competitions").doc(compId);
-  const compDoc = await compRef.get();
-  if (!compDoc.exists || compDoc.data().status !== "ended") {
-    throw new HttpsError("failed-precondition", 'Competition must be in "ended" status to be drawn manually.');
-  }
-
-  try {
-    const result = await performDraw(compId);
-    return { success: true, ...result };
-  } catch (error) {
-    logger.error(`Manual draw failed for compId: ${compId}`, error);
-    throw new HttpsError("internal", error.message || "An internal error occurred during the draw.");
-  }
-});
-
-// weeklyTokenCompMaintenance (fix: use admin Timestamp + query chaining)
-export const weeklyTokenCompMaintenance = onSchedule(
-  {
-    schedule: "every monday 12:00",
-    timeZone: "Europe/London",
-    region: REGION,
-  },
-  async () => {
-    logger.log("Starting weekly token competition maintenance...");
-
-    const compsRef = db.collection("competitions");
-    const oneWeekAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-    const snapshot = await compsRef
-      .where("competitionType", "==", "token")
-      .where("status", "==", "live")
-      .where("createdAt", "<=", oneWeekAgo)
-      .get();
-
-    if (snapshot.empty) {
-      logger.log("No old token competitions found needing cleanup. Exiting.");
-    } else {
-      logger.log(`Found ${snapshot.docs.length} old token competitions to process.`);
-    }
-
-    for (const doc of snapshot.docs) {
-      const compId = doc.id;
-      logger.log(`Processing competition ${compId}...`);
-      try {
-        await doc.ref.update({ status: "ended" });
-        logger.log(`Competition ${compId} status set to 'ended'.`);
-        const drawResult = await performDraw(compId);
-        logger.log(`Successfully drew winner for ${compId}: ${drawResult.winnerDisplayName}`);
-      } catch (error) {
-        logger.error(`Failed to process and draw winner for ${compId}`, error);
-      }
-    }
-
-    const liveTokenSnapshot = await compsRef
-      .where("competitionType", "==", "token")
-      .where("status", "==", "live")
-      .get();
-
-    if (liveTokenSnapshot.size < 3) {
-      logger.warn(`CRITICAL: The pool of live token competitions is low (${liveTokenSnapshot.size}). Admin should create more.`);
-    }
-
-    return null;
-  }
-);
+      creditBalance: FieldValue.increment(cred

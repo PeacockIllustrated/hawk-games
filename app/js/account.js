@@ -1,12 +1,12 @@
 'use strict';
 
 import { app } from './auth.js';
-import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js';
-import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js';
+import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-functions.js';
 import { 
     getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp, 
     collection, collectionGroup, query, where, getDocs, orderBy, documentId, onSnapshot
-} from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
+} from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
 
 const auth = getAuth(app);
 const db   = getFirestore(app);

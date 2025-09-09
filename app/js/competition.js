@@ -3,8 +3,16 @@
 // Full drop-in replacement, no brevity.
 
 // --- Firebase Imports ---
-import { getAuth } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import { app } from './auth.js';
 import { payByCard, payByCredit } from './payments.js';
 
@@ -634,7 +642,7 @@ async function handleSpinButtonClick() {
 
   try {
     // Spend token via CF
-    const spendToken = (await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js"));
+    const spendToken = (await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-functions.js"));
     const functions = spendToken.getFunctions(app);
     const spendTokenFunc = spendToken.httpsCallable(functions, 'spendSpinToken');
 

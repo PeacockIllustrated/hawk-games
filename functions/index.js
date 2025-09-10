@@ -205,10 +205,29 @@ const fulfilOrderTickets = async (orderId) => {
       });
 
       // 2) Update the competition counters
-      tx.update(compRef, {
-        ticketsSold: FieldValue.increment(qty),
-        updatedAt: nowServer(),
-      });
+      // Normalize fields when reading the comp
+      const cap  = Number(comp.totalTickets ?? comp.capacity ?? 0);
+      const sold = Number(comp.ticketsSold ?? comp.soldCount ?? 0);
+      const soldNow = sold + qty;
+      const atCapacity = cap > 0 && soldNow >= cap;
+      const isSellout = comp.closeMode === "sellout"; // default date if missing
+
+      // Build the correct "sold" field update (always prefer ticketsSold)
+      const soldFieldUpdate = ('ticketsSold' in comp || !('soldCount' in comp))
+        ? { ticketsSold: soldNow }
+        : { soldCount: soldNow };
+
+      // Update competition doc
+      if (atCapacity && isSellout){
+        tx.update(compRef, {
+          ...soldFieldUpdate,
+          status: "sold_out",
+          isLive: false,
+          soldOutAt: nowServer(),
+        });
+      } else {
+        tx.update(compRef, soldFieldUpdate);
+      }
 
       // Aggregate per-comp increments for the user entryCount
       perCompetitionAdds.set(compId, (perCompetitionAdds.get(compId) || 0) + qty);
@@ -273,6 +292,27 @@ export const createTrustOrder = onCall(
       const compSnap = await db.collection("competitions").doc(compId).get();
       if (!compSnap.exists) throw new HttpsError("not-found", "Competition not found");
       const comp = compSnap.data();
+
+      function toMillis(ts){ return ts?.toMillis ? ts.toMillis() : new Date(ts||0).getTime(); }
+      function computeStateServer(comp) {
+        const cap  = Number(comp.totalTickets ?? comp.capacity ?? 0);
+        const sold = Number(comp.ticketsSold ?? comp.soldCount ?? 0);
+        const left = Math.max(0, cap - sold);
+        if (cap > 0 && left === 0) return "sold_out";
+        const isSellout = comp?.closeMode === "sellout"; // default to date
+        if (!isSellout){
+          const endMs = toMillis(comp?.closeAt);
+          if (endMs && Date.now() >= endMs) return "closed";
+        }
+        return "live";
+      }
+
+      if (computeStateServer(comp) !== "live") throw new HttpsError("failed-precondition", "Competition closed");
+
+      // also protect against oversell
+      const cap  = Number(comp.totalTickets ?? comp.capacity ?? 0);
+      const sold = Number(comp.ticketsSold ?? comp.soldCount ?? 0);
+      if (Math.max(0, cap - sold) < qty) throw new HttpsError("failed-precondition", "Not enough tickets remaining");
 
       const unitPricePence = resolveUnitPricePence(comp);
       if (unitPricePence === null) {

@@ -19,6 +19,7 @@ import {
 import { app } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";
+import { computeState, resolveCloseMode, startCountdown, formatLeft } from "/app/js/lib/comp-state.js";
 
 // --- Firebase instances ---
 const auth = getAuth(app);
@@ -176,14 +177,17 @@ async function loadCompetitionDetails(id) {
     }
 
     // Behaviours
+    hydrateCloseUi(currentCompetitionData);
 
     // Countdown
-    const endDateRaw =
-      currentCompetitionData.endDate ??
-      currentCompetitionData.endsAt ??
-      currentCompetitionData.closesAt;
-    const endDate = toDateUTC(endDateRaw);
-    if (endDate) setupCountdown(endDate);
+    if (resolveCloseMode(currentCompetitionData) === 'date') {
+        const endDateRaw =
+        currentCompetitionData.endDate ??
+        currentCompetitionData.endsAt ??
+        currentCompetitionData.closesAt;
+        const endDate = toDateUTC(endDateRaw);
+        if (endDate) setupCountdown(endDate);
+    }
 
     // Skill Q: handle both shapes {text, answers, correctAnswer} and {questionText, answers, correctAnswer}
     const correctAnswer =
@@ -199,7 +203,7 @@ async function loadCompetitionDetails(id) {
 
 // -------------------- Entry logic --------------------
 function setupEntryLogic(correctAnswer) {
-  const entryButton = document.getElementById("entry-button");
+  const entryButton = document.getElementById("enterBtn");
   if (!entryButton) return;
 
   let isAnswerCorrect = false;
@@ -463,7 +467,7 @@ function setupCountdown(endDate) {
       clearInterval(interval);
       timerElement.textContent = "COMPETITION CLOSED";
       document
-        .querySelectorAll("#entry-button, .answer-btn, .ticket-option")
+        .querySelectorAll("#enterBtn, .answer-btn, .ticket-option")
         .forEach((el) => (el.disabled = true));
       return;
     }
@@ -529,7 +533,7 @@ function createHeroPageElements(data) {
   // --- 2e. Confirm Button (shared) ---
   mainContentSections.push(
     el("section", { class: "hero-comp-confirm-section" }, [
-      el("button", { id: "entry-button", class: ["btn", "hero-cta-btn"], disabled: true }, [
+      el("button", { id: "enterBtn", class: ["btn", "hero-cta-btn"], disabled: true }, [
         "Enter Now",
         el("span", { textContent: "Secure Your Chance" }),
       ]),
@@ -596,7 +600,10 @@ function createIntroDetails(data, isTrueHero) {
     el("span", { textContent: `£${cashAltVal.toLocaleString()}` }),
     " Cash Alternative",
   ]);
-  const timeRemaining = el("div", { class: "time-remaining", textContent: "TIME REMAINING" });
+  const timeRemaining = el("div", { class: "time-remaining" }, [
+      el("span", { textContent: "TIME REMAINING" }),
+      el("span", { id: "compEndChip", class: "badge" })
+  ]);
   const timer = el("div", { id: "timer", class: "hero-digital-timer" });
   const progressLabel = el("label", { textContent: `Tickets Sold: ${sold} / ${total}` });
   const progressBar = el("div", { class: "progress-bar" }, [
@@ -684,6 +691,30 @@ function createTrustBadges() {
 }
 
 // -------------------- Instant Win (Spin) --------------------
+function hydrateCloseUi(comp){
+  const state = computeState(comp);
+  const mode = resolveCloseMode(comp);
+  const chip = document.querySelector("#compEndChip");
+  const cta  = document.querySelector("#enterBtn");
+
+  if (chip){
+    if (mode === "sellout"){
+      const left = formatLeft(comp);
+      chip.textContent = (state === "sold_out") ? "Sold out" : `Ends when sold out · ${left} left`;
+      chip.className = "badge " + (state === "sold_out" ? "bad" : "pending");
+    } else {
+      chip.className = "badge pending";
+      chip.textContent = "Ends in —";
+      startCountdown(comp.closeAt, chip); // no-op if no date present
+    }
+  }
+
+  if (cta){
+    if (state === "live"){ cta.disabled = false; cta.textContent = "Enter now"; }
+    else if (state === "sold_out"){ cta.disabled = true; cta.textContent = "Sold out"; }
+    else { cta.disabled = true; cta.textContent = "Closed"; }
+  }
+}
 function showInstantWinModal(tokenCount) {
   const modal = document.getElementById("instant-win-modal");
   if (!modal) return;

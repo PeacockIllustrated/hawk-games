@@ -18,6 +18,7 @@ import {
 // --- App glue ---
 import { app } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
+import { renderGalleryForCompetition } from "./gallery.js";
 
 // --- Firebase instances ---
 const auth = getAuth(app);
@@ -167,6 +168,12 @@ async function loadCompetitionDetails(id) {
     // Assemble page
     pageContent.innerHTML = "";
     pageContent.append(...createHeroPageElements(currentCompetitionData));
+
+    // Render gallery if applicable
+    const mount = document.getElementById("compGallery");
+    if (mount) {
+      await renderGalleryForCompetition(currentCompetitionData, mount);
+    }
 
     // Behaviours
 

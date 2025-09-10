@@ -600,10 +600,13 @@ function createIntroDetails(data, isTrueHero) {
     el("span", { textContent: `£${cashAltVal.toLocaleString()}` }),
     " Cash Alternative",
   ]);
-  const timeRemaining = el("div", { class: "time-remaining" }, [
-      el("span", { textContent: "TIME REMAINING" }),
-      el("span", { id: "compEndChip", class: "badge" })
-  ]);
+  const timeRemainingChildren = [];
+  if (resolveCloseMode(data) === 'date') {
+    timeRemainingChildren.push(el("span", { textContent: "TIME REMAINING" }));
+  }
+  timeRemainingChildren.push(el("span", { id: "compEndChip", class: "badge" }));
+  const timeRemaining = el("div", { class: "time-remaining" }, timeRemainingChildren);
+
   const timer = el("div", { id: "timer", class: "hero-digital-timer" });
   const progressLabel = el("label", { textContent: `Tickets Sold: ${sold} / ${total}` });
   const progressBar = el("div", { class: "progress-bar" }, [

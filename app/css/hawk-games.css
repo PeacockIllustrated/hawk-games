@@ -697,6 +697,12 @@ input:checked + .slider:before { transform: translateX(26px); }
     .entry-details-panel h1 { font-size: 2rem; }
     .detail-timer { font-size: 2.5rem; }
     /* Hero Comp Page Responsive */
+    .hero-comp-header-fg {
+        transform: scale(3);
+    }
+    .hero-comp-progress-section {
+        max-width: 100%;
+    }
     .hero-comp-entry-flow { grid-template-columns: 1fr; }
     .glance-content { grid-template-columns: 1fr; }
     .hero-comp-trust-section { grid-template-columns: 1fr; }

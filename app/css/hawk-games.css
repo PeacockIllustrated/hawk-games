@@ -697,6 +697,12 @@ input:checked + .slider:before { transform: translateX(26px); }
     .entry-details-panel h1 { font-size: 2rem; }
     .detail-timer { font-size: 2.5rem; }
     /* Hero Comp Page Responsive */
+    .hero-comp-header-fg {
+        transform: scale(2);
+    }
+    .hero-comp-progress-section {
+        max-width: 100%;
+    }
     .hero-comp-entry-flow { grid-template-columns: 1fr; }
     .glance-content { grid-template-columns: 1fr; }
     .hero-comp-trust-section { grid-template-columns: 1fr; }
@@ -1467,6 +1473,17 @@ main.showcase-container {
     width: 100%;
     height: 100%;
 }
+
+/* --- 30. Competition Gallery --- */
+.comp-gallery{ margin-top:1.25rem }
+.comp-gallery-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }
+.comp-gallery-grid .thumb{ position:relative; overflow:hidden; border:1px solid var(--border-color); border-radius:6px; background:#111; padding:0; cursor:pointer }
+.comp-gallery-grid img{ width:100%; aspect-ratio:16/10; object-fit:cover; display:block }
+.comp-gallery-grid .thumb:hover{ transform:translateY(-2px); transition:transform .18s ease }
+.lightbox{ position:fixed; inset:0; background:rgba(0,0,0,.9); display:flex; align-items:center; justify-content:center; z-index:9999 }
+.lightbox[hidden]{ display:none }
+.lightbox__img{ max-width:92vw; max-height:86vh; border:1px solid var(--border-color); border-radius:8px }
+.lightbox__close{ position:absolute; top:14px; right:16px; font-size:36px; line-height:1; background:transparent; color:#fff; border:0; cursor:pointer }
 
 /* --- 29. New Balance Styles --- */
 

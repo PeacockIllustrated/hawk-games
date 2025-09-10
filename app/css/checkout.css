@@ -1,146 +1,231 @@
-/* === The Hawk Games – Checkout Pages (success/cancel) ===================== */
+/* Hawk Games — Checkout / Success
+   Uses the same tokens & feel as your master stylesheet. */
 
+/* Fonts match your global theme */
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Roboto:wght@400;500;700&display=swap');
+
+/* Brand tokens (fallbacks match hawk-games.css) */
 :root{
-  --bg: #0b0c0f;
-  --bg-2:#0a0b0e;
-  --panel: #13141a;
-  --panel-2: #101116;
-  --text: #e9eaf1;
-  --muted:#9aa0ad;
-  --gold:#F2B035;          /* brand gold */
-  --gold-2:#E09D22;
-  --accent:#F2B035;
-  --success:#22c55e;
-  --danger:#ef4444;
-  --radius: 18px;
-  --shadow: 0 10px 40px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.03);
+  --primary-gold: #e0a94a;
+  --light-white: #f0f0f0;
+  --dark-bg: #121212;
+  --card-bg: #1a1a1a;
+  --border-color: #2c2c2c;
+  --success-green: #27ae60;
+
+  --font-heading: 'Chakra Petch', sans-serif;
+  --font-body: 'Roboto', sans-serif;
+
+  /* Page-only accents */
+  --accent-orange: #ff7a1a;
+  --ring: 0 0 0 3px rgba(224,169,74,.18), 0 0 0 1px rgba(224,169,74,.55);
+  --glow: 0 12px 34px rgba(0,0,0,.55), 0 0 48px rgba(224,169,74,.10);
 }
 
-* { box-sizing: border-box; }
-
-html,body{
-  height:100%;
-  background: radial-gradient(1200px 800px at 20% -10%, #121317 0%, transparent 60%),
-              radial-gradient(1000px 700px at 110% 10%, #14161b 0%, transparent 55%),
-              linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
-  color: var(--text);
-  font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  line-height: 1.45;
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
   margin:0;
-}
-
-a { color: var(--accent); text-decoration: none; }
-a:hover { opacity:.92; }
-
-/* subtle animated shards in the background */
-.shards{ position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
-.shard{
-  position:absolute; width:220px; height:220px; border-radius:24px;
-  background: conic-gradient(from 220deg at 60% 40%, rgba(242,176,53,.18), rgba(242,176,53,.02));
-  filter: blur(18px) saturate(120%);
-  animation: drift 22s linear infinite;
-  opacity:.5;
-}
-.shard:nth-child(1){ top:-40px; left:8%; transform: rotate(12deg); }
-.shard:nth-child(2){ bottom:-60px; right:10%; transform: rotate(-16deg); animation-duration: 26s; }
-.shard:nth-child(3){ top:30%; right:-60px; transform: rotate(6deg); animation-duration: 28s; }
-.shard:nth-child(4){ bottom:20%; left:-70px; transform: rotate(-12deg); animation-duration: 30s; }
-@keyframes drift { to { transform: translate3d(0, -10px, 0) rotate(360deg); } }
-
-/* centered card */
-.hawk-frame{
-  position:relative; z-index:1;
-  width:min(760px, 92vw);
-  margin: min(12vh, 8rem) auto;
-  padding: clamp(28px, 4vw, 44px);
-  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)) ,
-              linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(255,255,255,.06);
-}
-.hawk-frame::before{
-  /* gold glow border */
-  content:"";
-  position:absolute; inset:-1px; border-radius: calc(var(--radius) + 2px);
-  padding:1px; pointer-events:none;
+  color:var(--light-white);
   background:
-    linear-gradient(180deg, rgba(242,176,53,.55), rgba(242,176,53,.08));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  box-shadow: 0 0 40px rgba(242,176,53,.1), inset 0 0 16px rgba(242,176,53,.08);
+    radial-gradient(1200px 600px at 60% -10%, rgba(224,169,74,.08), transparent 65%),
+    radial-gradient(900px 500px at 10% 10%, rgba(255,122,26,.06), transparent 60%),
+    linear-gradient(180deg, #0f0f0f 0%, var(--dark-bg) 40%, #0b0b0b 100%);
+  font:16px/1.6 var(--font-body);
+  letter-spacing:.2px;
 }
 
-/* top badge */
-.hawk-badge{
-  display:flex; align-items:center; gap:10px;
-  width:max-content; padding:8px 12px; border-radius:999px;
-  background: rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.08);
-  margin-bottom: 20px;
+/* Subtle animated shard grid */
+body::before{
+  content:"";
+  position:fixed; inset:0;
+  background:
+    linear-gradient(115deg, rgba(224,169,74,.06) 1px, transparent 1px) 0 0/22px 22px,
+    linear-gradient( 65deg, rgba(255,122,26,.05) 1px, transparent 1px) 0 0/28px 28px;
+  mask: linear-gradient(#000 75%, transparent);
+  pointer-events:none;
+  animation: drift 40s linear infinite;
 }
-.hawk-badge .logo{
-  width:28px; height:28px; display:grid; place-items:center;
-  border-radius:8px; font-weight:800; letter-spacing:.5px;
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 100%);
-  color:#111; box-shadow: 0 2px 14px rgba(242,176,53,.4);
+@keyframes drift{to{background-position:2000px 0, -1500px 0}}
+
+.wrap{max-width:860px;margin:6vh auto;padding:20px}
+.card{
+  position:relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)),
+    var(--card-bg);
+  border:1px solid var(--border-color);
+  border-radius:20px;
+  padding:26px 24px;
+  box-shadow:var(--glow);
+  overflow:hidden;
 }
 
-/* titles, copy */
-.hawk-title{
-  font-size: clamp(28px, 4vw, 40px);
-  font-weight: 800;
-  letter-spacing: .5px;
-  margin: 6px 0 8px;
-}
-.hawk-sub{
-  color: var(--muted);
-  margin: 0 0 22px;
-}
-.small{
-  color: #aab0bd;
-  font-size: .92rem;
-  margin-top: 14px;
+/* Gold shard accent */
+.card::before{
+  content:"";
+  position:absolute; top:-2px; right:-80px;
+  width:220px; height:220px;
+  transform:skew(-18deg) rotate(24deg);
+  background:linear-gradient(90deg, rgba(224,169,74,0), rgba(224,169,74,.6), rgba(255,122,26,0));
+  filter:blur(14px);
+  pointer-events:none;
+  opacity:.55;
 }
 
-/* loader spinner */
-.loader{
-  --size: 36px;
-  width: var(--size); height: var(--size);
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,.16);
-  border-top-color: var(--gold);
-  animation: spin 1s linear infinite;
-  margin: 18px 0;
+/* Headings & text */
+h1{
+  margin:0 0 10px;
+  font:700 30px/1.15 var(--font-heading);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  text-shadow:0 0 22px rgba(224,169,74,.10);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.lead{font-size:17px}
+p{margin:8px 0;color:#d6dce9}
+.muted{color:#99a3b5}
+.small{font-size:13px}
 
-/* buttons */
-.hawk-btn{
-  --btn-py: 14px; --btn-px: 22px;
-  display:inline-flex; align-items:center; justify-content:center;
-  padding: var(--btn-py) var(--btn-px);
-  border-radius: 14px; font-weight: 800; letter-spacing:.3px;
-  color:#121212; background: linear-gradient(180deg, var(--gold) 0%, var(--gold-2) 100%);
-  box-shadow: 0 8px 24px rgba(242,176,53,.3);
-  border: none; cursor: pointer; transition: transform .08s ease, filter .18s ease, box-shadow .18s ease;
+/* Dividers */
+.hr{
+  height:1px;margin:18px 0;border:0;
+  background:linear-gradient(90deg, transparent, rgba(224,169,74,.22), transparent);
 }
-.hawk-btn:hover { filter: brightness(1.04); transform: translateY(-1px); box-shadow: 0 10px 28px rgba(242,176,53,.38); }
-.hawk-btn:active{ transform: translateY(0); }
 
-.hawk-btn.alt{
-  background: transparent; color: var(--text);
-  border:1px solid rgba(255,255,255,.12);
-  box-shadow:none;
+/* Rows & monospace */
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfd7ea}
+
+/* Buttons — inherit your global .btn look */
+.btn{
+  display:inline-block;
+  padding:0.8rem 2rem;
+  background-color:var(--primary-gold);
+  color:var(--dark-bg);
+  text-decoration:none;
+  font-family:var(--font-heading);
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+  border:2px solid var(--primary-gold);
+  border-radius:4px;
+  font-weight:700;
+  text-align:center;
+  cursor:pointer;
+  transition:transform .2s cubic-bezier(0.34,1.56,0.64,1), background-color .3s ease, color .3s ease, box-shadow .18s ease;
 }
-.hawk-btn.alt:hover{ border-color: rgba(255,255,255,.2); }
+.btn:hover{ background-color:transparent; color:var(--primary-gold); transform:translateY(-3px); }
+.btn:active{ transform:translateY(-1px); transition-duration:.1s; }
+.btn:focus-visible{ outline:none; box-shadow:var(--ring); }
+.btn.primary{ box-shadow:0 6px 22px rgba(224,169,74,.22); }
 
-/* success / error accents if you want to swap classes */
-.success { color: var(--success); }
-.error { color: var(--danger); }
-
-@media (max-width: 520px){
-  .hawk-badge{ margin-bottom:14px; }
-  .loader{ margin: 14px 0; }
+/* Copy ref */
+.copy{
+  padding:8px 12px;border-radius:10px;
+  border:1px solid var(--border-color);
+  background:linear-gradient(180deg, #1a1a1a, #151515);
+  color:#e7ebf5; cursor:pointer; transition:.18s ease;
 }
+.copy:hover{border-color:#3a3a3a; transform:translateY(-1px)}
+.copy:focus-visible{outline:none; box-shadow:var(--ring)}
+
+/* Status badges */
+.badge{
+  padding:7px 12px;border-radius:999px;
+  font-weight:700;font-size:12px;letter-spacing:.3px;
+  border:1px solid var(--border-color);
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00));
+}
+.pending{
+  color:#f0f5ff; border-color:#2a3570;
+  box-shadow:0 0 0 1px rgba(42,53,112,.25) inset;
+  position:relative;
+}
+.pending::after{
+  content:""; display:inline-block; width:6px; height:6px; margin-left:8px;
+  border-radius:50%; background:linear-gradient(180deg, #8fb1ff, #4b7cff);
+  box-shadow:0 0 0 4px rgba(75,124,255,.15);
+  animation:pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(.9);opacity:.8}50%{transform:scale(1.12);opacity:1}}
+.good{
+  color:#09130f;background:linear-gradient(180deg, #f7e5b6, var(--primary-gold));
+  border-color:#f0d082;
+  box-shadow:0 2px 14px rgba(224,169,74,.35), inset 0 0 0 1px rgba(0,0,0,.12);
+}
+
+/* Tick animation (gold) */
+.checkwrap{display:flex;align-items:center;gap:14px;margin:8px 0 2px}
+.tick{width:42px;height:42px;filter:drop-shadow(0 0 18px rgba(224,169,74,.25))}
+.tick circle{stroke:#2a2f3e;stroke-width:4;fill:none;opacity:.8}
+.tick path{
+  stroke:var(--primary-gold); stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  stroke-dasharray:48; stroke-dashoffset:48; animation:draw .9s ease forwards .15s;
+}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* Promo tiles */
+.promo{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+@media (min-width:640px){ .promo{grid-template-columns:1fr 1fr} }
+.promo .tile{
+  background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)), #141414;
+  border:1px solid var(--border-color);
+  border-radius:14px;padding:14px 16px;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  transition:transform .16s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+  color:var(--light-white); text-decoration:none;
+}
+.promo .tile:hover{transform:translateY(-2px);border-color:var(--primary-gold);box-shadow:0 10px 28px rgba(224,169,74,.15)}
+.promo .tile b{font:700 16px/1.2 var(--font-heading);letter-spacing:.2px}
+
+/* Tickets (if you render later) */
+.tickets{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:10px;margin-top:12px}
+.ticket{
+  background:linear-gradient(180deg, rgba(224,169,74,.10), rgba(224,169,74,.04));
+  border:1px dashed rgba(224,169,74,.45);
+  color:#f6edd3;
+  border-radius:12px;padding:8px 10px;text-align:center;font-weight:800;font-family:var(--font-heading);
+}
+
+/* Minor bits */
+.ctas{margin-top:6px}
+.help{margin-top:12px}
+.noscript{max-width:860px;margin:2rem auto;background:#1a1a1a;border:1px solid var(--border-color);padding:1rem;border-radius:8px}
+
+/* Confetti canvas */
+#confetti{position:fixed;inset:0;pointer-events:none;opacity:.92}
+
+/* Focus rings everywhere */
+:where(button,a,.copy).focus-visible{outline:none;box-shadow:var(--ring)}
+
+/* ==== Cash comps section (reuses homepage card styles) ==== */
+.cash-section { margin-top: 8px; }
+.section-title {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  text-transform: uppercase;
+  text-align: left;
+  letter-spacing: 2px;
+  margin: 0 0 1.25rem 2px;
+  position: relative;
+}
+.section-title::after {
+  content: '';
+  position: absolute; bottom: -10px; left: 0;
+  width: 90px; height: 3px; background-color: var(--primary-gold);
+}
+
+/* Grid + card system (pulled from homepage) */
+.competition-grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; perspective: 2000px; } /* homepage uses 340px min */
+.hawk-card { position: relative; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: var(--light-white); transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.4s ease, border-color 0.4s ease; } /* matches home */
+.hawk-card:hover { transform: translateY(-10px) rotateY(3deg); border-color: var(--primary-gold); box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(224, 169, 74, 0.3); } /* matches home */
+.hawk-card__image { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background-color: #333; } /* matches home */
+.hawk-card__content { padding: 1.25rem; display: flex; flex-direction: column; flex-grow: 1; } /* slightly tighter for success page */
+.hawk-card__title { font-family: var(--font-heading); font-size: 1.3rem; text-transform: uppercase; line-height: 1.3; margin-bottom: 0.9rem; flex-grow: 1; }
+.hawk-card__timer { font-size: 0.9rem; font-weight: 700; color: #ccc; margin-bottom: 1rem; text-align: center; }
+
+.progress-bar { width: 100%; height: 8px; background-color: #111; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background-color: var(--primary-gold); transition: width 0.5s ease; } /* matches home */ /* :contentReference[oaicite:1]{index=1} */
+.hawk-card__progress-text { font-size: 0.8rem; text-align: center; color: #aaa; margin-top: 0.5rem; margin-bottom: 1rem; }
+
+.hawk-card__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; } /* matches home */ /* :contentReference[oaicite:2]{index=2} */
+.hawk-card__price { font-family: var(--font-heading); font-size: 1.4rem; color: var(--primary-gold); } /* matches home */ /* :contentReference[oaicite:3]{index=3} */

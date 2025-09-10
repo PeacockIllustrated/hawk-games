@@ -131,13 +131,6 @@ export function renderHeader(user) {
   const existingOverlay = document.getElementById("mobile-nav-overlay");
   if (existingOverlay) existingOverlay.remove();
 
-  const devBanner = createElement("div", {
-    class: "dev-banner",
-    textContent:
-      "Currently under development. Any tickets acquired or prizes won will not be valid or redeemable, even after full launch.",
-  });
-  headerEl.append(devBanner);
-
   let currentPage = document.body.dataset.page || "";
   if (
     window.location.pathname.endsWith("index.html") &&
@@ -177,7 +170,7 @@ export function renderHeader(user) {
     const instantWinLink = createElement("a", { href: "instant-games.html", class: `btn ${currentPage === "instant-wins" ? "active" : ""}` }, [
       "Instant Wins",
     ]);
-    links.push(instantWinLink);
+    links.unshift(instantWinLink);
     return links;
   };
 

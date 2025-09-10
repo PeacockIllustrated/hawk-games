@@ -1,192 +1,258 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Payment Successful | The Hawk Games</title>
-
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Hawk Games — Order Confirmation</title>
   <link rel="stylesheet" href="/app/css/checkout.css">
-  <meta name="robots" content="noindex" />
+  <meta name="robots" content="noindex">
 </head>
 <body>
-  <noscript>
-    <style>main{display:none}</style>
-    <div style="color:#fff;background:#000;padding:1rem;text-align:center">
-      JavaScript is required to confirm your payment. Please enable it and refresh.
-    </div>
-  </noscript>
+  <canvas id="confetti" aria-hidden="true"></canvas>
 
-  <!-- Subtle background shards (match site style) -->
-  <div class="shards">
-    <div class="shard"></div><div class="shard"></div><div class="shard"></div><div class="shard"></div>
+  <div class="wrap">
+    <div class="card">
+      <h1>Order confirmation</h1>
+
+      <div class="row" id="statusRow">
+        <span class="badge pending" id="statusBadge">Payment received — assigning tickets…</span>
+        <span class="mono small" id="orderRefBadge"></span>
+        <button id="copyBtn" class="copy" type="button">Copy ref</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="content">
+        <div class="checkwrap" aria-live="polite">
+          <svg class="tick" viewBox="0 0 48 48" role="img" aria-label="Payment successful">
+            <circle cx="24" cy="24" r="20"></circle>
+            <path d="M14 24l7 7 14-14"></path>
+          </svg>
+          <div>
+            <p class="lead"><strong>Thanks — your payment was successful.</strong></p>
+            <p class="muted">We’re assigning your tickets now. This usually finishes within a few seconds.</p>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <p class="small muted" id="reassure" style="display:none">
+          This is taking longer than usual. Your payment <em>has</em> been received — our system will finish assigning your tickets shortly.
+          You’ll get an email the moment it’s done. You can also find your entries any time below.
+        </p>
+
+        <div class="row ctas">
+          <a id="accountLink" class="btn primary" href="/app/account.html">View my entries</a>
+          <a id="homeLink" class="btn" href="/app/">Back to comps</a>
+        </div>
+
+        <div class="hr"></div>
+
+        <!-- Cash Competitions (uses homepage styles) -->
+        <section aria-label="Cash competitions" class="cash-section">
+          <h2 class="section-title">Cash <span style="color:var(--primary-gold)">Competitions</span></h2>
+          <div id="cashGrid" class="competition-grid-container">
+            <!-- Static fallback cards (will be replaced if Firestore loads) -->
+            <a class="hawk-card" href="/app/">
+            <img class="hawk-card__image" src="https://firebasestorage.googleapis.com/v0/b/the-hawk-games-64239.firebasestorage.app/o/competition_images%2FCash%20Prize%201.png?alt=media&token=c47608d3-b7e1-4770-949a-68d57df573e0" alt="Win £1,000 cash">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Win £1,000 Cash</h3>
+                <div class="progress-bar"><div class="progress-bar-fill" style="width:40%"></div></div>
+                <div class="hawk-card__progress-text">40% sold</div>
+                <div class="hawk-card__footer">
+                  <span class="hawk-card__price">£0.99</span>
+                  <span class="btn btn-small">Enter</span>
+                </div>
+              </div>
+            </a>
+            <a class="hawk-card" href="/app/">
+              <img class="hawk-card__image" src="https://firebasestorage.googleapis.com/v0/b/the-hawk-games-64239.firebasestorage.app/o/competition_images%2Fcash%20prize%202.png?alt=media&token=7625bacc-2d74-4d6b-8e18-81a95e4f71a4" alt="Win £5,000 cash">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">Win £5,000 Cash</h3>
+                <div class="progress-bar"><div class="progress-bar-fill" style="width:22%"></div></div>
+                <div class="hawk-card__progress-text">22% sold</div>
+                <div class="hawk-card__footer">
+                  <span class="hawk-card__price">£1.99</span>
+                  <span class="btn btn-small">Enter</span>
+                </div>
+              </div>
+            </a>
+          </div>
+        </section>
+
+        <p class="small muted help">
+          Need help? Email <a href="mailto:support@the-hawk-games.co.uk">support@the-hawk-games.co.uk</a>.
+        </p>
+      </div>
+    </div>
   </div>
 
-  <main class="hawk-frame" id="frame" aria-live="polite">
-    <div class="hawk-badge">
-      <div class="logo">H</div>
-      <span>The Hawk Games • Secure Checkout</span>
-    </div>
-
-    <h1 class="hawk-title" id="title">Confirming your payment…</h1>
-    <p class="hawk-sub" id="sub">
-      We’re finalising your order with Trust Payments. This usually takes a moment.
-    </p>
-    <div class="loader" id="loader" aria-hidden="false"></div>
-
-    <p class="small">Do not close this tab. We’ll update as soon as your order is confirmed.</p>
-  </main>
+  <noscript>
+    <div class="noscript">Payment received. Please visit <a href="/app/account.html">My Entries</a> to view your tickets.</div>
+  </noscript>
 
   <script type="module">
-    // Firebase (CDN, v9 modules)
-    import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-    import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check.js";
-    // Your config, exported as: export const firebaseConfig = { ... }
-    import { firebaseConfig } from "./js/firebase-config.js";
+    const ACCOUNT_URL = "/app/account.html";
+    const HOME_URL    = "/app/";
 
-    // Init (idempotent)
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const qs = new URLSearchParams(location.search);
+    const orderRef = qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || "—";
 
-    // 🔐 App Check (REQUIRED for Firestore if enforcement is on)
-    // Same key you use in /app/js/auth.js
-    initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider('6LdkDqgrAAAAAAuWtoK941myjHGZd8vka_Q3JhKg'),
-      isTokenAutoRefreshEnabled: true
+    const statusBadge   = document.getElementById("statusBadge");
+    const orderRefBadge = document.getElementById("orderRefBadge");
+    const copyBtn       = document.getElementById("copyBtn");
+    const reassure      = document.getElementById("reassure");
+
+    document.getElementById("accountLink").href = ACCOUNT_URL;
+    document.getElementById("homeLink").href    = HOME_URL;
+
+    orderRefBadge.textContent = "Ref: " + orderRef;
+    try { if (orderRef !== "—") history.replaceState({}, "", location.pathname + "?orderRef=" + encodeURIComponent(orderRef)); } catch {}
+
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(orderRef);
+        copyBtn.textContent = "Copied";
+        setTimeout(()=> copyBtn.textContent = "Copy ref", 1200);
+      } catch {}
     });
 
-    const db  = getFirestore(app);
-    const auth = getAuth(app);
+    // Celebrate + reassure
+    fireConfetti(900);
+    setTimeout(()=> reassure.style.display = "block", 35000);
 
-    // Grab order id from multiple possible param names (Trust can rename things)
-    const qs = new URLSearchParams(location.search);
-    const orderId =
-      qs.get("orderId") ||          // our preferred param
-      qs.get("orderreference") ||   // Trust commonly returns this
-      qs.get("requestreference") || // sometimes this one appears
-      qs.get("orderid");            // rare fallback
-
-    // Debug toggle: add ?debug=1 to the URL if you want console detail
-    const debug = qs.get("debug") === "1";
-    const log = (...args) => debug && console.log("[Success]", ...args);
-
-    if (debug) {
-      log("URL:", location.href);
-      log("Resolved orderId:", orderId);
-      log("All params:", Object.fromEntries(qs.entries()));
-    }
-
-    // UI hooks
-    const title  = document.getElementById("title");
-    const sub    = document.getElementById("sub");
-    const frame  = document.getElementById("frame");
-    const loader = document.getElementById("loader");
-
-    function addCTA(text, href, altStyle = false) {
-      const a = document.createElement("a");
-      a.className = altStyle ? "hawk-btn alt" : "hawk-btn";
-      a.href = href;
-      a.textContent = text;
-      frame.appendChild(a);
-      return a;
-    }
-
-    function showInfoLine(text) {
-      const p = document.createElement("p");
-      p.className = "small";
-      p.textContent = text;
-      frame.appendChild(p);
-      return p;
-    }
-
-    function showErrorUI(msg, ctaText, ctaHref) {
-      title.textContent = "We hit a snag";
-      sub.textContent = msg || "There was a problem confirming your order.";
-      loader?.remove();
-      if (ctaText && ctaHref) addCTA(ctaText, ctaHref, true);
-    }
-
-    // Wait for auth state before trying to read from Firestore
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        log("User authenticated:", user.uid);
-
-        if (!orderId) {
-          title.textContent = "Missing order reference";
-          sub.textContent = "We couldn’t find your orderId in the URL.";
-          loader?.remove();
-          addCTA("Go to My Account", "/app/account.html");
-          return;
-        }
-
-        const ref = doc(db, "orders", orderId);
-
-        // Listen for order status changes
-        const unsubscribe = onSnapshot(ref, (snap) => {
-          if (!snap.exists()) {
-            // Webhook may land just after redirect; keep spinner and friendly copy
-            title.textContent = "Preparing your order…";
-            sub.textContent = "Hang tight. This usually takes just a moment.";
+    // Optional status flip (if you wire an endpoint later)
+    const endpoint = window.__ORDER_STATUS_ENDPOINT__;
+    if (endpoint && orderRef && orderRef !== "—") {
+      const poll = async (tries=30) => {
+        try {
+          const url = `${endpoint.replace(/\/$/,'')}/${encodeURIComponent(orderRef)}`;
+          const res = await fetch(url, { headers: { "Accept":"application/json" }});
+          if (!res.ok) throw 0;
+          const o = await res.json().catch(()=> ({}));
+          const s = (o.status || "").toUpperCase();
+          if (s === "FULFILLED") {
+            statusBadge.textContent = "Tickets confirmed";
+            statusBadge.className = "badge good";
             return;
           }
-
-          const o = snap.data();
-          log("Order doc update:", o);
-
-          // Terminal statuses => stop listening
-          if (o.status === "paid" || o.status === "fulfilled") {
-            unsubscribe();
-            title.textContent = "Payment complete — you're in! ✅";
-            sub.textContent = "Your entries are now active on your account. Good luck!";
-            loader?.remove();
-
-            addCTA("Back to Games", "/app/index.html");
-            showInfoLine(`Order: ${orderId}${o.providerRef ? " • Ref: " + o.providerRef : ""}`);
-
-          } else if (o.status === "failed" || o.status === "cancelled") {
-            unsubscribe();
-            title.textContent = (o.status === "failed") ? "Payment failed ❌" : "Payment cancelled ❌";
-            sub.textContent = o.failureReason || "No funds were taken. You can safely try again.";
-            loader?.remove();
-            addCTA("Back to Games", "/app/index.html", true);
-
-          } else {
-            // 'created' or 'processing' — just wait
-            title.textContent = "Confirming your payment…";
-            sub.textContent = "We’re waiting for final confirmation from the payment provider.";
+          if (s === "FAILED") {
+            statusBadge.textContent = "Order not completed";
+            statusBadge.className = "badge pending";
+            return;
           }
-        }, (err) => {
-          // Permission / App Check / connectivity errors arrive here
-          log("onSnapshot error:", err);
+          if (tries > 0) setTimeout(()=>poll(tries-1), 1200);
+        } catch {
+          if (tries > 0) setTimeout(()=>poll(tries-1), 1500);
+        }
+      };
+      poll();
+    }
 
-          // try to give a helpful message
-          if (err?.code === "permission-denied") {
-            showErrorUI(
-              "We can’t access this order. Make sure you’re signed in with the same account you used to pay.",
-              "Go to My Account",
-              "/app/account.html"
-            );
-          } else if (String(err?.message || "").toLowerCase().includes("app check")) {
-            showErrorUI(
-              "Security check failed. Please refresh the page. If this keeps happening, try disabling content blockers."
-            );
-          } else {
-            showErrorUI("There was a problem checking your order status. Please check your account page for your entries.",
-                        "Go to My Account",
-                        "/app/account.html");
-          }
+    // Load Cash Comps from Firestore if available (progressive enhancement)
+    (async () => {
+      try {
+        const { db } = await import("/app/js/firebase-init.js");
+        const { collection, query, where, orderBy, limit, getDocs } =
+          await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+        const grid = document.getElementById("cashGrid");
+
+        // Prefer explicit category/type, fall back to title match
+        // (adjust field names to your schema)
+        let q1;
+        try {
+          q1 = query(
+            collection(db, "competitions"),
+            where("isLive", "==", true),
+            where("category", "in", ["cash","Cash","CASH"]),
+            orderBy("priority", "desc"),
+            limit(4)
+          );
+        } catch { /* Firestore 'in' might require index; will fall back */ }
+
+        let snaps = q1 ? await getDocs(q1) : null;
+
+        if (!snaps || snaps.empty) {
+          const q2 = query(
+            collection(db, "competitions"),
+            where("isLive", "==", true),
+            where("type", "==", "cash"),
+            orderBy("priority", "desc"),
+            limit(4)
+          );
+          snaps = await getDocs(q2);
+        }
+
+        if (!snaps.empty) {
+          grid.innerHTML = "";
+          snaps.forEach(docSnap => {
+            const c = docSnap.data();
+            // Field guesses — adjust to your schema
+            const href  = c.path || `/app/competition.html?id=${docSnap.id}`;
+            const img   = c.image || c.coverImage || "/app/assets/cash-generic.jpg";
+            const title = c.title || "Cash Competition";
+            const price = (typeof c.ticketPrice === "number" ? c.ticketPrice/100 : c.price) || 0.99;
+            const sold  = typeof c.soldCount === "number" && typeof c.capacity === "number"
+                          ? Math.max(0, Math.min(100, Math.round((c.soldCount / c.capacity) * 100))) : null;
+
+            const a = document.createElement("a");
+            a.className = "hawk-card";
+            a.href = href;
+            a.innerHTML = `
+              <img class="hawk-card__image" src="${img}" alt="${escapeHtml(title)}">
+              <div class="hawk-card__content">
+                <h3 class="hawk-card__title">${escapeHtml(title)}</h3>
+                ${sold!=null ? `
+                  <div class="progress-bar"><div class="progress-bar-fill" style="width:${sold}%"></div></div>
+                  <div class="hawk-card__progress-text">${sold}% sold</div>` : ``}
+                <div class="hawk-card__footer">
+                  <span class="hawk-card__price">£${Number(price).toFixed(2)}</span>
+                  <span class="btn btn-small">Enter</span>
+                </div>
+              </div>
+            `;
+            grid.appendChild(a);
+          });
+        }
+      } catch { /* no firebase on this page → keep static fallbacks */ }
+
+      function escapeHtml(s){return (s??"").toString().replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;" }[m]))}
+    })();
+
+    // Confetti (brand)
+    function fireConfetti(duration=900){
+      const c = document.getElementById("confetti");
+      const ctx = c.getContext("2d");
+      let W = c.width = innerWidth, H = c.height = innerHeight;
+      const N = Math.min(140, Math.floor(W/12));
+      const parts = Array.from({length:N}, () => ({
+        x: Math.random()*W, y: -10-Math.random()*40, r: 3+Math.random()*4,
+        vx: -1+Math.random()*2, vy: 2+Math.random()*3, rot: Math.random()*6.28, vr: -0.2+Math.random()*0.4,
+        s: Math.random()*0.6+0.4
+      }));
+      let t0 = performance.now();
+      const start = t0;
+      const draw = (t)=>{
+        const dt = (t - t0); t0 = t;
+        ctx.clearRect(0,0,W,H);
+        parts.forEach(p=>{
+          p.x += p.vx * (dt/16);
+          p.y += p.vy * (dt/16);
+          p.rot += p.vr * (dt/16);
+          if (p.y > H+20) p.y = -10, p.x = Math.random()*W;
+          ctx.save();
+          ctx.translate(p.x,p.y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha = p.s;
+          ctx.fillStyle = Math.random()<.5 ? "#E0A94A" : (Math.random()<.75 ? "#FF7A1A" : "#FFFFFF");
+          ctx.fillRect(-p.r, -p.r, p.r*2, p.r*0.6);
+          ctx.restore();
         });
-
-      } else {
-        log("No authenticated user found.");
-        title.textContent = "Please sign in";
-        sub.textContent = "To confirm your order status, please sign in to your account.";
-        loader?.remove();
-        addCTA("Sign In", `/app/login.html?redirect=${encodeURIComponent(location.pathname + location.search)}`);
-      }
-    });
+        if (t - start < duration) requestAnimationFrame(draw); else ctx.clearRect(0,0,W,H);
+      };
+      requestAnimationFrame(draw);
+      addEventListener("resize", ()=>{ W = c.width = innerWidth; H = c.height = innerHeight; });
+    }
   </script>
 </body>
 </html>

@@ -61,7 +61,11 @@ export async function renderGalleryForCompetition(comp, mountEl) {
               <img loading="lazy" src="${it.url}" alt="${alt}">
             </button>`;
   }).join("");
-  mountEl.appendChild(grid);
+
+  const container = document.createElement("div");
+  container.className = "container";
+  container.appendChild(grid);
+  mountEl.appendChild(container);
 
   // Wire lightbox
   const lb = document.getElementById("lightbox");

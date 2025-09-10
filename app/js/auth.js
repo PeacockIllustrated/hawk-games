@@ -144,7 +144,7 @@ export function renderHeader(user) {
   const createNavLinks = () => {
     const navItems = [
       { href: "index.html", page: "competitions", text: "Competitions" },
-      { href: "showcase.html", page: "showcase", text: "Showcase" },
+     // { href: "showcase.html", page: "showcase", text: "Showcase" },
       { href: "index.html#past-winners-section", page: "winners", text: "Winners" },
       { href: "terms-and-conditions.html", page: "terms", text: "Terms" },
     ];

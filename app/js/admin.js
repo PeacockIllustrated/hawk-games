@@ -108,6 +108,7 @@ function renderView(viewName) {
     switch (viewName) {
         case 'dashboard': renderDashboardView(); break;
         case 'create': renderCreateCompView(); break;
+        case 'hero-comp': renderHeroCompView(); break;
         case 'spinner-settings': renderSpinnerSettingsView(); break;
         case 'plinko-settings': renderPlinkoSettingsView(); break;
         case 'plinko-stats': renderPlinkoStatsView(); break;
@@ -128,6 +129,20 @@ function renderDashboardView() {
     loadAndRenderCompetitions(listContainer);
 }
 
+// --- VIEW: Hero Competition ---
+function renderHeroCompView() {
+    const listContainer = createElement('div', { id: 'hero-competition-list' }, [
+        createElement('div', { class: 'placeholder', textContent: 'Loading hero competition...' })
+    ]);
+    const panel = createElement('div', { class: 'content-panel' }, [
+        createElement('h2', { textContent: 'Hero Competition' }),
+        createElement('p', { textContent: 'The competition featured on the homepage.'}),
+        listContainer
+    ]);
+    mainContentContainer.append(panel);
+    loadAndRenderHeroCompetitions(listContainer);
+}
+
 async function loadAndRenderCompetitions(listDiv) {
     try {
         const q = query(collection(db, "competitions"), orderBy("createdAt", "desc"));
@@ -144,6 +159,31 @@ async function loadAndRenderCompetitions(listDiv) {
         console.error("Error loading competitions:", error);
         listDiv.innerHTML = '';
         listDiv.append(createElement('p', { style: { color: 'red' }, textContent: 'Failed to load competitions. Check Firestore index and security rules.' }));
+    }
+}
+
+async function loadAndRenderHeroCompetitions(listDiv) {
+    try {
+        const q = query(collection(db, "competitions"), where("isHeroComp", "==", true), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        const heroCompetitions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        listDiv.innerHTML = '';
+
+        if (heroCompetitions.length === 0) {
+            listDiv.append(createElement('p', { textContent: 'No hero competition found. You can set a competition as a hero competition when you create it.' }));
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        heroCompetitions.forEach(comp => fragment.appendChild(renderCompetitionRow(comp)));
+        listDiv.appendChild(fragment);
+
+        listDiv.addEventListener('click', handleDashboardClick);
+    } catch (error) {
+        console.error("Error loading hero competition:", error);
+        listDiv.innerHTML = '';
+        listDiv.append(createElement('p', { style: { color: 'red' }, textContent: 'Failed to load hero competition. Check Firestore index and security rules.' }));
     }
 }
 

@@ -600,12 +600,9 @@ function createIntroDetails(data, isTrueHero) {
     el("span", { textContent: `£${cashAltVal.toLocaleString()}` }),
     " Cash Alternative",
   ]);
-  const timeRemainingChildren = [];
-  if (resolveCloseMode(data) === 'date') {
-    timeRemainingChildren.push(el("span", { textContent: "TIME REMAINING" }));
-  }
-  timeRemainingChildren.push(el("span", { id: "compEndChip", class: "badge" }));
-  const timeRemaining = el("div", { class: "time-remaining" }, timeRemainingChildren);
+  const timeRemaining = el("div", { class: "time-remaining" }, [
+      el("span", { id: "compEndChip", class: "badge" })
+  ]);
 
   const timer = el("div", { id: "timer", class: "hero-digital-timer" });
   const progressLabel = el("label", { textContent: `Tickets Sold: ${sold} / ${total}` });
@@ -707,8 +704,7 @@ function hydrateCloseUi(comp){
       chip.className = "badge " + (state === "sold_out" ? "bad" : "pending");
     } else {
       chip.className = "badge pending";
-      chip.textContent = "Ends in —";
-      startCountdown(comp.closeAt, chip); // no-op if no date present
+      startCountdown(comp.closeAt, chip, "Ends in ");
     }
   }
 

@@ -698,7 +698,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     .detail-timer { font-size: 2.5rem; }
     /* Hero Comp Page Responsive */
     .hero-comp-header-fg {
-        transform: scale(3);
+        transform: scale(2);
     }
     .hero-comp-progress-section {
         max-width: 100%;

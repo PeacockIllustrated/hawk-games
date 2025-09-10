@@ -169,9 +169,6 @@ async function loadCompetitionDetails(id) {
     pageContent.append(...createHeroPageElements(currentCompetitionData));
 
     // Behaviours
-    if (currentCompetitionData.hasParallax) {
-      initializeParallax();
-    }
 
     // Countdown
     const endDateRaw =
@@ -486,18 +483,6 @@ function setupCountdown(endDate) {
   }, 1000);
 }
 
-// -------------------- Parallax --------------------
-function initializeParallax() {
-  const bg = document.querySelector(".hero-comp-header-bg");
-  const fg = document.querySelector(".hero-comp-header-fg");
-  if (!bg || !fg) return;
-  window.addEventListener("scroll", () => {
-    const scrollValue = window.scrollY;
-    bg.style.transform = `translateY(${scrollValue * 0.1}px)`;
-    fg.style.transform = `translateY(-${scrollValue * 0.15}px)`;
-  });
-}
-
 // -------------------- Page builder --------------------
 function createHeroPageElements(data) {
   const isTrueHero = Boolean(data?.isHeroComp && data?.hasParallax);
@@ -528,7 +513,7 @@ function createHeroPageElements(data) {
 
   // --- 2c. Main Layout Section ---
   const introSectionClass = isTrueHero ? "hero-comp-title-section" : "main-comp-layout";
-  const introSectionChildren = isTrueHero ? [introDetails] : [prizeVisualsPanel, introDetails];
+  const introSectionChildren = isTrueHero ? introDetails : [prizeVisualsPanel, introDetails];
   mainContentSections.push(el("section", { class: introSectionClass }, introSectionChildren));
 
   // --- 2d. Entry Flow (shared) ---

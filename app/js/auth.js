@@ -24,6 +24,8 @@ import {
   onSnapshot,
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+import { FEATURES } from "./features.js";
+
 import {
   initializeAppCheck,
   ReCaptchaEnterpriseProvider,
@@ -167,10 +169,12 @@ export function renderHeader(user) {
       );
     }
 
-    const instantWinLink = createElement("a", { href: "instant-games.html", class: `btn ${currentPage === "instant-wins" ? "active" : ""}` }, [
-      "Instant Wins",
-    ]);
-    links.unshift(instantWinLink);
+    if (FEATURES.instantWins) {
+      const instantWinLink = createElement("a", { href: "instant-games.html", class: `btn ${currentPage === "instant-wins" ? "active" : ""}` }, [
+        "Instant Wins",
+      ]);
+      links.unshift(instantWinLink);
+    }
     return links;
   };
 

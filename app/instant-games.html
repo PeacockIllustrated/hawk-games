@@ -12,6 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body data-page="instant-wins">
+    <script type="module">
+      import { FEATURES } from "/app/js/features.js";
+      if (!FEATURES.instantWins) {
+        // No customer access: bounce to home
+        location.replace("/app/");
+      }
+    </script>
     <header class="main-header"></header>
 
     <main class="container">

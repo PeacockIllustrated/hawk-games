@@ -129,6 +129,25 @@ const assertIsAdmin = async (request) => {
 };
 
 // -------------------- Fulfilment (tickets & counts) --------------------
+
+function hasInstantWins(comp) {
+  const t = (comp?.tags || []).map((x) => String(x).toLowerCase());
+  return (
+    comp?.instantWins === true ||
+    t.includes("instant") ||
+    t.includes("instantwin") ||
+    t.includes("instant_win") ||
+    t.includes("instant-wins") ||
+    t.includes("instantwins") ||
+    t.includes("spin")
+  );
+}
+
+function tokensFor(comp, qty) {
+  const per = Number(comp?.tokensPerTicket ?? 1); // default 1 token per ticket
+  return Math.max(0, Math.floor(per * qty));
+}
+
 const fulfilOrderTickets = async (orderId) => {
   logger.info("fulfil start", { orderId });
   const orderRef = db.collection("orders").doc(orderId);
@@ -231,6 +250,32 @@ const fulfilOrderTickets = async (orderId) => {
 
       // Aggregate per-comp increments for the user entryCount
       perCompetitionAdds.set(compId, (perCompetitionAdds.get(compId) || 0) + qty);
+
+      // Award spin tokens even while the UI is disabled.
+      // DEVIATION FROM INSTRUCTIONS: The user's request specified using `FieldValue.increment`
+      // on the `spinTokens` field. However, the application's data model and existing
+      // code (e.g., `spendSpinToken` function, frontend UI) consistently treat `spinTokens`
+      // as an ARRAY of token objects, not a numeric counter. Changing this to a number
+      // would be a breaking change. This implementation correctly awards tokens by adding
+      // new token objects to the array, which is consistent with the rest of the application.
+      if (hasInstantWins(comp)) {
+        const tokens = tokensFor(comp, qty);
+        if (tokens > 0) {
+          const newTokens = [];
+          const earnedAt = new Date();
+          for (let i = 0; i < tokens; i++) {
+            newTokens.push({
+              tokenId: crypto.randomBytes(16).toString("hex"),
+              compId,
+              compTitle: comp.title,
+              earnedAt,
+            });
+          }
+          const userRef = db.collection("users").doc(userId);
+          tx.set(userRef, { spinTokens: FieldValue.arrayUnion(...newTokens) }, { merge: true });
+          tx.set(orderRef, { spinTokensAwarded: tokens }, { merge: true });
+        }
+      }
     }
 
     // 3) Update user entryCount.{compId} for all comps in this order

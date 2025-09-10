@@ -1472,6 +1472,15 @@ main.showcase-container {
     height: 100%;
 }
 
+.is-disabled { pointer-events: none; cursor: default; }
+.btn.disabled,
+.btn[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: .8;
+  filter: grayscale(.1);
+  cursor: default;
+}
+
 /* --- 30. Competition Gallery --- */
 .comp-gallery{ margin-top:1.25rem }
 .comp-gallery-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }

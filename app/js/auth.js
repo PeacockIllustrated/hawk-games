@@ -170,7 +170,7 @@ export function renderHeader(user) {
     const instantWinLink = createElement("a", { href: "instant-games.html", class: `btn ${currentPage === "instant-wins" ? "active" : ""}` }, [
       "Instant Wins",
     ]);
-    links.push(instantWinLink);
+    links.unshift(instantWinLink);
     return links;
   };
 

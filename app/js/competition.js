@@ -500,17 +500,10 @@ function createHeroPageElements(data) {
 
   // --- 1. Header ---
   const header = isTrueHero
-    ? el("header", { class: "hero-comp-header" }, [
-        el("div", {
-          class: "hero-comp-header-bg",
-          style: { backgroundImage: data?.imageSet?.background ? `url('${data.imageSet.background}')` : "" },
-        }),
-        el("img", {
-          class: "hero-comp-header-fg",
-          src: data?.imageSet?.foreground || data?.prizeImage || "",
-          alt: data?.title || "Prize",
-        }),
-      ])
+    ? el("header", {
+        class: "hero-comp-header",
+        style: { backgroundImage: data?.imageSet?.background ? `url('${data.imageSet.background}')` : "" },
+      })
     : el("header"); // Empty header keeps structure for non-hero comps
 
   // --- 2. Main Content ---

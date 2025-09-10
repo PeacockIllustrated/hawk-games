@@ -689,7 +689,7 @@ input:checked + .slider:before { transform: translateX(26px); }
         position: static;
     }
     .main-nav-desktop { display: none; }
-    .hero-home { background-image: url('../assets/hero-bg-mobile.png'); }
+    .hero-home { background-image: url('../assets/hero-bg-mobile.png'); max-height: 65vh; }
     .hero-card-title { font-size: 2rem; }
     .hero-card-content { padding: 2rem; }
     .entry-details-panel h1 { font-size: 2rem; }

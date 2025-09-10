@@ -1,0 +1,76 @@
+/* ----- Prize at a glance (hero spec panel) ----- */
+.glance{ margin: 2.5rem 0 1.5rem }
+.glance__title{
+  margin: 0 0 1rem;
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-size: clamp(1.1rem, 0.9rem + 1.2vw, 1.6rem);
+  text-align: center;
+}
+.glance__inner{
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 22px;
+  background: #1a1a1a;
+  border: 1px solid var(--border-color, #2c2c2c);
+  border-radius: 10px;
+  padding: 18px;
+}
+@media (max-width: 900px){ .glance__inner{ grid-template-columns: 1fr; } }
+.glance__visual{
+  position: relative;
+  background: #181818;
+  border: 1px solid var(--border-color, #2c2c2c);
+  border-radius: 8px;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.glance__img{
+  max-width: 92%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 12px 28px rgba(0,0,0,.6));
+}
+.glance__badges{ position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.glance-badge{
+  background: linear-gradient(180deg, #f7e5b6, #e0a94a);
+  color: #121212;
+  border: 1px solid #f0d082;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .3px;
+}
+
+.glance__specs{ display: flex; flex-direction: column; gap: 14px }
+.spec-grid{ display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px }
+@media (max-width: 560px){ .spec-grid{ grid-template-columns: 1fr; } }
+.spec{
+  background: #141414;
+  border: 1px solid var(--border-color, #2c2c2c);
+  border-radius: 8px;
+  padding: 12px 12px 10px;
+}
+.spec__label{
+  display: block;
+  color: #99a3b5;
+  font-size: 12px;
+  letter-spacing: .3px;
+  margin-bottom: 4px;
+}
+.spec__value{ font-weight: 800; font-size: 16px; color: var(--light-white, #f0f0f0); }
+
+.feature-list{ margin: 2px 0 0; padding-left: 18px; display: grid; gap: 6px }
+.feature-list li{
+  list-style: none; position: relative; padding-left: 18px;
+}
+.feature-list li::before{
+  content: "✓"; position: absolute; left: 0; top: 0;
+  color: var(--primary-gold, #e0a94a); font-weight: 800;
+}
+.glance__note{ color: #99a3b5; font-size: 12px; margin-top: 6px }

@@ -67,6 +67,29 @@ export async function payByCard({ compId, qty }) {
   }
 
   // fields includes notificationpassword, sitereference, orderreference, etc.
+
+  // --- Client-side modifications for v2 Mobile-friendly flow ---
+
+  // 1. Force v2 of the payment pages API
+  fields.version = "2";
+
+  // 2. Force the "Card Only" layout, hiding address fields.
+  fields.stdefaultprofile = "st_cardonly";
+
+  // 3. (Optional) Pre-select card entry to skip an interstitial page.
+  fields.paymenttypedescription = "VISA";
+
+  // 4. Ensure our success page receives the order reference for lookup.
+  if (fields.successfulurlredirect && fields.orderreference) {
+    try {
+      const url = new URL(fields.successfulurlredirect);
+      url.searchParams.set("orderRef", fields.orderreference);
+      fields.successfulurlredirect = url.toString();
+    } catch (e) {
+      console.warn("Could not append orderRef to success URL", e);
+    }
+  }
+
   postToHPP(endpoint, fields);
 }
 

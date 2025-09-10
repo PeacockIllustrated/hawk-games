@@ -229,3 +229,20 @@ p{margin:8px 0;color:#d6dce9}
 
 .hawk-card__footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; } /* matches home */ /* :contentReference[oaicite:2]{index=2} */
 .hawk-card__price { font-family: var(--font-heading); font-size: 1.4rem; color: var(--primary-gold); } /* matches home */ /* :contentReference[oaicite:3]{index=3} */
+
+/* Mobile layout polish on our page only */
+.checkout-wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+.checkout-summary { margin-bottom: 14px; }
+.checkout-cta button,
+.checkout-cta .btn {
+  width: 100%;
+  min-height: 48px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+@media (min-width: 480px){
+  .checkout-cta button, .checkout-cta .btn { width: auto; min-width: 220px; }
+}
+
+/* prevent iOS zoom-on-focus for our inputs (not Trust’s) */
+input, select, textarea { font-size: 16px; }

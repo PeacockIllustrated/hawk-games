@@ -8,6 +8,47 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        .live-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--primary-gold);
+            color: #000;
+            padding: 1.5rem 3rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            text-decoration: none;
+            text-transform: uppercase;
+            border-radius: 10px;
+            border: 4px solid var(--primary-gold);
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            line-height: 1.2;
+        }
+        .live-button span {
+            font-size: 1.2rem;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+        .live-button:hover {
+            background-color: transparent;
+            color: var(--primary-gold);
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+        .hero-section {
+            position: relative; /* Needed for absolute positioning of child */
+        }
+        .hero-section img {
+            filter: brightness(0.6); /* Darken the image to make text pop */
+        }
+        .cta-wrapper {
+            display: none !important;
+        }
+    </style>
+    <style>
         :root {
             --primary-gold: #e0a94a;
             --light-white: #f0f0f0;
@@ -332,7 +373,11 @@
 <body>
 
     <main class="hero-section">
-        <img src="the-hawk-games-banner.png" alt="The Hawk Games - Coming Soon">
+        <img src="the-hawk-games-banner.png" alt="The Hawk Games - Now Live!">
+        <a href="app/index.html" class="live-button">
+            WE ARE NOW LIVE<br>
+            <span>Click Here To Play</span>
+        </a>
     </main>
 
     <footer class="info-banner">

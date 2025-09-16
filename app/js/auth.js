@@ -427,7 +427,6 @@ document.addEventListener("DOMContentLoaded", () => {
         authModeToggle.addEventListener('click', () => setAuthMode(!isRegisterMode));
 
         termsCheckbox.addEventListener("change", () => {
-            googleLoginBtn.disabled = !termsCheckbox.checked;
             authSubmitBtn.disabled = !termsCheckbox.checked;
         });
         authSubmitBtn.disabled = !termsCheckbox.checked;

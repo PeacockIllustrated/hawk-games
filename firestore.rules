@@ -1,65 +1,105 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --------------------------- Users ---------------------------
-    // - Anyone can create their own user profile (on signup)
-    // - Authenticated users can only read/update their own data
-    // - No one can delete user records
+    /* -------- Helpers -------- */
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isBackendOrAdmin() { return isAdmin(); } // upgrade to custom claims later
+
+    /* -------- Admin / Settings -------- */
+    match /admin_settings/{setting} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /* -------- Users -------- */
     match /users/{userId} {
-      allow create: if request.auth != null;
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if false;
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Create own profile; cannot self-elevate
+      allow create: if isOwner(userId) &&
+        (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+
+      // Update safe fields; admins full control
+      allow update: if (isOwner(userId) &&
+                        !('isAdmin' in request.resource.data) &&
+                        !('loyalty' in request.resource.data))
+                     || isAdmin();
+
+      allow delete: if isAdmin();
     }
 
-    // --------------------------- Competitions ---------------------------
-    // - Publicly readable
-    // - Admin-only write access
+    /* -------- Competitions (public) -------- */
     match /competitions/{compId} {
-      allow read: if true;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow list, get: if true;
+      allow create, update, delete: if isAdmin();
     }
 
-    // --------------------------- Entries ---------------------------
-    // - Authenticated users can create their own entries
-    // - Users can only read their own entries
-    // - Admin can read all entries
-    match /entries/{entryId} {
-      allow create: if request.auth != null && request.auth.token.email_verified == true;
-      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-      allow update, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    match /spinner_competitions/{compId} {
+      allow list, get: if true;
+      allow create, update, delete: if isAdmin();
     }
 
-    // --------------------------- Orders ---------------------------
-    // - Users can create their own orders
-    // - Users can only read/update their own orders
-    // - Admin can read all orders
+    /* -------- Entries (collection-group) -------- */
+    match /{any=**}/entries/{entryId} {
+      allow get, list: if isAdmin() ||
+                         (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false; // server only
+    }
+
+    /* -------- Orders (critical) --------
+       Goal: allow success.html to subscribe BEFORE the order exists,
+       then require ownership once the doc is created by the webhook.
+    */
     match /orders/{orderId} {
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid && request.auth.token.email_verified == true;
-        allow read, update: if request.auth != null && (request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
-        allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // Single-doc reads only
+      allow get: if isAdmin()
+                  || ( signedIn() && (
+                        !exists(/databases/$(database)/documents/orders/$(orderId)) // pre-create
+                        || resource.data.userId == request.auth.uid                 // post-create
+                     ));
+
+      // No broad listing for users; admins only
+      allow list: if isAdmin();
+
+      // Writes ONLY via backend/webhooks/admin
+      allow create, update, delete: if false;
     }
 
-    // --------------------------- App-wide Settings (e.g. maintenance mode) ---------------------------
-    match /settings/app-wide {
-        allow read: if true;
-        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    /* -------- Tickets (optional; if you expose them) -------- */
+    match /tickets/{ticketId} {
+      allow get, list: if isAdmin() ||
+                        (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false;
     }
 
-    // --------------------------- Stripe Customers (private subcollection) ---------------------------
-    // - Users can access their own customer data & payment methods
-    match /users/{userId}/customers/{customerId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-    }
-    match /users/{userId}/payments/{paymentId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId;
+    /* -------- Audit Logs -------- */
+    match /audits/{auditId} {
+      allow write: if isBackendOrAdmin();
+      allow read:  if isAdmin();
     }
 
-    // --------------------------- Public Pages (e.g. winners) ---------------------------
-    match /public-content/{docId} {
+    /* -------- Public winners page -------- */
+    match /pastWinners/{winnerId} {
       allow read: if true;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow write: if false;
+    }
+
+    /* -------- Anything else: locked -------- */
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

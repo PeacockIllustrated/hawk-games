@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify Email | The Hawk Games</title>
+    <link rel="stylesheet" href="css/hawk-games.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .verify-container { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 200px); padding: 2rem 0; }
+        .verify-box { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 3rem; border-radius: 5px; text-align: center; max-width: 500px; width: 100%; }
+        .verify-box h1 { font-family: var(--font-heading); font-size: 2rem; text-transform: uppercase; margin-bottom: 1rem; }
+        .verify-box p { color: #aaa; margin-bottom: 2rem; line-height: 1.6; }
+        .resend-btn { margin-top: 1rem; }
+        #message { margin-top: 1.5rem; color: var(--primary-gold); font-weight: 700; }
+    </style>
+</head>
+<body data-page="verify-email">
+    <header class="main-header"></header>
+    <main>
+        <div class="verify-container">
+            <div class="verify-box">
+                <h1>Check Your Inbox</h1>
+                <p>
+                    We've sent a verification link to <strong id="user-email">your email</strong>.
+                    Please click the link in the email to activate your account.
+                </p>
+                <p>Once verified, you can log in and access all features.</p>
+                <button id="resend-verification-btn" class="btn resend-btn">Resend Verification Email</button>
+                <div id="message"></div>
+                 <p style="margin-top: 2rem; font-size: 0.9rem;">
+                    <a href="login.html" style="color: var(--primary-gold);">Back to Login</a>
+                </p>
+            </div>
+        </div>
+    </main>
+    <footer class="main-footer"></footer>
+    <script type="module" src="js/verify-email.js"></script>
+</body>
+</html>

@@ -13,6 +13,11 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  updateProfile,
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
 import {
@@ -84,6 +89,75 @@ onAuthStateChanged(auth, (user) => {
 
   renderFooter();
 });
+
+export function requireVerifiedEmail() {
+    return new Promise((resolve) => {
+        const checkVerification = () => {
+            const user = auth.currentUser;
+            if (user && user.emailVerified) {
+                resolve(true);
+            } else if (user) {
+                // User is logged in but email is not verified
+                showVerificationGate();
+                resolve(false);
+            } else {
+                // User is not logged in, redirect to login
+                window.location.href = 'login.html';
+                resolve(false);
+            }
+        };
+
+        if (auth.currentUser) {
+            checkVerification();
+        } else {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    checkVerification();
+                } else {
+                    window.location.href = 'login.html';
+                    resolve(false);
+                }
+            }, () => {
+                window.location.href = 'login.html';
+                resolve(false);
+            });
+        }
+    });
+}
+
+function showVerificationGate() {
+    const gate = document.createElement('div');
+    gate.style.position = 'fixed';
+    gate.style.top = '0';
+    gate.style.left = '0';
+    gate.style.width = '100%';
+    gate.style.height = '100%';
+    gate.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    gate.style.color = 'white';
+    gate.style.display = 'flex';
+    gate.style.justifyContent = 'center';
+    gate.style.alignItems = 'center';
+    gate.style.zIndex = '1000';
+    gate.innerHTML = `
+        <div style="text-align: center; padding: 2rem; background: var(--card-bg); border-radius: 5px;">
+            <h2>Email Verification Required</h2>
+            <p>You must verify your email address before you can perform this action.</p>
+            <p>A verification email was sent to you. Please check your inbox.</p>
+            <button id="gate-resend-btn" class="btn">Resend Verification</button>
+            <a href="/login.html" style="display: block; margin-top: 1rem; color: var(--primary-gold);">Logout</a>
+        </div>
+    `;
+    document.body.appendChild(gate);
+
+    document.getElementById('gate-resend-btn').addEventListener('click', async () => {
+        try {
+            await sendEmailVerification(auth.currentUser);
+            alert('A new verification email has been sent.');
+        } catch (error) {
+            alert('Error sending verification email. Please try again later.');
+        }
+    });
+}
 
 // -------------------- Profile bootstrap --------------------
 async function createUserProfileIfNotExists(user) {
@@ -318,25 +392,146 @@ export function renderFooter() {
 
 // -------------------- Login wiring --------------------
 document.addEventListener("DOMContentLoaded", () => {
-  const loginBtn = document.getElementById("google-login-btn");
-  const termsCheckbox = document.getElementById("terms-agree-checkbox");
+    const page = document.body.dataset.page;
 
-  if (loginBtn && termsCheckbox) {
-    termsCheckbox.addEventListener("change", () => {
-      loginBtn.disabled = !termsCheckbox.checked;
-    });
+    if (page === 'login') {
+        const googleLoginBtn = document.getElementById("google-login-btn");
+        const termsCheckbox = document.getElementById("terms-agree-checkbox");
+        const emailPasswordForm = document.getElementById('email-password-form');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const authModeToggle = document.getElementById('auth-mode-toggle');
+        const authTitle = document.getElementById('auth-title');
+        const authSubtitle = document.getElementById('auth-subtitle');
+        const nameGroup = document.getElementById('name-group');
+        const passwordPolicy = document.getElementById('password-policy');
+        const authModeText = document.getElementById('auth-mode-text');
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        const authError = document.getElementById('auth-error');
 
-    loginBtn.addEventListener("click", async () => {
-      if (!termsCheckbox.checked) {
-        alert("Please agree to the terms and confirm your age before proceeding.");
-        return;
-      }
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider());
-        window.location.href = "account.html";
-      } catch (error) {
-        console.error("Google Sign-In Error:", error);
-      }
-    });
-  }
+        let isRegisterMode = false;
+        let failedLoginAttempts = 0;
+        let loginTimeout = null;
+
+        const setAuthMode = (register) => {
+            isRegisterMode = register;
+            authTitle.textContent = register ? 'Register' : 'Sign In';
+            authSubtitle.textContent = register ? 'Create a new account.' : 'Enter your details to access your account.';
+            authSubmitBtn.textContent = register ? 'Register' : 'Sign In';
+            nameGroup.style.display = register ? 'block' : 'none';
+            passwordPolicy.style.display = register ? 'block' : 'none';
+            authModeText.textContent = register ? 'Already have an account?' : "Don't have an account?";
+            authModeToggle.textContent = register ? 'Sign In' : 'Register';
+            forgotPasswordLink.style.display = register ? 'none' : 'block';
+        };
+
+        authModeToggle.addEventListener('click', () => setAuthMode(!isRegisterMode));
+
+        termsCheckbox.addEventListener("change", () => {
+            googleLoginBtn.disabled = !termsCheckbox.checked;
+            authSubmitBtn.disabled = !termsCheckbox.checked;
+        });
+        authSubmitBtn.disabled = !termsCheckbox.checked;
+
+
+        const showError = (message) => {
+            authError.textContent = message;
+            authError.style.display = 'block';
+        };
+
+        const hideError = () => {
+            authError.textContent = '';
+            authError.style.display = 'none';
+        };
+
+        const validatePassword = (password) => {
+            const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+            return regex.test(password);
+        };
+
+        emailPasswordForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideError();
+
+            if (!termsCheckbox.checked) {
+                showError("Please agree to the terms and confirm your age before proceeding.");
+                return;
+            }
+
+            const email = emailPasswordForm.email.value;
+            const password = emailPasswordForm.password.value;
+            const name = emailPasswordForm.name.value;
+
+            try {
+                if (isRegisterMode) {
+                    // Register
+                    if (!validatePassword(password)) {
+                        showError("Password does not meet the policy requirements.");
+                        return;
+                    }
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(userCredential.user, { displayName: name });
+                    await sendEmailVerification(userCredential.user);
+                    window.location.href = "verify-email.html";
+                } else {
+                    // Login
+                    if (loginTimeout) {
+                        showError("Too many failed attempts. Please try again later.");
+                        return;
+                    }
+                    await signInWithEmailAndPassword(auth, email, password);
+                    failedLoginAttempts = 0; // reset on success
+                    window.location.href = "account.html";
+                }
+            } catch (error) {
+                if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                    failedLoginAttempts++;
+                    if (failedLoginAttempts >= 3) {
+                        showError("Too many failed attempts. Please wait 60 seconds.");
+                        authSubmitBtn.disabled = true;
+                        setTimeout(() => {
+                            authSubmitBtn.disabled = false;
+                            failedLoginAttempts = 0;
+                            hideError();
+                        }, 60000);
+                    } else {
+                        showError("Invalid email or password.");
+                    }
+                } else if (error.code === 'auth/email-already-in-use') {
+                    showError("An account with this email already exists.");
+                } else {
+                    showError("An unexpected error occurred. Please try again.");
+                }
+                console.error("Auth Error:", error);
+            }
+        });
+
+        googleLoginBtn.addEventListener("click", async () => {
+            if (!termsCheckbox.checked) {
+                showError("Please agree to the terms and confirm your age before proceeding.");
+                return;
+            }
+            try {
+                await signInWithPopup(auth, new GoogleAuthProvider());
+                window.location.href = "account.html";
+            } catch (error) {
+                showError("Failed to sign in with Google. Please try again.");
+                console.error("Google Sign-In Error:", error);
+            }
+        });
+
+        forgotPasswordLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const email = prompt("Please enter your email address to reset your password:");
+            if (email) {
+                try {
+                    await sendPasswordResetEmail(auth, email);
+                    alert("A password reset link has been sent to your email.");
+                } catch (error) {
+                    alert("Failed to send password reset email. Please check the email address and try again.");
+                    console.error("Password Reset Error:", error);
+                }
+            }
+        });
+
+    }
 });

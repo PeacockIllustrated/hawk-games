@@ -1,9 +1,65 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --------------------------- Users ---------------------------
+    // - Anyone can create their own user profile (on signup)
+    // - Authenticated users can only read/update their own data
+    // - No one can delete user records
+    match /users/{userId} {
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // --------------------------- Competitions ---------------------------
+    // - Publicly readable
+    // - Admin-only write access
+    match /competitions/{compId} {
+      allow read: if true;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // --------------------------- Entries ---------------------------
+    // - Authenticated users can create their own entries
+    // - Users can only read their own entries
+    // - Admin can read all entries
+    match /entries/{entryId} {
+      allow create: if request.auth != null && request.auth.token.email_verified == true;
+      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+      allow update, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // --------------------------- Orders ---------------------------
+    // - Users can create their own orders
+    // - Users can only read/update their own orders
+    // - Admin can read all orders
     match /orders/{orderId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow write: if false;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid && request.auth.token.email_verified == true;
+        allow read, update: if request.auth != null && (request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+        allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // --------------------------- App-wide Settings (e.g. maintenance mode) ---------------------------
+    match /settings/app-wide {
+        allow read: if true;
+        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // --------------------------- Stripe Customers (private subcollection) ---------------------------
+    // - Users can access their own customer data & payment methods
+    match /users/{userId}/customers/{customerId} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/payments/{paymentId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // --------------------------- Public Pages (e.g. winners) ---------------------------
+    match /public-content/{docId} {
+      allow read: if true;
+      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
   }
 }

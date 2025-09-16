@@ -16,7 +16,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // --- App glue ---
-import { app } from "./auth.js";
+import { app, requireVerifiedEmail } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";
 import { computeState, resolveCloseMode, startCountdown, formatLeft } from "/app/js/lib/comp-state.js";
@@ -243,16 +243,10 @@ function setupEntryLogic(correctAnswer) {
   }
 
   // Click → show confirmation modal, re-validate auth and correctness
-  entryButton.addEventListener("click", () => {
-    if (!auth.currentUser) {
-      openModal(
-        el("div", {}, [
-          el("h2", { textContent: "Login Required" }),
-          el("p", { textContent: "Please log in or register to enter." }),
-          el("a", { href: "login.html", class: "btn" }, ["Login"]),
-        ])
-      );
-      return;
+  entryButton.addEventListener("click", async () => {
+    const isVerified = await requireVerifiedEmail();
+    if (!isVerified) {
+        return; // Gate is shown by requireVerifiedEmail function
     }
 
     if (!isAnswerCorrect) {

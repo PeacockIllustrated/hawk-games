@@ -21,7 +21,7 @@ main:not(.hero-comp-main) { padding-top: 120px; }
 .container { width: 90%; max-width: 1400px; margin: 0 auto; }
 
 /* --- 2. Universal Components --- */
-.section-title { font-family: var(--font-heading); font-size: 2.8rem; text-transform: uppercase; text-align: center; letter-spacing: 2px; margin-bottom: 3rem; padding-bottom: 1rem; position: relative; }
+.section-title { font-family: var(--font-heading); font-size: 2.8rem; text-transform: uppercase; text-align: center; letter-spacing: 2px; margin-bottom: 3rem; padding-bottom: var(--divider-gap, 0.5em); position: relative; }
 .section-title::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 100px; height: 3px; background-color: var(--primary-gold); }
 .btn { display: inline-block; padding: 0.8rem 2.5rem; background-color: var(--primary-gold); color: var(--dark-bg); text-decoration: none; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 1.5px; border: 2px solid var(--primary-gold); border-radius: 4px; font-weight: 700; text-align: center; cursor: pointer; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.3s ease, color 0.3s ease; }
 .btn:hover { background-color: transparent; color: var(--primary-gold); transform: translateY(-3px); }
@@ -1476,7 +1476,26 @@ main.showcase-container {
 /* Instant Wins promo (keeps brand tokens: --primary-gold, --light-white, --border-color) */
 .spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); }
 .spin-promo .card { background:#1a1a1a; border:1px solid var(--border-color, #2c2c2c); border-radius:12px; padding:20px; margin-bottom:16px; }
-.section-title { font-family: var(--font-heading, 'Chakra Petch', sans-serif); text-transform: uppercase; letter-spacing:1.5px; font-weight:700; margin:0 0 12px; }
+.spin-promo-body .section-title {
+    font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    position: relative;
+    padding-bottom: var(--divider-gap, 0.5em);
+}
+
+.spin-promo-body .section-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 3px;
+    background-color: var(--primary-gold);
+}
 
 .spin-hero { display:grid; grid-template-columns: 1.2fr 0.8fr; gap:18px; overflow:hidden; }
 @media (max-width: 900px){ .spin-hero{ grid-template-columns: 1fr; } }

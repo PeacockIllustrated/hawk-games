@@ -17,7 +17,7 @@
   --font-body: 'Roboto', sans-serif;
 
   /* Page-only accents */
-  --accent-orange: #ff7a1a;
+  --accent-orange: #00AFFF;
   --ring: 0 0 0 3px rgba(224,169,74,.18), 0 0 0 1px rgba(224,169,74,.55);
   --glow: 0 12px 34px rgba(0,0,0,.55), 0 0 48px rgba(224,169,74,.10);
 }

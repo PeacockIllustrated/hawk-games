@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* -------- Helpers -------- */
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isBackendOrAdmin() { return isAdmin(); } // upgrade to custom claims later
+
+    /* -------- Admin / Settings -------- */
+    match /admin_settings/{setting} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    /* -------- Users -------- */
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Create own profile; cannot self-elevate
+      allow create: if isOwner(userId) &&
+        (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+
+      // Update safe fields; admins full control
+      allow update: if (isOwner(userId) &&
+                        !('isAdmin' in request.resource.data) &&
+                        !('loyalty' in request.resource.data))
+                     || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    /* -------- Competitions (public) -------- */
+    match /competitions/{compId} {
+      allow list, get: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /spinner_competitions/{compId} {
+      allow list, get: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    /* -------- Entries (collection-group) -------- */
+    match /{any=**}/entries/{entryId} {
+      allow get, list: if isAdmin() ||
+                         (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false; // server only
+    }
+
+    /* -------- Orders (critical) --------
+       Goal: allow success.html to subscribe BEFORE the order exists,
+       then require ownership once the doc is created by the webhook.
+    */
+    match /orders/{orderId} {
+      // Single-doc reads only
+      allow get: if isAdmin()
+                  || ( signedIn() && (
+                        !exists(/databases/$(database)/documents/orders/$(orderId)) // pre-create
+                        || resource.data.userId == request.auth.uid                 // post-create
+                     ));
+
+      // No broad listing for users; admins only
+      allow list: if isAdmin();
+
+      // Writes ONLY via backend/webhooks/admin
+      allow create, update, delete: if false;
+    }
+
+    /* -------- Tickets (optional; if you expose them) -------- */
+    match /tickets/{ticketId} {
+      allow get, list: if isAdmin() ||
+                        (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    /* -------- Audit Logs -------- */
+    match /audits/{auditId} {
+      allow write: if isBackendOrAdmin();
+      allow read:  if isAdmin();
+    }
+
+    /* -------- Public winners page -------- */
+    match /pastWinners/{winnerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    /* -------- Anything else: locked -------- */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

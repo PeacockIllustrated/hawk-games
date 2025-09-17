@@ -37,7 +37,7 @@
 }
 .glance__badges{ position: absolute; left: 12px; bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 .glance-badge{
-  background: linear-gradient(180deg, #f7e5b6, #e0a94a);
+  background: linear-gradient(180deg, #A0E8FF, #68D6FF);
   color: #121212;
   border: 1px solid #f0d082;
   border-radius: 999px;
@@ -71,6 +71,6 @@
 }
 .feature-list li::before{
   content: "✓"; position: absolute; left: 0; top: 0;
-  color: var(--primary-gold, #e0a94a); font-weight: 800;
+  color: var(--primary-gold, #68D6FF); font-weight: 800;
 }
 .glance__note{ color: #99a3b5; font-size: 12px; margin-top: 6px }

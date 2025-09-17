@@ -349,9 +349,9 @@ function initializePlinkoBoard() {
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
         <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#f4d488"/>
-            <stop offset="45%" stop-color="#e0a94a"/>
-            <stop offset="100%" stop-color="#b38a37"/>
+            <stop offset="0%" stop-color="#A0E8FF"/>
+            <stop offset="45%" stop-color="#68D6FF"/>
+            <stop offset="100%" stop-color="#008fcc"/>
         </linearGradient>
     `;
     plinkoSvg.appendChild(defs);

@@ -16,7 +16,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // --- App glue ---
-import { app } from "./auth.js";
+import { app, requireVerifiedEmail } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";
 import { computeState, resolveCloseMode, startCountdown, formatLeft } from "/app/js/lib/comp-state.js";
@@ -243,16 +243,10 @@ function setupEntryLogic(correctAnswer) {
   }
 
   // Click → show confirmation modal, re-validate auth and correctness
-  entryButton.addEventListener("click", () => {
-    if (!auth.currentUser) {
-      openModal(
-        el("div", {}, [
-          el("h2", { textContent: "Login Required" }),
-          el("p", { textContent: "Please log in or register to enter." }),
-          el("a", { href: "login.html", class: "btn" }, ["Login"]),
-        ])
-      );
-      return;
+  entryButton.addEventListener("click", async () => {
+    const isVerified = await requireVerifiedEmail();
+    if (!isVerified) {
+        return; // Gate is shown by requireVerifiedEmail function
     }
 
     if (!isAnswerCorrect) {
@@ -500,17 +494,10 @@ function createHeroPageElements(data) {
 
   // --- 1. Header ---
   const header = isTrueHero
-    ? el("header", { class: "hero-comp-header" }, [
-        el("div", {
-          class: "hero-comp-header-bg",
-          style: { backgroundImage: data?.imageSet?.background ? `url('${data.imageSet.background}')` : "" },
-        }),
-        el("img", {
-          class: "hero-comp-header-fg",
-          src: data?.imageSet?.foreground || data?.prizeImage || "",
-          alt: data?.title || "Prize",
-        }),
-      ])
+    ? el("header", {
+        class: "hero-comp-header",
+        style: { backgroundImage: data?.imageSet?.background ? `url('${data.imageSet.background}')` : "" },
+      })
     : el("header"); // Empty header keeps structure for non-hero comps
 
   // --- 2. Main Content ---
@@ -601,9 +588,9 @@ function createIntroDetails(data, isTrueHero) {
     " Cash Alternative",
   ]);
   const timeRemaining = el("div", { class: "time-remaining" }, [
-      el("span", { textContent: "TIME REMAINING" }),
       el("span", { id: "compEndChip", class: "badge" })
   ]);
+
   const timer = el("div", { id: "timer", class: "hero-digital-timer" });
   const progressLabel = el("label", { textContent: `Tickets Sold: ${sold} / ${total}` });
   const progressBar = el("div", { class: "progress-bar" }, [
@@ -669,13 +656,89 @@ function createEntryFlow(data) {
 }
 
 function createGlanceSection(data) {
-  const prizeSpecs = (Array.isArray(data?.prizeSpecs) ? data.prizeSpecs : []).map((spec) => el("li", { textContent: String(spec) }));
-  const glanceImage = safeGet(data, "imageSet.foreground") || data?.prizeImage || "";
-
-  return el("section", { class: "hero-comp-glance-section" }, [
-    el("h2", { textContent: "3. Prize At a Glance" }),
-    el("div", { class: "glance-content" }, [el("img", { src: glanceImage, alt: "Prize image" }), el("ul", {}, prizeSpecs)]),
-  ]);
+  // This section is now hardcoded for the Mercedes-Benz E220d AMG Line hero competition.
+  // The `el` helper is used for safe DOM element creation.
+  return el(
+    "section",
+    {
+      id: "prize-at-a-glance",
+      class: "glance",
+      "aria-label": "Prize at a glance",
+    },
+    [
+      el("h2", { class: "glance__title", textContent: "3. PRIZE AT A GLANCE" }),
+      el("div", { class: "glance__inner" }, [
+        // Left: visual
+        el("div", { class: "glance__visual" }, [
+          el("img", {
+            class: "glance__img",
+            src: "/app/assets/merc-e220d-hero.jpg",
+            alt: "Mercedes-Benz E220d AMG",
+            loading: "lazy",
+          }),
+          el("div", { class: "glance__badges" }, [
+            el("span", { class: "glance-badge", textContent: "AMG Line" }),
+            el("span", { class: "glance-badge", textContent: "9G-TRONIC" }),
+            el("span", { class: "glance-badge", textContent: "LED Headlights" }),
+          ]),
+        ]),
+        // Right: spec panel
+        el("div", { class: "glance__specs" }, [
+          el("div", { class: "spec-grid" }, [
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Model" }),
+              el("b", { class: "spec__value", textContent: "Mercedes-Benz E220d AMG Line" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Engine" }),
+              el("b", { class: "spec__value", textContent: "2.0-litre OM654 turbo-diesel" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Power" }),
+              el("b", { class: "spec__value", textContent: "~191 bhp (194 PS)" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Torque" }),
+              el("b", { class: "spec__value", textContent: "~400 Nm (295 lb-ft)" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "0–62 mph" }),
+              el("b", { class: "spec__value", textContent: "~7.3–7.5 s" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Top speed" }),
+              el("b", { class: "spec__value", textContent: "~149 mph" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Transmission" }),
+              el("b", { class: "spec__value", textContent: "9G-TRONIC automatic" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Drive" }),
+              el("b", { class: "spec__value", textContent: "Rear-wheel drive (4MATIC optional)" }),
+            ]),
+            el("div", { class: "spec" }, [
+              el("span", { class: "spec__label", textContent: "Fuel economy" }),
+              el("b", { class: "spec__value", textContent: "up to ~60 mpg (WLTP)" }),
+            ]),
+          ]),
+          el("ul", { class: "feature-list" }, [
+            el("li", { textContent: "AMG Line exterior & interior styling" }),
+            el("li", { textContent: "MBUX infotainment with Apple CarPlay / Android Auto" }),
+            el("li", { textContent: 'Digital cockpit (12.3" display cluster)' }),
+            el("li", { textContent: "LED High Performance headlamps" }),
+            el("li", { textContent: "Parking sensors & reversing camera" }),
+            el("li", { textContent: "Heated front seats; Artico/leather-look upholstery" }),
+            el("li", { textContent: "AMG alloy wheels & sport suspension" }),
+          ]),
+          el("p", {
+            class: "glance__note",
+            textContent: "Figures are indicative and vary by model year, options and exact vehicle supplied.",
+          }),
+        ]),
+      ]),
+    ]
+  );
 }
 
 function createTrustBadges() {
@@ -704,8 +767,7 @@ function hydrateCloseUi(comp){
       chip.className = "badge " + (state === "sold_out" ? "bad" : "pending");
     } else {
       chip.className = "badge pending";
-      chip.textContent = "Ends in —";
-      startCountdown(comp.closeAt, chip); // no-op if no date present
+      startCountdown(comp.closeAt, chip, "Ends in ");
     }
   }
 

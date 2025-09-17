@@ -30,15 +30,19 @@ export function formatLeft(comp){
   return Math.max(0, getCapacity(comp) - getSold(comp));
 }
 
-export function startCountdown(closeAt, el){
+export function startCountdown(closeAt, el, prefix = ""){
   const endMs = toMillis(closeAt);
-  if (!el || !endMs) return; // no-op if no date
+  if (!el || !endMs) {
+    if (el) el.textContent = "Closed";
+    return;
+  }
   function tick(){
     const diff = endMs - Date.now();
     if (diff <= 0){ el.textContent = "Closed"; return; }
     const s = Math.floor(diff/1000), d = Math.floor(s/86400);
     const h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60), sec = s%60;
-    el.textContent = d>0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${sec}s`;
+    const timeStr = d>0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${sec}s`;
+    el.textContent = prefix + timeStr;
     setTimeout(tick, 500);
   }
   tick();

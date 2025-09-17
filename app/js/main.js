@@ -1,7 +1,8 @@
 'use strict';
 
 import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import { app } from './auth.js'; 
+import { app } from './auth.js';
+import { resolveCloseMode, formatLeft } from './lib/comp-state.js';
 
 const db = getFirestore(app);
 
@@ -235,12 +236,22 @@ function createWinnerCard(winnerData) {
 }
 
 function createHeroCompetitionCard(compData) {
-    const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
-    const endDate = compData.endDate.toDate();
+    const progressPercent = (compData.totalTickets > 0) ? (compData.ticketsSold / compData.totalTickets) * 100 : 0;
     const price = compData.ticketTiers?.[0]?.price || 0.00;
-    const instantWinBadge = compData.instantWinsConfig?.enabled 
+    const instantWinBadge = compData.instantWinsConfig?.enabled
         ? createElement('div', { class: 'hawk-card__instant-win-badge', textContent: '⚡️ Instant Wins' })
         : null;
+
+    const mode = resolveCloseMode(compData);
+    let timerElement;
+    if (mode === 'date') {
+        const endDateRaw = compData.endDate ?? compData.endsAt ?? compData.closeAt;
+        const endDate = endDateRaw ? endDateRaw.toDate() : null;
+        timerElement = createElement('div', { class: 'hero-card-timer', 'data-end-date': endDate ? endDate.toISOString() : '', textContent: 'Calculating...' });
+    } else {
+        const left = formatLeft(compData);
+        timerElement = createElement('div', { class: 'hero-card-timer', textContent: `Ends when sold out · ${left} left` });
+    }
 
     return createElement('a', { href: `competition.html?id=${compData.id}`, class: 'hero-competition-card' }, [
         instantWinBadge,
@@ -250,7 +261,7 @@ function createHeroCompetitionCard(compData) {
         createElement('div', { class: 'hero-card-content' }, [
             createElement('span', { class: 'hero-card-tagline', textContent: 'Main Event' }),
             createElement('h2', { class: 'hero-card-title', textContent: compData.title }),
-            createElement('div', { class: 'hero-card-timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' }),
+            timerElement,
             createElement('div', { class: 'progress-bar' }, [
                 createElement('div', { class: 'progress-bar-fill', style: { width: `${progressPercent}%` } })
             ]),
@@ -264,16 +275,24 @@ function createHeroCompetitionCard(compData) {
 }
 
 function createCompetitionCard(compData) {
-    const progressPercent = (compData.ticketsSold / compData.totalTickets) * 100;
-    const endDate = compData.endDate ? compData.endDate.toDate() : null;
+    const progressPercent = (compData.totalTickets > 0) ? (compData.ticketsSold / compData.totalTickets) * 100 : 0;
     const price = compData.ticketTiers?.[0]?.price || 0.00;
-    const instantWinBadge = compData.instantWinsConfig?.enabled 
+    const instantWinBadge = compData.instantWinsConfig?.enabled
         ? createElement('div', { class: 'hawk-card__instant-win-badge', textContent: '⚡️ Instant Wins' })
         : null;
 
-    const timerElement = endDate
-        ? createElement('div', { class: 'hawk-card__timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' })
-        : createElement('div', { class: 'hawk-card__timer', textContent: 'Draws Weekly' });
+    const mode = resolveCloseMode(compData);
+    let timerElement;
+    if (mode === 'date') {
+        const endDateRaw = compData.endDate ?? compData.endsAt ?? compData.closeAt;
+        const endDate = endDateRaw ? endDateRaw.toDate() : null;
+        timerElement = endDate
+            ? createElement('div', { class: 'hawk-card__timer', 'data-end-date': endDate.toISOString(), textContent: 'Calculating...' })
+            : createElement('div', { class: 'hawk-card__timer', textContent: 'Draws Weekly' });
+    } else {
+        const left = formatLeft(compData);
+        timerElement = createElement('div', { class: 'hawk-card__timer', textContent: `Ends when sold out · ${left} left` });
+    }
 
     return createElement('a', { href: `competition.html?id=${compData.id}`, class: 'hawk-card' }, [
         instantWinBadge,

@@ -18,6 +18,19 @@
         .google-btn { display: flex; align-items: center; justify-content: center; gap: 1rem; background-color: #fff; color: #222; width: 100%; padding-top: 0.8rem; padding-bottom: 0.8rem; font-family: var(--font-body); font-weight: 700; border: none; font-size: 1rem; text-transform: none; }
         .google-btn:hover { background-color: #f0f0f0; color: #111; }
         .google-btn svg { width: 24px; height: 24px; }
+
+        .form-group { margin-bottom: 1.5rem; text-align: left; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 700; color: #ccc; }
+        .form-group input { width: 100%; padding: 0.75rem; background-color: var(--input-bg); border: 1px solid var(--border-color); border-radius: 3px; color: #fff; }
+        .form-group input:focus { outline: none; border-color: var(--primary-gold); }
+        .divider { display: flex; align-items: center; text-align: center; color: #888; margin: 2rem 0; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border-color); }
+        .divider:not(:empty)::before { margin-right: .25em; }
+        .divider:not(:empty)::after { margin-left: .25em; }
+        .toggle-auth { margin-top: 1.5rem; }
+        .toggle-auth button { background: none; border: none; color: var(--primary-gold); cursor: pointer; text-decoration: underline; }
+        #auth-error { color: var(--error-red); margin-bottom: 1rem; display: none; }
+
     </style>
 </head>
 <body data-page="login">
@@ -25,19 +38,50 @@
     <main>
         <div class="login-container">
             <div class="login-box">
-                <h1>Sign In / Register</h1>
-                <p>Use your Google account to securely sign in and start playing.</p>
-                <div class="terms-check-container" style="display: flex; align-items: flex-start; justify-content: center; margin-bottom: 1.5rem; font-size: 0.9rem; color: #ccc; max-width: 380px; margin-left: auto; margin-right: auto; text-align: left; line-height: 1.5;">
-                    <input type="checkbox" id="terms-agree-checkbox" style="margin-right: 0.75rem; accent-color: var(--primary-gold); width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0;">
-                    <label for="terms-agree-checkbox">
-                        I confirm that I am 18+ years of age and I have read and agree to the
-                        <a href="terms-and-conditions.html" target="_blank" style="color: var(--primary-gold);">Terms & Conditions</a>.
-                    </label>
+                <h1 id="auth-title">Sign In</h1>
+                <p id="auth-subtitle">Enter your details to access your account.</p>
+
+                <div id="auth-error" class="error-message"></div>
+
+                <form id="email-password-form">
+                    <div class="form-group" id="name-group" style="display: none;">
+                        <label for="name">Full Name (Optional)</label>
+                        <input type="text" id="name" name="name" autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required autocomplete="current-password">
+                        <small id="password-policy" style="display:none; color: #aaa; font-size: 0.8rem; margin-top: 0.5rem;">Min. 8 chars, with uppercase, lowercase, number, and special character.</small>
+                    </div>
+                    <div class="terms-check-container" style="display: flex; align-items: flex-start; justify-content: center; margin-bottom: 1.5rem; font-size: 0.9rem; color: #ccc; max-width: 380px; margin-left: auto; margin-right: auto; text-align: left; line-height: 1.5;">
+                        <input type="checkbox" id="terms-agree-checkbox" style="margin-right: 0.75rem; accent-color: var(--primary-gold); width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0;">
+                        <label for="terms-agree-checkbox">
+                            I confirm that I am 18+ years of age and I have read and agree to the
+                            <a href="terms-and-conditions.html" target="_blank" style="color: var(--primary-gold);">Terms & Conditions</a>.
+                        </label>
+                    </div>
+                    <button type="submit" id="auth-submit-btn" class="btn">Sign In</button>
+                </form>
+
+                <div class="toggle-auth">
+                    <a href="#" id="forgot-password-link" style="font-size: 0.9rem; color: #ccc;">Forgot Password?</a>
                 </div>
-                <button id="google-login-btn" class="btn google-btn" disabled>
+
+                <div class="divider">OR</div>
+
+                <button id="google-login-btn" class="btn google-btn">
                     <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><g><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></g></svg>
                     Sign in with Google
                 </button>
+
+                <div class="toggle-auth">
+                    <span id="auth-mode-text">Don't have an account?</span>
+                    <button id="auth-mode-toggle">Register</button>
+                </div>
             </div>
         </div>
     </main>

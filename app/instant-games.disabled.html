@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instant Win Games | The Hawk Games</title>
+    <!-- SECURITY: Add reCAPTCHA script for App Check -->
+    <script src="https://www.google.com/recaptcha/enterprise.js?render=6LdkDqgrAAAAAAuWtoK941myjHGZd8vka_Q3JhKg"></script>
+    <link rel="stylesheet" href="css/hawk-games.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body data-page="instant-wins">
+    <script type="module">
+      import { FEATURES } from "/app/js/features.js";
+      if (!FEATURES.instantWins) {
+        // No customer access: bounce to home
+        location.replace("/app/");
+      }
+    </script>
+    <header class="main-header"></header>
+
+    <main class="container">
+        <nav class="game-tabs">
+            <button class="game-tab-btn active" data-gametab="spinner">
+                <span class="token-icon"></span> Spinner Game
+            </button>
+            <!-- <button class="game-tab-btn" data-gametab="plinko">
+                <span class="plinko-icon"></span> Plinko
+            </button> -->
+        </nav>
+
+        <!-- MASTER LAYOUT CONTAINER: Class will be toggled by JS -->
+        <div id="game-hub-layout" class="instant-win-layout spinner-active">
+            <!-- Game Content Area (Column 1) -->
+            <div class="game-content-container">
+                <!-- SPINNER GAME PANEL -->
+                <section id="spinner-game-container" class="game-panel active">
+                    <div class="spin-game-panel">
+                        <div class="spin-panel-header">
+                            <h1 class="section-title">Instant Win</h1>
+                            <p class="section-subtitle">Use your tokens for a chance to win cash prizes & site credit instantly!</p>
+                        </div>
+                        <div class="wheel-area">
+                            <div class="wheel-container">
+                                <div class="wheel-pointer"></div>
+                                <div id="wheel" class="wheel"></div>
+                            </div>
+                        </div>
+                        <div class="spin-panel-footer">
+                            <div class="spin-actions">
+                                <button id="spin-button" class="btn btn-spin" data-spin-amount="1" disabled>Spin x1</button>
+                                <button id="spin-x3-button" class="btn btn-spin" data-spin-amount="3" disabled>Spin x3</button>
+                                <button id="spin-x5-button" class="btn btn-spin" data-spin-amount="5" disabled>Spin x5</button>
+                            </div>
+                            <div id="spin-prize-reveal">
+                                <div id="spin-result" class="spin-result-container"></div>
+                            </div>
+                            <button id="show-prizes-btn" class="btn-link">View Prizes & Odds</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PLINKO GAME PANEL -->
+                <!-- <section id="plinko-game-container" class="game-panel">
+                    <div class="plinko-game-panel card">
+                         <div class="hd"><h1>Plinko Game</h1></div>
+                        <div class="bd">
+                            <div class="board" id="plinko-board" title="Click anywhere to drop a ball">
+                                <div class="dropzone">Drop Zone</div>
+                                <svg id="plinko-svg" viewBox="0 0 800 900" aria-label="Plinko Board"></svg>
+                            </div>
+                        </div>
+                    </div>
+                </section> -->
+            </div>
+
+            <!-- Inventory & Controls Area (Column 2 or Full-Width Row) -->
+            <aside class="inventory-and-controls-panel">
+                <!-- SPINNER CONTROLS (Will be hidden when Plinko is active) -->
+                <div id="spinner-controls" class="game-controls-panel active">
+                    <div class="inventory-card">
+                         <h3>Your Balance</h3>
+                        <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="token-icon"></span>
+                                <div class="balance-details">
+                                    <span id="token-count" class="balance-value">0</span>
+                                    <span>Spin Tokens</span>
+                                </div>
+                            </div>
+                            <button id="buy-spinner-tokens-btn" class="btn-buy-tokens">+</button>
+                        </div>
+                        <!-- <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="plinko-icon"></span>
+                                <div class="balance-details">
+                                    <span id="plinko-token-count" class="balance-value">0</span>
+                                    <span>Plinko Tokens</span>
+                                </div>
+                            </div>
+                            <button id="buy-plinko-tokens-btn" class="btn-buy-plinko-tokens">+</button>
+                        </div> -->
+                        <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="credit-icon">£</span>
+                                <div class="balance-details">
+                                    <span id="credit-balance-display" class="balance-value">£0.00</span>
+                                    <span>Site Credit</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="balance-row">
+                            <div class="balance-item">
+                                <span class="cash-icon">£</span>
+                                <div class="balance-details">
+                                    <span id="cash-balance-display" class="balance-value">£0.00</span>
+                                    <span>Cold Hard Cash</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="token-inventory">
+                        <h3>Token Inventory</h3>
+                        <div id="token-accordion-container">
+                            <div class="placeholder">Loading your tokens...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- PLINKO CONTROLS (Will be shown when Plinko is active) -->
+                <!-- <div id="plinko-controls" class="game-controls-panel">
+                    <div class="plinko-controls-panel content-panel">
+                        <div class="plinko-actions">
+                            <button id="plinko-drop-1" class="btn btn-primary">Drop 1 Ball</button>
+                            <button id="plinko-drop-3" class="btn btn-ghost">Drop 3 Balls</button>
+                        </div>
+                        <div class="plinko-balance">
+                             <h3>Your Balance</h3>
+                             <div class="balance-row">
+                                <div class="balance-item">
+                                    <span class="plinko-icon"></span>
+                                    <div class="balance-details">
+                                        <span id="plinko-balance-display" class="balance-value">0</span>
+                                        <span>Plinko Tokens</span>
+                                    </div>
+                                </div>
+                                <button id="buy-plinko-tokens-btn-2" class="btn-buy-plinko-tokens">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div> -->
+
+            </aside>
+        </div>
+    </main>
+    
+    <div id="purchase-modal" class="modal-container">
+        <div class="purchase-modal-content">
+            <div id="purchase-modal-body"></div>
+        </div>
+    </div>
+    
+    <div id="prizes-modal" class="modal-container">
+        <div class="modal-content">
+            <h2>Prizes & Odds</h2>
+            <div id="prizes-table-container"></div>
+            <button class="btn btn-secondary" style="margin-top: 1.5rem;" data-close-modal>Close</button>
+        </div>
+    </div>
+    
+    <div id="win-celebration-modal" class="modal-container win-celebration-modal"></div>
+    
+    <footer class="main-footer"></footer>
+
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/instant-games.js"></script>
+</body>
+</html>

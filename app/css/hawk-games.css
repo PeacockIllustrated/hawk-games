@@ -1613,6 +1613,27 @@ main.showcase-container {
 }
 
 @media (max-width: 768px) {
+    .competition-group-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding-bottom: 1.5rem;
+    }
+
+    .group-header-details {
+        align-items: center;
+    }
+
+    .accordion-toggle {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+    }
+
+    .competition-entry-group.expanded .accordion-toggle {
+        margin-top: 0;
+    }
+
     .entry-list-item {
         flex-direction: column;
         align-items: flex-start;

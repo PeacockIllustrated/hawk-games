@@ -1473,6 +1473,67 @@ main.showcase-container {
     height: 100%;
 }
 
+/* --- Account Page Entry Summary --- */
+.entries-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    justify-content: space-around;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    text-align: center;
+    background-color: var(--dark-bg);
+    padding: 1rem;
+    border-radius: 5px;
+    flex-grow: 1;
+    min-width: 150px;
+}
+
+.summary-label {
+    display: block;
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.summary-value {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    color: var(--primary-gold);
+}
+
+/* --- Competition Entry Group visual improvement --- */
+.competition-entry-group {
+    background-color: var(--card-bg); /* Use card-bg for consistency */
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.competition-entry-group:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.competition-group-header {
+    background-color: #222; /* Slightly different bg for header */
+}
+
+/* Making the WON status more prominent */
+.status-won {
+    background-color: var(--primary-gold);
+    color: var(--dark-bg);
+    box-shadow: 0 0 10px var(--primary-gold);
+    animation: pulse-glow 1.5s infinite;
+}
+
 /* Instant Wins promo (keeps brand tokens: --primary-gold, --light-white, --border-color) */
 .spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); }
 .spin-promo .card { background:#1a1a1a; border:1px solid var(--border-color, #2c2c2c); border-radius:12px; padding:20px; margin-bottom:16px; }

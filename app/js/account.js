@@ -23,6 +23,7 @@ const elSignOut = document.getElementById('sign-out-btn');
 const elMarketingTgl = document.getElementById('marketing-consent');
 const elMarketingFeedback = document.getElementById('preference-feedback');
 const elEntriesList = document.getElementById('entries-list');
+const elEntriesSummary = document.getElementById('entries-summary');
 const elAdminContainer = document.getElementById('admin-panel-container');
 
 // Balance display elements
@@ -63,6 +64,51 @@ function renderAvatar(el, user) {
   el.alt = user.displayName || 'User Avatar';
 }
 
+function renderSummaryStatistics(competitionsMap, groupedEntries) {
+    if (!elEntriesSummary) return;
+
+    let totalTicketsBought = 0;
+    let totalInstantWinValue = 0;
+    let activeEntriesCount = 0;
+
+    for (const compId in groupedEntries) {
+        const compData = competitionsMap.get(compId);
+        const entries = groupedEntries[compId];
+
+        for (const entry of entries) {
+            totalTicketsBought += entry.ticketsBought || 0;
+            if (entry.instantWins) {
+                for (const win of entry.instantWins) {
+                    totalInstantWinValue += win.prizeValue || 0;
+                }
+            }
+        }
+
+        if (compData && compData.status === 'live') {
+            activeEntriesCount++;
+        }
+    }
+
+    const totalCompetitionsEntered = Object.keys(groupedEntries).length;
+
+    const summaryData = [
+        { label: 'Competitions Entered', value: totalCompetitionsEntered },
+        { label: 'Total Tickets', value: totalTicketsBought },
+        { label: 'Active Entries', value: activeEntriesCount },
+        { label: 'Instant Wins', value: `£${totalInstantWinValue.toFixed(2)}` },
+    ];
+
+    elEntriesSummary.innerHTML = '';
+    summaryData.forEach(item => {
+        const statItem = createElement('div', { class: 'summary-item' }, [
+            createElement('span', { class: 'summary-label', textContent: item.label }),
+            createElement('strong', { class: 'summary-value', textContent: item.value }),
+        ]);
+        elEntriesSummary.appendChild(statItem);
+    });
+}
+
+
 function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
     if (!elEntriesList) return;
     elEntriesList.innerHTML = ''; 
@@ -72,11 +118,6 @@ function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
         const dateB = groupedEntries[b][0].enteredAt?.toDate() || 0;
         return dateB - dateA; // Sort by most recent entry first
     });
-
-    if (competitionIdsInOrder.length === 0) {
-        elEntriesList.append(createElement('div', { class: 'placeholder', textContent: "You haven't entered any competitions yet." }));
-        return;
-    }
 
     const fragment = document.createDocumentFragment();
     for (const compId of competitionIdsInOrder) {
@@ -180,6 +221,13 @@ async function loadUserEntries(user) {
         }
     }
     
+    if (Object.keys(groupedEntries).length === 0) {
+        if (elEntriesList) elEntriesList.innerHTML = `<div class="placeholder">You haven't entered any competitions yet.</div>`;
+        if (elEntriesSummary) elEntriesSummary.innerHTML = ''; // Clear summary
+        return;
+    }
+
+    renderSummaryStatistics(competitionsMap, groupedEntries);
     renderCompetitionGroups(competitionsMap, groupedEntries, user.uid);
 
   } catch (err) {

@@ -1595,6 +1595,41 @@ main.showcase-container {
 .entry-numbers { color: #ccc; font-family: monospace; flex-basis: 35%; min-width: 150px; }
 .instant-win-tag { flex-shrink: 0; }
 
+.group-header-badges {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.entry-count-badge {
+    background-color: #333;
+    color: #ccc;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+    .entry-list-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .entry-date, .entry-tickets, .entry-numbers {
+        flex-basis: auto;
+        width: 100%;
+    }
+
+    .instant-win-tag {
+        margin-top: 0.5rem;
+        align-self: flex-start;
+    }
+}
+
 /* Instant Wins promo (keeps brand tokens: --primary-gold, --light-white, --border-color) */
 .spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); }
 .spin-promo .card { background:#1a1a1a; border:1px solid var(--border-color, #2c2c2c); border-radius:12px; padding:20px; margin-bottom:16px; }

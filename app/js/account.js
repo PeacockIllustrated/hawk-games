@@ -167,7 +167,10 @@ function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
                 createElement('img', { src: compData.prizeImage, alt: compData.title, class: 'group-header-image' }),
                 createElement('div', { class: 'group-header-details' }, [
                     createElement('h4', { textContent: compData.title }),
-                    createElement('span', { class: ['status-badge', statusClass], textContent: statusText })
+                    createElement('div', { class: 'group-header-badges' }, [
+                        createElement('span', { class: ['status-badge', statusClass], textContent: statusText }),
+                        createElement('span', { class: 'entry-count-badge', textContent: `${entriesForComp.length} ${entriesForComp.length > 1 ? 'Entries' : 'Entry'}` })
+                    ])
                 ]),
                 createElement('span', { class: 'accordion-toggle' })
             ]),

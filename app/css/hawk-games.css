@@ -193,7 +193,16 @@ input:checked + .slider:before { transform: translateX(26px); }
 
 /* --- 9. Competition Entry Group Styles (Account Page) --- */
 .competition-entry-group { background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 1.5rem; overflow: hidden; }
-.competition-group-header { display: flex; align-items: center; gap: 1rem; padding: 1rem; background-color: #222; border-bottom: 1px solid var(--border-color); }
+.competition-group-header {
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: #222;
+    border-bottom: 1px solid var(--border-color);
+}
 .group-header-image { width: 100px; height: 65px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
 .group-header-details { display: flex; flex-direction: column; gap: 0.5rem; }
 .group-header-details h4 { font-family: var(--font-heading); font-size: 1.3rem; line-height: 1.2; margin: 0; }
@@ -1533,6 +1542,58 @@ main.showcase-container {
     box-shadow: 0 0 10px var(--primary-gold);
     animation: pulse-glow 1.5s infinite;
 }
+
+/* --- Accordion Styles for Competition Entries --- */
+.accordion-toggle {
+    width: 12px;
+    height: 12px;
+    border-style: solid;
+    border-color: var(--primary-gold);
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+    margin-left: auto; /* Push to the far right */
+}
+
+.competition-entry-group.expanded .accordion-toggle {
+    transform: rotate(-135deg);
+    margin-top: -6px; /* Adjust position when open */
+}
+
+.entry-list-container {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, padding 0.4s ease-out;
+    padding: 0 1rem;
+}
+
+.competition-entry-group.expanded .entry-list-container {
+    max-height: 1000px; /* Generous max height */
+    padding: 0.5rem 1rem 1rem 1rem;
+    transition: max-height 0.6s ease-in, padding 0.6s ease-in;
+}
+
+/* --- Visual Polish for Entry List Item --- */
+.entry-list-item {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 0;
+    font-size: 0.95rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.entry-list-item:last-child {
+    border-bottom: none;
+}
+
+.entry-date { color: #aaa; flex-basis: 25%; min-width: 120px; }
+.entry-tickets { font-weight: 700; flex-basis: 20%; min-width: 100px; }
+.entry-numbers { color: #ccc; font-family: monospace; flex-basis: 35%; min-width: 150px; }
+.instant-win-tag { flex-shrink: 0; }
 
 /* Instant Wins promo (keeps brand tokens: --primary-gold, --light-white, --border-color) */
 .spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); }

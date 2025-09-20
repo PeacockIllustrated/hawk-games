@@ -39,6 +39,21 @@ const elTransferAmount = document.getElementById('transfer-amount');
 const elPayoutForm = document.getElementById('payout-form');
 const elPayoutAmount = document.getElementById('payout-amount');
 
+// Accordion functionality for competition entries
+if (elEntriesList) {
+    elEntriesList.addEventListener('click', (event) => {
+        // We only care about clicks on the header of a competition group
+        const header = event.target.closest('.competition-group-header');
+        if (!header) return;
+
+        // Find the parent group and toggle the 'expanded' class
+        const group = header.closest('.competition-entry-group');
+        if (group) {
+            group.classList.toggle('expanded');
+        }
+    });
+}
+
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
@@ -153,7 +168,8 @@ function renderCompetitionGroups(competitionsMap, groupedEntries, currentUid) {
                 createElement('div', { class: 'group-header-details' }, [
                     createElement('h4', { textContent: compData.title }),
                     createElement('span', { class: ['status-badge', statusClass], textContent: statusText })
-                ])
+                ]),
+                createElement('span', { class: 'accordion-toggle' })
             ]),
             createElement('div', { class: 'entry-list-container' }, entryRows)
         ]);

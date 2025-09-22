@@ -737,7 +737,13 @@ export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
     }
   }
 
-  return { success: true, totalRevenue, totalCost, netProfit, totalSiteCreditAwarded, totalSiteCreditSpent };
+  const ticketsAwardedSnapshot = await db.collection("spin_wins").where("prizeType", "==", "ticket").get();
+  let totalTicketsAwarded = 0;
+  ticketsAwardedSnapshot.forEach((w) => {
+    totalTicketsAwarded += w.data().prizeValue;
+  });
+
+  return { success: true, totalRevenue, totalCost, netProfit, totalSiteCreditAwarded, totalSiteCreditSpent, totalTicketsAwarded };
 });
 
 // spendSpinToken
@@ -779,19 +785,54 @@ export const spendSpinToken = onCall(functionOptions, async (request) => {
     let finalPrize = { won: false, prizeType: "none", value: 0 };
     for (const prize of cumulativeProbabilities) {
       if (random < prize.cumulativeProb) {
-        finalPrize = { won: true, prizeType: prize.type, value: prize.value };
+        finalPrize = { won: true, prizeType: prize.type, value: prize.value, competitionId: prize.competitionId || null };
         break;
       }
     }
     if (finalPrize.won) {
       const winLogRef = db.collection("spin_wins").doc();
-      transaction.set(winLogRef, {
+      const winPayload = {
         userId: uid,
         prizeType: finalPrize.prizeType,
         prizeValue: finalPrize.value,
         wonAt: nowServer(),
         tokenIdUsed: tokenId,
-      });
+      };
+
+      if (finalPrize.prizeType === "ticket" && finalPrize.competitionId) {
+        winPayload.competitionId = finalPrize.competitionId;
+
+        const compRef = db.collection("competitions").doc(finalPrize.competitionId);
+        const compDoc = await transaction.get(compRef);
+        if (!compDoc.exists || compDoc.data().status !== 'live') {
+            logger.warn(`User ${uid} won tickets for an invalid/ended competition ${finalPrize.competitionId}. Prize not awarded.`);
+        } else {
+            const compData = compDoc.data();
+            const ticketsToAward = finalPrize.value;
+            const ticketsSoldBefore = compData.ticketsSold || 0;
+
+            if (ticketsSoldBefore + ticketsToAward > compData.totalTickets) {
+                 logger.warn(`Not enough tickets available in competition ${finalPrize.competitionId} to award prize to user ${uid}.`);
+            } else {
+                transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsToAward) });
+                transaction.update(userRef, { [`entryCount.${finalPrize.competitionId}`]: FieldValue.increment(ticketsToAward) });
+
+                const entryRef = compRef.collection("entries").doc();
+                transaction.set(entryRef, {
+                    userId: uid,
+                    userDisplayName: userData.displayName || "N/A",
+                    ticketsBought: ticketsToAward,
+                    ticketStart: ticketsSoldBefore,
+                    ticketEnd: ticketsSoldBefore + ticketsToAward - 1,
+                    enteredAt: nowServer(),
+                    entryType: 'spinner_win'
+                });
+            }
+        }
+      }
+
+      transaction.set(winLogRef, winPayload);
+
       if (finalPrize.prizeType === "credit") {
         transaction.update(userRef, { creditBalance: FieldValue.increment(finalPrize.value) });
       } else if (finalPrize.prizeType === "cash") {

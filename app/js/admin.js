@@ -380,8 +380,14 @@ async function renderRevenueAnalyticsView() {
             createElement('p', { class: 'stat-annotation', textContent: 'Total site credit spent on entries.' })
         ]);
 
+        const ticketsAwardedCard = createElement('div', { class: 'stat-card' }, [
+            createElement('h3', { textContent: 'Tickets Awarded (Spinner)' }),
+            createElement('p', { class: 'stat-value', textContent: (data.totalTicketsAwarded || 0).toLocaleString() }),
+            createElement('p', { class: 'stat-annotation', textContent: 'Total competition tickets won from the spinner.' })
+        ]);
+
         statsContainer.innerHTML = '';
-        statsContainer.append(revenueCard, costCard, profitCard, creditAwardedCard, creditSpentCard);
+        statsContainer.append(revenueCard, costCard, profitCard, creditAwardedCard, creditSpentCard, ticketsAwardedCard);
 
     } catch (error) {
         console.error("Error fetching revenue analytics:", error);

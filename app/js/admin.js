@@ -335,62 +335,91 @@ function renderPlinkoStatsView() {
 async function renderRevenueAnalyticsView() {
     const panel = createElement('div', { class: 'content-panel' });
     const title = createElement('h2', { textContent: 'Revenue Analytics' });
-    const statsContainer = createElement('div', { class: 'stats-container' });
 
-    panel.append(title, statsContainer);
+    const tabNav = createElement('div', { class: 'analytics-nav' });
+    const tabContent = createElement('div', { class: 'analytics-content' });
+
+    panel.append(title, tabNav, tabContent);
     mainContentContainer.append(panel);
 
-    statsContainer.innerHTML = '<p>Loading analytics data...</p>';
+    tabContent.innerHTML = '<p>Loading analytics data...</p>';
+
     try {
         const getRevenueAnalytics = httpsCallable(functions, 'getRevenueAnalytics');
         const result = await getRevenueAnalytics();
         if (!result.data.success) throw new Error(result.data.message || 'The function reported an error.');
 
         const data = result.data;
-        console.log("Revenue analytics data:", data);
         const currencyFormatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
+        // --- Create Stat Cards ---
         const revenueCard = createElement('div', { class: 'stat-card' }, [
             createElement('h3', { textContent: 'Total Revenue' }),
             createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalRevenue || 0) }),
             createElement('p', { class: 'stat-annotation', textContent: 'Cash sales from all competitions.' })
         ]);
         const costCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Total Cost (Prizes)' }),
+            createElement('h3', { textContent: 'Total Cost (Instant Win Prizes)' }),
             createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalCost || 0) }),
-            createElement('p', { class: 'stat-annotation', textContent: 'The value of all cash prizes won.' })
+            createElement('p', { class: 'stat-annotation', textContent: 'Value of all cash prizes won from instant games.' })
         ]);
         const profitCard = createElement('div', { class: ['stat-card', data.netProfit >= 0 ? 'profit' : 'loss'] }, [
             createElement('h3', { textContent: 'Net Profit' }),
             createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.netProfit || 0) }),
             createElement('p', { class: 'stat-annotation', textContent: 'Total Revenue - Total Cost.' })
         ]);
-
         const creditAwardedCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Site Credit Awarded' }),
+            createElement('h3', { textContent: 'Site Credit Awarded (Instant Wins)' }),
             createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalSiteCreditAwarded || 0) }),
-            createElement('p', { class: 'stat-annotation', textContent: 'Total site credit won from prizes.' })
+            createElement('p', { class: 'stat-annotation', textContent: 'Total site credit won from instant games.' })
         ]);
-
         const creditSpentCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Site Credit Spent' }),
+            createElement('h3', { textContent: 'Site Credit Spent (Competitions)' }),
             createElement('p', { class: 'stat-value', textContent: currencyFormatter.format(data.totalSiteCreditSpent || 0) }),
-            createElement('p', { class: 'stat-annotation', textContent: 'Total site credit spent on entries.' })
+            createElement('p', { class: 'stat-annotation', textContent: 'Total site credit spent on competition entries.' })
         ]);
-
         const ticketsAwardedCard = createElement('div', { class: 'stat-card' }, [
-            createElement('h3', { textContent: 'Tickets Awarded (Spinner)' }),
+            createElement('h3', { textContent: 'Tickets Awarded (Instant Wins)' }),
             createElement('p', { class: 'stat-value', textContent: (data.totalTicketsAwarded || 0).toLocaleString() }),
-            createElement('p', { class: 'stat-annotation', textContent: 'Total competition tickets won from the spinner.' })
+            createElement('p', { class: 'stat-annotation', textContent: 'Total competition tickets won from instant games.' })
         ]);
 
-        statsContainer.innerHTML = '';
-        statsContainer.append(revenueCard, costCard, profitCard, creditAwardedCard, creditSpentCard, ticketsAwardedCard);
+        // --- Create Tab Panes ---
+        const summaryPane = createElement('div', { id: 'summary-pane', class: ['analytics-pane', 'active'] }, [ profitCard ]);
+        const competitionsPane = createElement('div', { id: 'competitions-pane', class: 'analytics-pane' }, [ revenueCard, creditSpentCard ]);
+        const instantGamesPane = createElement('div', { id: 'instant-games-pane', class: 'analytics-pane' }, [ costCard, creditAwardedCard, ticketsAwardedCard ]);
+
+        // --- Setup Tab Navigation ---
+        const tabs = [
+            { name: 'Summary', pane: summaryPane },
+            { name: 'Competitions', pane: competitionsPane },
+            { name: 'Instant Games', pane: instantGamesPane }
+        ];
+
+        tabs.forEach((tab, index) => {
+            const tabLink = createElement('a', { href: '#', class: 'analytics-nav-link', textContent: tab.name });
+            if (index === 0) tabLink.classList.add('active');
+
+            tabLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Update nav links
+                document.querySelectorAll('.analytics-nav-link').forEach(link => link.classList.remove('active'));
+                tabLink.classList.add('active');
+                // Update panes
+                document.querySelectorAll('.analytics-pane').forEach(pane => pane.classList.remove('active'));
+                tab.pane.classList.add('active');
+            });
+            tabNav.appendChild(tabLink);
+        });
+
+        // --- Final Render ---
+        tabContent.innerHTML = '';
+        tabContent.append(summaryPane, competitionsPane, instantGamesPane);
 
     } catch (error) {
         console.error("Error fetching revenue analytics:", error);
-        statsContainer.innerHTML = '';
-        statsContainer.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
+        tabContent.innerHTML = '';
+        tabContent.append(createElement('p', { style: { color: 'red' }, textContent: `Error: ${error.message}` }));
     }
 }
 

@@ -147,8 +147,8 @@ body.mobile-nav-open .hamburger-btn span:nth-child(3) { transform: rotate(-45deg
 #entry-button { width: 100%; margin-top: 2rem; padding: 1.2rem; font-size: 1.3rem; }
 
 /* --- 6. Modal Styles --- */
-.modal-container { position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-.modal-container.show { opacity: 1; pointer-events: auto; }
+.modal-container { position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: none; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.modal-container.show { opacity: 1; pointer-events: auto; display: flex; }
 .modal-content { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 2rem; border-radius: 5px; width: 90%; max-width: 450px; text-align: center; }
 .modal-content h2 { font-family: var(--font-heading); font-size: 1.8rem; text-transform: uppercase; }
 .modal-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
@@ -164,7 +164,9 @@ body.mobile-nav-open .hamburger-btn span:nth-child(3) { transform: rotate(-45deg
 .profile-name { font-family: var(--font-heading); font-size: 1.8rem; }
 .profile-email { color: #aaa; margin-bottom: 1.5rem; word-break: break-all; }
 .profile-actions { display: flex; flex-direction: column; gap: 1rem; }
-.content-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2rem; margin-bottom: 2rem; }
+.content-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 2rem; }
+.content-panel > h2 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; padding: 1.5rem; background-color: #111; border-bottom: 1px solid var(--border-color); margin: 0; }
+.content-panel > *:not(h2) { padding: 1.5rem; }
 .content-panel h3 { font-family: var(--font-heading); text-transform: uppercase; font-size: 1.4rem; padding-bottom: 0.75rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); }
 .preference-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .preference-row label { flex-grow: 1; }
@@ -180,6 +182,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 .status-ended { background-color: rgba(231, 76, 60, 0.2); color: #e74c3c; }
 .status-won { background-color: var(--primary-gold); color: var(--dark-bg); }
 .status-drawn { background-color: #555; color: #fff; }
+.status-queued { background-color: rgba(243, 156, 18, 0.2); color: #f39c12; }
 
 /* --- 8. Homepage & Universal Section Styles --- */
 #hero-competition-section, #how-it-works-section, #instant-win-section, #main-competitions-section, #spinner-competition-section, #past-winners-section { padding: 5rem 0; }
@@ -192,38 +195,27 @@ input:checked + .slider:before { transform: translateX(26px); }
 .winner-card p { color: #ccc; font-size: 0.9rem; }
 
 /* --- 9. Competition Entry Group Styles (Account Page) --- */
-.competition-entry-group { background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 1.5rem; overflow: hidden; }
-.competition-group-header {
-    cursor: pointer;
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    background-color: #222;
-    border-bottom: 1px solid var(--border-color);
-}
+.competition-entry-group { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; margin-bottom: 1.5rem; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.competition-entry-group:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+.competition-group-header { cursor: pointer; position: relative; display: flex; align-items: center; gap: 1rem; padding: 1rem; background-color: #222; border-bottom: 1px solid var(--border-color); }
 .group-header-image { width: 100px; height: 65px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
 .group-header-details { display: flex; flex-direction: column; gap: 0.5rem; }
 .group-header-details h4 { font-family: var(--font-heading); font-size: 1.3rem; line-height: 1.2; margin: 0; }
-.entry-list-container { padding: 0.5rem 1rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.entry-list-item { display: grid; grid-template-columns: 1fr 1fr 2fr auto; align-items: center; gap: 1rem; padding: 0.75rem 0; font-size: 0.9rem; border-bottom: 1px solid var(--border-color); }
-.entry-list-item:last-child { border-bottom: none; padding-bottom: 0.25rem; }
-.entry-date { color: #aaa; }
-.entry-tickets { font-weight: 700; }
-.entry-numbers { color: #ccc; font-family: monospace; }
-.instant-win-tag { background-color: var(--primary-gold); color: var(--dark-bg); font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; justify-self: end; }
+.group-header-badges { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.entry-count-badge { background-color: #333; color: #ccc; font-weight: bold; padding: 4px 8px; border-radius: 20px; font-size: 0.8rem; text-transform: uppercase; }
+.accordion-toggle { width: 12px; height: 12px; border-style: solid; border-color: var(--primary-gold); border-width: 0 3px 3px 0; transform: rotate(45deg); transition: transform 0.3s ease; flex-shrink: 0; margin-left: auto; }
+.competition-entry-group.expanded .accordion-toggle { transform: rotate(-135deg); margin-top: -6px; }
+.entry-list-container { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out, padding 0.4s ease-out; padding: 0 1rem; }
+.competition-entry-group.expanded .entry-list-container { max-height: 1000px; padding: 0.5rem 1rem 1rem 1rem; transition: max-height 0.6s ease-in, padding 0.6s ease-in; }
+.entry-list-item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.8rem 0; font-size: 0.95rem; border-bottom: 1px solid var(--border-color); }
+.entry-list-item:last-child { border-bottom: none; }
+.entry-date { color: #aaa; flex-basis: 25%; min-width: 120px; }
+.entry-tickets { font-weight: 700; flex-basis: 20%; min-width: 100px; }
+.entry-numbers { color: #ccc; font-family: monospace; flex-basis: 35%; min-width: 150px; }
+.instant-win-tag { background-color: var(--primary-gold); color: var(--dark-bg); font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; justify-self: end; flex-shrink: 0; }
 
 /* --- 10. Spin Token Indicator (in Header) --- */
-.token-icon {
-    display: inline-block;
-    width: 24px;
-    height: 24px;
-    background-image: url('../assets/logo-icon.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-}
+.token-icon { display: inline-block; width: 24px; height: 24px; background-image: url('../assets/logo-icon.png'); background-size: contain; background-repeat: no-repeat; background-position: center; }
 
 /* --- 11. Instant Win Page (OVERHAUL) --- */
 .instant-win-layout { display: grid; grid-template-columns: 1fr 400px; gap: 3rem; align-items: flex-start; }
@@ -267,7 +259,6 @@ input:checked + .slider:before { transform: translateX(26px); }
 .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
 .accordion-content ul { list-style-type: '•  '; padding: 0.5rem 0 1rem 1.5rem; }
 .accordion-content li { color: #aaa; font-family: monospace; font-size: 0.9rem; padding: 0.25rem 0; }
-
 
 /* --- 12. HERO SECTION --- */
 .hero-home { position: relative; height: 85vh; display: flex; align-items: center; justify-content: center; text-align: center; color: white; padding: 1rem; overflow: hidden; background-image: url('../assets/hero-bg.png'); background-position: center center; background-repeat: no-repeat; background-size: cover; }
@@ -316,13 +307,15 @@ input:checked + .slider:before { transform: translateX(26px); }
 .admin-nav a { display: block; color: #ccc; text-decoration: none; padding: 0.75rem 0; font-weight: bold; border-bottom: 2px solid transparent; }
 .admin-nav a:hover { color: var(--primary-gold); }
 .admin-nav a.active { color: var(--primary-gold); border-bottom-color: var(--primary-gold); }
-.content-panel { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; }
-.content-panel > h2 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; padding: 1.5rem; background-color: #111; border-bottom: 1px solid var(--border-color); margin: 0; }
-.admin-form { padding: 1.5rem; }
 .competition-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); gap: 1.5rem; }
 .competition-row:last-child { border-bottom: none; }
 .comp-row-main { flex-grow: 1; }
 .comp-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 0.5rem; }
+.title-badge { font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 10px; margin-left: 0.5rem; vertical-align: middle; }
+.title-badge-hero { background-color: var(--primary-gold); color: var(--dark-bg); }
+.title-badge-instant { background-color: #3498db; color: white; }
+.title-badge-token { background-color: #9b59b6; color: white; }
+.title-badge-main { background-color: #27ae60; color: white; }
 .comp-progress-text { font-size: 0.8rem; color: #aaa; margin-bottom: 0.5rem; }
 .comp-row-status { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; flex-shrink: 0; }
 .comp-actions { display: flex; gap: 0.5rem; }
@@ -366,71 +359,15 @@ input:checked + .slider:before { transform: translateX(26px); }
 .card-style-option.selected { border-color: var(--primary-gold); background-color: rgba(224, 169, 74, 0.1); }
 
 /* --- Ticket Slider Styles --- */
-.ticket-slider-container {
-    padding: 1rem;
-    background-color: var(--dark-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-}
-
-.ticket-slider-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-}
-
-#ticket-count-display {
-    font-weight: bold;
-    font-family: var(--font-heading);
-    color: var(--primary-gold);
-}
-
-.ticket-slider {
-    width: 100%;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 10px;
-    background: #333;
-    border-radius: 5px;
-    outline: none;
-    opacity: 0.7;
-    transition: opacity .2s;
-}
-
-.ticket-slider:hover {
-    opacity: 1;
-}
-
-.ticket-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 25px;
-    height: 25px;
-    background: var(--primary-gold);
-    cursor: pointer;
-    border-radius: 50%;
-}
-
-.ticket-slider::-moz-range-thumb {
-    width: 25px;
-    height: 25px;
-    background: var(--primary-gold);
-    cursor: pointer;
-    border-radius: 50%;
-}
-
-.ticket-price-display {
-    margin-top: 1.5rem;
-    text-align: center;
-    font-size: 1.5rem;
-    font-family: var(--font-heading);
-}
-
-#ticket-price-display-value {
-    color: var(--primary-gold);
-    font-weight: bold;
-}
+.ticket-slider-container { padding: 1rem; background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 5px; }
+.ticket-slider-label { display: flex; justify-content: space-between; font-size: 1.1rem; margin-bottom: 1rem; }
+#ticket-count-display { font-weight: bold; font-family: var(--font-heading); color: var(--primary-gold); }
+.ticket-slider { width: 100%; -webkit-appearance: none; appearance: none; height: 10px; background: #333; border-radius: 5px; outline: none; opacity: 0.7; transition: opacity .2s; }
+.ticket-slider:hover { opacity: 1; }
+.ticket-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 25px; height: 25px; background: var(--primary-gold); cursor: pointer; border-radius: 50%; }
+.ticket-slider::-moz-range-thumb { width: 25px; height: 25px; background: var(--primary-gold); cursor: pointer; border-radius: 50%; }
+.ticket-price-display { margin-top: 1.5rem; text-align: center; font-size: 1.5rem; font-family: var(--font-heading); }
+#ticket-price-display-value { color: var(--primary-gold); font-weight: bold; }
 .ticket-amount { font-family: var(--font-heading); font-size: 3rem; display: block; line-height: 1; }
 .ticket-label { font-size: 1rem; text-transform: uppercase; color: #aaa; }
 .ticket-price { font-size: 1.2rem; color: #fff; margin-top: 0.5rem; display: block; }
@@ -451,196 +388,39 @@ input:checked + .slider:before { transform: translateX(26px); }
 .trust-badge h3 { font-family: var(--font-heading); font-size: 1.1rem; margin-top: 0.5rem; }
 
 /* --- 19. INSTANT WIN SHOWCASE --- */
-.instant-win-showcase-section {
-    padding: 6rem 0;
-    position: relative;
-    overflow: hidden;
-    background: radial-gradient(circle at 50% 0%, rgba(224, 169, 74, 0.15) 0%, rgba(18,18,18,0) 40%);
-    text-align: center;
-    border-top: 10px solid var(--primary-gold);
-    border-bottom: 10px solid var(--primary-gold);
-}
-
-.instant-win-showcase-section::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 800px; /* Increased size */
-    height: 800px; /* Increased size */
-    background-image: url('../assets/spin-wheel-bg.png'); /* Changed to detailed spinner */
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    opacity: 0.1; /* Increased opacity */
-    z-index: -1;
-    animation: spin-and-center 40s linear infinite; /* Removed pulse-glow */
-}
-
-.instant-win-showcase-section .section-title {
-    font-size: 3.5rem;
-    color: var(--primary-gold);
-}
-
-.instant-win-showcase-section .section-subtitle {
-    font-size: 1.2rem;
-    max-width: 700px;
-    margin-bottom: 3rem; /* Added margin */
-}
-
-.promo-highlights {
-    display: flex;
-    justify-content: center;
-    gap: 2rem;
-    margin-bottom: 3rem;
-    flex-wrap: wrap;
-}
-
-.promo-item {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background-color: rgba(0,0,0,0.3);
-    padding: 0.75rem 1.5rem;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-}
-
-.promo-item span {
-    color: var(--light-white);
-}
-
-.showcase-cta .btn {
-    padding: 1.2rem 3.5rem;
-    font-size: 1.3rem;
-    transform: scale(1.1); /* Make it stand out */
-}
-
+.instant-win-showcase-section { padding: 6rem 0; position: relative; overflow: hidden; background: radial-gradient(circle at 50% 0%, rgba(224, 169, 74, 0.15) 0%, rgba(18,18,18,0) 40%); text-align: center; border-top: 10px solid var(--primary-gold); border-bottom: 10px solid var(--primary-gold); }
+.instant-win-showcase-section::before { content: ''; position: absolute; top: 50%; left: 50%; width: 800px; height: 800px; background-image: url('../assets/spin-wheel-bg.png'); background-size: contain; background-repeat: no-repeat; background-position: center; opacity: 0.1; z-index: -1; animation: spin-and-center 40s linear infinite; }
+.instant-win-showcase-section .section-title { font-size: 3.5rem; color: var(--primary-gold); }
+.instant-win-showcase-section .section-subtitle { font-size: 1.2rem; max-width: 700px; margin-bottom: 3rem; }
+.promo-highlights { display: flex; justify-content: center; gap: 2rem; margin-bottom: 3rem; flex-wrap: wrap; }
+.promo-item { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; display: flex; align-items: center; gap: 0.75rem; background-color: rgba(0,0,0,0.3); padding: 0.75rem 1.5rem; border-radius: 5px; border: 1px solid var(--border-color); }
+.promo-item span { color: var(--light-white); }
+.showcase-cta .btn { padding: 1.2rem 3.5rem; font-size: 1.3rem; transform: scale(1.1); }
 
 /* --- 19. WHY CHOOSE US SECTION --- */
-#why-choose-us-section {
-    padding: 5rem 0;
-}
-
-.why-us-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2.5rem;
-    margin-top: 3rem;
-}
-
-.why-us-card {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    padding: 2.5rem 2rem;
-    text-align: center;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.why-us-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-}
-
-.why-us-icon {
-    font-size: 3.5rem;
-    margin-bottom: 1.5rem;
-    line-height: 1;
-}
-
-.why-us-card h3 {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    text-transform: uppercase;
-    color: var(--primary-gold);
-    margin-bottom: 1rem;
-}
-
-.why-us-card p {
-    color: #aaa;
-    line-height: 1.7;
-}
+#why-choose-us-section { padding: 5rem 0; }
+.why-us-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2.5rem; margin-top: 3rem; }
+.why-us-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; padding: 2.5rem 2rem; text-align: center; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.why-us-card:hover { transform: translateY(-10px); box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+.why-us-icon { font-size: 3.5rem; margin-bottom: 1.5rem; line-height: 1; }
+.why-us-card h3 { font-family: var(--font-heading); font-size: 1.5rem; text-transform: uppercase; color: var(--primary-gold); margin-bottom: 1rem; }
+.why-us-card p { color: #aaa; line-height: 1.7; }
 
 /* --- 20. LATEST WINNER SECTION --- */
-#latest-winner-section {
-    padding: 3rem 0;
-}
-
-.latest-winner-card {
-    background: linear-gradient(45deg, var(--card-bg), #2c2c2c);
-    border: 1px solid var(--primary-gold);
-    box-shadow: 0 10px 40px rgba(224, 169, 74, 0.2);
-    border-radius: 10px;
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    align-items: center;
-    gap: 3rem;
-    overflow: hidden;
-    max-width: 900px;
-    margin: 0 auto;
-}
-
-.latest-winner-image {
-    position: relative;
-    height: 100%;
-}
-
-.latest-winner-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.latest-winner-tag {
-    position: absolute;
-    top: 1.5rem;
-    left: -40px;
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    padding: 0.5rem 2rem;
-    font-family: var(--font-heading);
-    font-weight: 700;
-    text-transform: uppercase;
-    transform: rotate(-45deg);
-    font-size: 1rem;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-}
-
-.latest-winner-content {
-    padding: 2rem;
-}
-
-.latest-winner-content h3 {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    line-height: 1.2;
-    margin-bottom: 1rem;
-}
-
-.latest-winner-content p {
-    font-size: 1.2rem;
-    color: #ccc;
-    margin-bottom: 2rem;
-}
-
-.latest-winner-content p strong {
-    color: var(--primary-gold);
-}
-
+#latest-winner-section { padding: 3rem 0; }
+.latest-winner-card { background: linear-gradient(45deg, var(--card-bg), #2c2c2c); border: 1px solid var(--primary-gold); box-shadow: 0 10px 40px rgba(224, 169, 74, 0.2); border-radius: 10px; display: grid; grid-template-columns: 300px 1fr; align-items: center; gap: 3rem; overflow: hidden; max-width: 900px; margin: 0 auto; }
+.latest-winner-image { position: relative; height: 100%; }
+.latest-winner-image img { width: 100%; height: 100%; object-fit: cover; }
+.latest-winner-tag { position: absolute; top: 1.5rem; left: -40px; background-color: var(--primary-gold); color: var(--dark-bg); padding: 0.5rem 2rem; font-family: var(--font-heading); font-weight: 700; text-transform: uppercase; transform: rotate(-45deg); font-size: 1rem; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+.latest-winner-content { padding: 2rem; }
+.latest-winner-content h3 { font-family: var(--font-heading); font-size: 2.5rem; line-height: 1.2; margin-bottom: 1rem; }
+.latest-winner-content p { font-size: 1.2rem; color: #ccc; margin-bottom: 2rem; }
+.latest-winner-content p strong { color: var(--primary-gold); }
 
 /* --- 21. RESPONSIVE FIXES --- */
 @media (max-width: 992px) {
-    .latest-winner-card {
-        grid-template-columns: 200px 1fr;
-        gap: 1.5rem;
-    }
-    .latest-winner-content h3 {
-        font-size: 2rem;
-    }
+    .latest-winner-card { grid-template-columns: 200px 1fr; gap: 1.5rem; }
+    .latest-winner-content h3 { font-size: 2rem; }
     .account-layout { grid-template-columns: 1fr; }
     .hero-competition-card { grid-template-columns: 1fr; }
     .hero-logo { width: clamp(150px, 60vw, 250px); }
@@ -655,48 +435,16 @@ input:checked + .slider:before { transform: translateX(26px); }
 }
 
 /* --- 28. COMPETITION PAGE LAYOUT REFINEMENTS --- */
-.main-comp-layout {
-    display: grid;
-    grid-template-columns: 35% 1fr;
-    gap: 3rem;
-    align-items: end;
-    padding-top: 120px; /* Standard top padding */
-}
-
-.prize-visuals-panel {
-    position: sticky;
-    top: 120px; /* Stick below the header */
-}
-
-.prize-visuals-panel img {
-    border-radius: 5px;
-    border: 5px solid var(--primary-gold);
-}
-
-.intro-details-panel {
-    display: flex;
-    flex-direction: column;
-}
-
-.intro-details-panel h1 {
-    font-family: var(--font-heading);
-    font-size: clamp(2rem, 5vw, 2.8rem);
-    text-transform: uppercase;
-    line-height: 1.2;
-}
-
-.intro-details-panel .hero-comp-progress-section {
-    margin-top: auto; /* Pushes the progress bar to the bottom */
-    padding-top: 2rem;
-}
+.main-comp-layout { display: grid; grid-template-columns: 35% 1fr; gap: 3rem; align-items: end; padding-top: 120px; }
+.prize-visuals-panel { position: sticky; top: 120px; }
+.prize-visuals-panel img { border-radius: 5px; border: 5px solid var(--primary-gold); }
+.intro-details-panel { display: flex; flex-direction: column; }
+.intro-details-panel h1 { font-family: var(--font-heading); font-size: clamp(2rem, 5vw, 2.8rem); text-transform: uppercase; line-height: 1.2; }
+.intro-details-panel .hero-comp-progress-section { margin-top: auto; padding-top: 2rem; }
 
 @media (max-width: 768px) {
-    .main-comp-layout {
-        grid-template-columns: 1fr;
-    }
-    .prize-visuals-panel {
-        position: static;
-    }
+    .main-comp-layout { grid-template-columns: 1fr; }
+    .prize-visuals-panel { position: static; }
     .main-nav-desktop { display: none; }
     .hero-home { background-image: url('../assets/hero-bg-mobile.png'); }
     .hero-comp-header { max-height: 65vh; }
@@ -705,12 +453,8 @@ input:checked + .slider:before { transform: translateX(26px); }
     .entry-details-panel h1 { font-size: 2rem; }
     .detail-timer { font-size: 2.5rem; }
     /* Hero Comp Page Responsive */
-    .hero-comp-header-fg {
-        transform: scale(2);
-    }
-    .hero-comp-progress-section {
-        max-width: 100%;
-    }
+    .hero-comp-header-fg { transform: scale(2); }
+    .hero-comp-progress-section { max-width: 100%; }
     .hero-comp-entry-flow { grid-template-columns: 1fr; }
     .glance-content { grid-template-columns: 1fr; }
     .hero-comp-trust-section { grid-template-columns: 1fr; }
@@ -718,27 +462,12 @@ input:checked + .slider:before { transform: translateX(26px); }
     .competition-row { flex-direction: column; align-items: stretch; }
     .comp-row-status { flex-direction: row; justify-content: space-between; align-items: center; margin-top: 1rem; }
     .admin-form .form-group-inline { flex-direction: column; align-items: stretch; }
-
     /* Button and Action Stacking */
-    .modal-actions,
-    .comp-actions {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    .promo-highlights {
-        flex-direction: column;
-    }
-
-
+    .modal-actions, .comp-actions { flex-direction: column; gap: 0.75rem; }
+    .promo-highlights { flex-direction: column; }
     /* Latest Winner Mobile */
-    .latest-winner-card {
-        grid-template-columns: 1fr;
-        text-align: center;
-    }
-    .latest-winner-image img {
-        height: 250px;
-    }
+    .latest-winner-card { grid-template-columns: 1fr; text-align: center; }
+    .latest-winner-image img { height: 250px; }
 }
 
 @media (max-width: 480px) {
@@ -752,1247 +481,154 @@ input:checked + .slider:before { transform: translateX(26px); }
     .main-nav-desktop { display: flex; }
 }
 
-
 /* --- 20. Instant Win Celebration Animations --- */
-.spin-result-container.is-winner {
-    animation: glow-gold 1.5s ease-out forwards;
-}
-
-@keyframes spin-and-center {
-    0% { transform: translate(-50%, -50%) rotate(0deg); }
-    100% { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
-@keyframes glow-gold {
-    0% { box-shadow: 0 0 0px rgba(224, 169, 74, 0); }
-    50% { box-shadow: 0 0 40px 10px rgba(224, 169, 74, 0.7); }
-    100% { box-shadow: 0 0 0px rgba(224, 169, 74, 0); }
-}
-
-.prize-pop-in {
-    animation: pop-in 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
-    transform: scale(0);
-}
-
-@keyframes pop-in {
-    0% { transform: scale(0); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-.confetti-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 100;
-}
-
-.confetti {
-    position: absolute;
-    width: 8px;
-    height: 16px;
-    background-color: var(--primary-gold);
-    top: -20px;
-    opacity: 0;
-    animation: confetti-fall 4s ease-out infinite;
-}
-
-.confetti:nth-child(odd) {
-    background-color: var(--light-white);
-}
-
-@keyframes confetti-fall {
-    0% {
-        transform: translateY(0) rotateZ(0deg);
-        opacity: 1;
-    }
-    100% {
-        transform: translateY(100vh) rotateZ(720deg);
-        opacity: 0;
-    }
-}
+.spin-result-container.is-winner { animation: glow-gold 1.5s ease-out forwards; }
+@keyframes spin-and-center { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes glow-gold { 0% { box-shadow: 0 0 0px rgba(224, 169, 74, 0); } 50% { box-shadow: 0 0 40px 10px rgba(224, 169, 74, 0.7); } 100% { box-shadow: 0 0 0px rgba(224, 169, 74, 0); } }
+.prize-pop-in { animation: pop-in 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards; transform: scale(0); }
+@keyframes pop-in { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.confetti-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; z-index: 100; }
+.confetti { position: absolute; width: 8px; height: 16px; background-color: var(--primary-gold); top: -20px; opacity: 0; animation: confetti-fall 4s ease-out infinite; }
+.confetti:nth-child(odd) { background-color: var(--light-white); }
+@keyframes confetti-fall { 0% { transform: translateY(0) rotateZ(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotateZ(720deg); opacity: 0; } }
 
 /* --- 21. Win Celebration Modal Animations --- */
-.win-celebration-modal .modal-content {
-    background: radial-gradient(circle, #2a2a2a 0%, var(--card-bg) 100%);
-    border: 2px solid var(--primary-gold);
-    box-shadow: 0 0 50px 10px rgba(224, 169, 74, 0.4);
-    transform: scale(0);
-    animation: scale-in-bounce 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
-}
-
-.win-celebration-modal.closing .modal-content {
-    animation: scale-out 0.3s ease-in forwards;
-}
-
-@keyframes scale-in-bounce {
-    0% { transform: scale(0); }
-    70% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-@keyframes scale-out {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(0.7); opacity: 0; }
-}
-
-.win-modal-icon {
-    font-size: 5rem;
-    line-height: 1;
-    margin-bottom: 1rem;
-    filter: drop-shadow(0 0 15px var(--primary-gold));
-    animation: trophy-shine 2s infinite;
-}
-
-@keyframes trophy-shine {
-    0%, 100% { transform: scale(1); opacity: 0.9; }
-    50% { transform: scale(1.1); opacity: 1; }
-}
-
-.win-modal-heading {
-    font-family: var(--font-heading);
-    text-transform: uppercase;
-    font-size: 1.5rem;
-    color: #ccc;
-    letter-spacing: 2px;
-}
-
-.win-modal-prize-value {
-    font-family: var(--font-heading);
-    font-size: clamp(3rem, 15vw, 6rem);
-    font-weight: 700;
-    color: var(--primary-gold);
-    line-height: 1.1;
-    margin: 0.5rem 0;
-    text-shadow: 0 0 20px rgba(224, 169, 74, 0.8);
-}
-
-.win-modal-prize-type {
-    font-family: var(--font-body);
-    font-size: 1.2rem;
-    color: #fff;
-    font-weight: bold;
-    margin-bottom: 2rem;
-}
-
-.win-modal-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: center;
-}
-
-.win-modal-actions .btn {
-    width: 100%;
-    max-width: 300px;
-    padding: 1rem;
-    font-size: 1.2rem;
-}
-
-.win-modal-actions .btn-secondary {
-    background: none;
-    border: none;
-    color: #888;
-    text-decoration: underline;
-    font-size: 1rem;
-}
-
-.win-modal-actions .btn-secondary:hover {
-    color: var(--light-white);
-}
-
-.win-modal-token-info {
-    font-size: 0.9rem;
-    color: #aaa;
-    min-height: 1.2em;
-}
+.win-celebration-modal .modal-content { background: radial-gradient(circle, #2a2a2a 0%, var(--card-bg) 100%); border: 2px solid var(--primary-gold); box-shadow: 0 0 50px 10px rgba(224, 169, 74, 0.4); transform: scale(0); animation: scale-in-bounce 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards; }
+.win-celebration-modal.closing .modal-content { animation: scale-out 0.3s ease-in forwards; }
+@keyframes scale-in-bounce { 0% { transform: scale(0); } 70% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes scale-out { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.7); opacity: 0; } }
+.win-modal-icon { font-size: 5rem; line-height: 1; margin-bottom: 1rem; filter: drop-shadow(0 0 15px var(--primary-gold)); animation: trophy-shine 2s infinite; }
+@keyframes trophy-shine { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.1); opacity: 1; } }
+.win-modal-heading { font-family: var(--font-heading); text-transform: uppercase; font-size: 1.5rem; color: #ccc; letter-spacing: 2px; }
+.win-modal-prize-value { font-family: var(--font-heading); font-size: clamp(3rem, 15vw, 6rem); font-weight: 700; color: var(--primary-gold); line-height: 1.1; margin: 0.5rem 0; text-shadow: 0 0 20px rgba(224, 169, 74, 0.8); }
+.win-modal-prize-type { font-family: var(--font-body); font-size: 1.2rem; color: #fff; font-weight: bold; margin-bottom: 2rem; }
+.win-modal-actions { display: flex; flex-direction: column; gap: 1rem; align-items: center; }
+.win-modal-actions .btn { width: 100%; max-width: 300px; padding: 1rem; font-size: 1.2rem; }
+.win-modal-actions .btn-secondary { background: none; border: none; color: #888; text-decoration: underline; font-size: 1rem; }
+.win-modal-actions .btn-secondary:hover { color: var(--light-white); }
+.win-modal-token-info { font-size: 0.9rem; color: #aaa; min-height: 1.2em; }
 
 /* --- 22. ReCAPTCHA Badge Hiding --- */
-/* This rule is required by Google's ToS when displaying your own compliance text. */
-.grecaptcha-badge {
-    visibility: hidden !important;
-}
+.grecaptcha-badge { visibility: hidden !important; }
 
 /* --- 23. New Footer Design (Refined) --- */
-.main-footer {
-    background-color: #0a0a0a;
-    border-top: 2px solid var(--border-color);
-    padding: 4rem 0 0 0; /* More top padding, no bottom padding */
-    margin-top: 5rem;
-    font-size: 0.95rem;
-}
-
-.main-footer .container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 3rem; /* Increased gap for better spacing */
-    padding-bottom: 4rem;
-}
-
-.footer-column {
-    flex: 1;
-    min-width: 240px;
-}
-
-/* Column 1: Brand */
-.footer-brand .logo {
-    max-width: 160px;
-    margin-bottom: 1.5rem;
-}
-
-.footer-brand .tagline {
-    color: #aaa;
-    max-width: 280px;
-    line-height: 1.7;
-}
-
-/* Columns 2 & 3: Links & Social */
-.footer-column h4 {
-    font-family: var(--font-heading);
-    color: var(--primary-gold);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 1.5rem;
-    font-size: 1.1rem;
-}
-
-.footer-links ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.footer-links li {
-    margin-bottom: 1rem;
-}
-
-.footer-links a {
-    color: #ccc;
-    text-decoration: none;
-    transition: color 0.3s ease;
-}
-
-.footer-links a:hover {
-    color: var(--primary-gold);
-}
-
-.footer-social-icons {
-    display: flex;
-    gap: 1.25rem;
-}
-
-.footer-social-icons a {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 44px;
-    height: 44px;
-    border: 1px solid var(--border-color);
-    border-radius: 50%;
-    color: #888;
-    transition: all 0.3s ease;
-}
-
-.footer-social-icons a:hover {
-    color: var(--primary-gold);
-    border-color: var(--primary-gold);
-    transform: translateY(-3px);
-    background-color: rgba(224, 169, 74, 0.1);
-}
-
-.footer-social-icons svg {
-    width: 20px;
-    height: 20px;
-    fill: currentColor;
-}
-
-/* Bottom Bar for Copyright & Compliance */
-.footer-bottom-bar {
-    background-color: #000;
-    padding: 1.5rem 0;
-    border-top: 1px solid var(--border-color);
-}
-
-.footer-bottom-bar .container {
-    padding-bottom: 0;
-    gap: 1rem;
-    align-items: center;
-}
-
-.footer-copyright,
-.recaptcha-notice {
-    font-size: 0.8rem;
-    color: #777;
-    flex-grow: 1;
-}
-
-.recaptcha-notice {
-    text-align: right;
-}
-
-.recaptcha-notice a {
-    color: #aaa;
-    text-decoration: none;
-}
-
-.recaptcha-notice a:hover {
-    text-decoration: underline;
-}
+.main-footer { background-color: #0a0a0a; border-top: 2px solid var(--border-color); padding: 4rem 0 0 0; margin-top: 5rem; font-size: 0.95rem; }
+.main-footer .container { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3rem; padding-bottom: 4rem; }
+.footer-column { flex: 1; min-width: 240px; }
+.footer-brand .logo { max-width: 160px; margin-bottom: 1.5rem; }
+.footer-brand .tagline { color: #aaa; max-width: 280px; line-height: 1.7; }
+.footer-column h4 { font-family: var(--font-heading); color: var(--primary-gold); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 1.5rem; font-size: 1.1rem; }
+.footer-links ul { list-style: none; padding: 0; margin: 0; }
+.footer-links li { margin-bottom: 1rem; }
+.footer-links a { color: #ccc; text-decoration: none; transition: color 0.3s ease; }
+.footer-links a:hover { color: var(--primary-gold); }
+.footer-social-icons { display: flex; gap: 1.25rem; }
+.footer-social-icons a { display: inline-flex; justify-content: center; align-items: center; width: 44px; height: 44px; border: 1px solid var(--border-color); border-radius: 50%; color: #888; transition: all 0.3s ease; }
+.footer-social-icons a:hover { color: var(--primary-gold); border-color: var(--primary-gold); transform: translateY(-3px); background-color: rgba(224, 169, 74, 0.1); }
+.footer-social-icons svg { width: 20px; height: 20px; fill: currentColor; }
+.footer-bottom-bar { background-color: #000; padding: 1.5rem 0; border-top: 1px solid var(--border-color); }
+.footer-bottom-bar .container { padding-bottom: 0; gap: 1rem; align-items: center; }
+.footer-copyright, .recaptcha-notice { font-size: 0.8rem; color: #777; flex-grow: 1; }
+.recaptcha-notice { text-align: right; }
+.recaptcha-notice a { color: #aaa; text-decoration: none; }
+.recaptcha-notice a:hover { text-decoration: underline; }
 
 @media (max-width: 768px) {
-    .main-footer .container {
-        flex-direction: column;
-        text-align: center;
-    }
-    .footer-brand .tagline {
-        margin: 0 auto;
-    }
-    .footer-social-icons {
-        justify-content: center;
-    }
-    .footer-bottom-bar .container {
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-    .footer-copyright,
-    .recaptcha-notice {
-        text-align: center;
-    }
+    .main-footer .container { flex-direction: column; text-align: center; }
+    .footer-brand .tagline { margin: 0 auto; }
+    .footer-social-icons { justify-content: center; }
+    .footer-bottom-bar .container { flex-direction: column; gap: 1.5rem; }
+    .footer-copyright, .recaptcha-notice { text-align: center; }
 }
 /* =================================================== */
 /* ==       SECTION 24: INSTANT GAMES HUB           == */
 /* =================================================== */
-
-.game-tabs {
-    display: flex;
-    gap: 0.5rem;
-    border-bottom: 2px solid var(--border-color);
-    margin-bottom: 3rem;
-}
-
-.game-tab-btn {
-    background: transparent;
-    border: none;
-    color: #888;
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    text-transform: uppercase;
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border-bottom: 4px solid transparent;
-    position: relative;
-    top: 2px;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.game-tab-btn:hover {
-    color: var(--light-white);
-}
-
-.game-tab-btn.active {
-    color: var(--primary-gold);
-    border-bottom-color: var(--primary-gold);
-}
-
-/*.plinko-icon {
-    display: inline-block;
-    width: 24px;
-    height: 24px;
-    background-color: #4a69e0;
-    border-radius: 50%;
-}*/
-
-.game-panel, .game-controls-panel {
-    display: none;
-    animation: fadeIn 0.5s ease-in-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.game-panel.active, .game-controls-panel.active {
-    display: block;
-}
-
-/* --- Layout Switching Logic --- */
-.instant-win-layout.spinner-active {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 3rem;
-    align-items: flex-start;
-}
-
-/*.instant-win-layout.plinko-active {
-    display: flex;
-    flex-direction: column;
-    gap: 3rem;
-}
-
-.balance-row .btn-buy-plinko-tokens {
-    font-size: 1.8rem;
-    line-height: 1;
-    padding: 0;
-    width: 40px;
-    height: 40px;
-    border-radius: 4px;
-    border: 1px solid #333;
-    background-color: #222;
-    color: #888;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.balance-row .btn-buy-plinko-tokens:hover {
-    background-color: #333;
-    color: var(--light-white);
-}
-
-/* NEW: Plinko Controls Panel */
-/*.plinko-controls-panel {
-    padding: 2rem;
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 2rem;
-    align-items: center;
-}
-
-.plinko-actions {
-    display: flex;
-    gap: 1rem;
-}
-
-.plinko-actions .btn {
-    flex-grow: 1;
-    padding: 1.2rem;
-    font-size: 1.2rem;
-}
-
-.plinko-balance h3 {
-    font-family: var(--font-heading);
-    text-transform: uppercase;
-    font-size: 1.4rem;
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1rem;
-}*/
+.game-tabs { display: flex; gap: 0.5rem; border-bottom: 2px solid var(--border-color); margin-bottom: 3rem; }
+.game-tab-btn { background: transparent; border: none; color: #888; font-family: var(--font-heading); font-size: 1.2rem; text-transform: uppercase; padding: 1rem 1.5rem; cursor: pointer; transition: all 0.3s ease; border-bottom: 4px solid transparent; position: relative; top: 2px; display: flex; align-items: center; gap: 0.75rem; }
+.game-tab-btn:hover { color: var(--light-white); }
+.game-tab-btn.active { color: var(--primary-gold); border-bottom-color: var(--primary-gold); }
+.game-panel, .game-controls-panel { display: none; animation: fadeIn 0.5s ease-in-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.game-panel.active, .game-controls-panel.active { display: block; }
+.instant-win-layout.spinner-active { display: grid; grid-template-columns: 1fr 400px; gap: 3rem; align-items: flex-start; }
 
 @media(max-width: 768px) {
-    .instant-win-layout.spinner-active {
-        grid-template-columns: 1fr;
-    }
-    .plinko-controls-panel {
-        grid-template-columns: 1fr;
-    }
+    .instant-win-layout.spinner-active { grid-template-columns: 1fr; }
+    .plinko-controls-panel { grid-template-columns: 1fr; }
 }
 
 /* =================================================== */
 /* ==     SECTION 25: IMPROVED PURCHASE MODAL       == */
 /* =================================================== */
-
-.purchase-modal-content {
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    width: 90%;
-    max-width: 500px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    max-height: 90vh; /* Ensure modal doesn't overflow viewport height */
-}
-
-#purchase-modal-body {
-    padding: 2rem;
-    overflow-y: auto; /* Enable scrolling for content */
-}
-
-#purchase-modal-body h2 {
-    font-family: var(--font-heading);
-    font-size: 1.8rem;
-    text-transform: uppercase;
-    color: var(--primary-gold);
-}
-
-#purchase-modal-body p {
-    color: #aaa;
-    margin: 0.5rem 0 2rem 0;
-}
-
-.modal-form .skill-question-box,
-.modal-form .ticket-selector-box {
-    text-align: left;
-    margin-bottom: 1.5rem;
-    padding: 1.5rem;
-    border: 1px solid var(--border-color);
-    background-color: var(--dark-bg);
-    border-radius: 4px;
-}
-
-.modal-form .question-text {
-    font-size: 1.1rem;
-    color: var(--light-white);
-    margin-bottom: 1rem;
-}
-
-.modal-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: flex-end;
-    margin-top: 1.5rem;
-    padding: 1.5rem;
-    border-top: 1px solid var(--border-color);
-    background-color: #111;
-}
-
-/* =================================================== */
-/* ==          SECTION 26: PLINKO STYLES            == */
-/* == (Migrated from plinko-mvp.html for integration)== */
-/* =================================================== */
-/*
-.plinko-game-panel.card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, .02), rgba(255, 255, 255, .0));
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
-    position: relative;
-    overflow: hidden;
-}
-
-.plinko-game-panel.card .hd {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px 0 16px;
-}
-
-.plinko-game-panel.card .bd {
-    padding: 14px 16px 16px 16px;
-    display: flex;
-    justify-content: center;
-}
-
-.plinko-game-panel.card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    border-radius: 16px;
-    background: radial-gradient(800px 200px at 50% -10%, rgba(224, 169, 74, .14), transparent 60%);
-    mix-blend-mode: screen;
-    opacity: .4;
-}
-
-.plinko-game-panel h1 {
-    font-family: var(--font-heading);
-    font-size: 1.8rem;
-    margin: 8px 0;
-}
-
-/* Plinko Board */
-.plinko-game-panel .board {
-    margin: 10px 0 18px 0;
-    border-radius: 18px;
-    overflow: hidden;
-    position: relative;
-    background: #0f1013;
-    border: 1px solid #181920;
-    box-shadow: inset 0 -30px 120px rgba(0, 0, 0, .55), inset 0 2px 0 rgba(255, 255, 255, .02);
-    max-width: 800px;
-    width: 100%;
-}
-
-.plinko-game-panel .board::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(600px 280px at 50% 0%, rgba(224, 169, 74, .12), transparent 65%), radial-gradient(300px 160px at 48% 20%, rgba(224, 169, 74, .06), transparent 60%);
-    opacity: .6;
-}
-
-.plinko-game-panel .dropzone {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    top: 14px;
-    color: #bfbfbf;
-    font-size: 12px;
-    text-shadow: 0 1px 0 rgba(0, 0, 0, .8);
-    animation: dz 2.4s ease-in-out infinite;
-    user-select: none;
-    pointer-events: none;
-}
-
-@keyframes dz {
-    0%, 100% { opacity: .85; transform: translateX(-50%) translateY(0); }
-    50% { opacity: .55; transform: translateX(-50%) translateY(1px); }
-}
-
-.plinko-game-panel svg {
-    width: 100%;
-    height: auto;
-    display: block;
-}
-
-.plinko-game-panel .peg {
-    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .8));
-    fill: url(#goldGrad); 
-    stroke: #d09832;
-    stroke-width: .75;
-}
-
-.plinko-game-panel .pocket {
-    fill: #14151b;
-    stroke: #262832;
-    rx: 10;
-}
-
-/* FIX: Improved prize label styling */
-.plinko-game-panel .payoutLabel {
-    fill: var(--primary-gold);
-    font-family: var(--font-heading); /* Oswald font */
-    font-weight: 700;
-    font-size: 1.2rem;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-    opacity: 0.8;
-}
-
-.plinko-game-panel .slotLabel {
-    fill: #bfbfbf;
-    font-size: 12px;
-}
-
-/* Plinko Controls (from MVP) */
-.plinko-actions .btn-primary {
-    background: linear-gradient(180deg, #f4d488, var(--primary-gold));
-    color: #1a1a1a;
-    box-shadow: 0 8px 30px rgba(224, 169, 74, .25), inset 0 1px 0 rgba(255, 255, 255, .5);
-}
-.plinko-actions .btn-ghost { background:#1a1b21; border-color: #333; color: var(--light-white); }
-.plinko-actions .btn:active { transform: translateY(1px) scale(.99); }
-.plinko-actions .btn-primary:hover { filter:brightness(1.03); }
-.plinko-actions .btn-ghost:hover { border-color:#444; background-color: #222; }
-
-.plinko-game-panel .chips {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.plinko-game-panel .chip {
-    padding: 6px 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    color: #bfbfbf;
-    font-size: 12px;
-    background: #101117;
-}
-
-.plinko-confetti {
-    position: fixed;
-    width: 6px;
-    height: 10px;
-    background: var(--primary-gold);
-    left: 50%;
-    top: 40%;
-    opacity: .95;
-    transform: translateX(-50%);
-    border-radius: 2px;
-    box-shadow: 0 0 10px rgba(224, 169, 74, .6);
-    pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .plinko-game-panel .dropzone, .plinko-confetti { animation: none; transition: none }
-}
-*/
-
-/* =================================================== */
-/* ==   SECTION 28: COMPETITION PAGE 3D VIEWER      == */
-/* =================================================== */
-
-.view-toggle-buttons {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1rem;
-}
-
-.views-container {
-    position: relative;
-}
-
-.view-panel {
-    display: none;
-}
-
-.view-panel.active {
-    display: block;
-    animation: fadeIn 0.3s ease-in-out; /* Re-use existing fadeIn animation */
-}
-
-.spline-view {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    background-color: #000; /* Black background for the container */
-    border-radius: 5px;
-    overflow: hidden; /* Hide anything that might spill out */
-}
-
-.spline-view spline-viewer {
-    width: 100%;
-    height: 100%;
-    border-radius: 5px;
-}
-
-/* Showcase Page Styles */
-body[data-page="showcase"] {
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    margin: 0;
-}
-
-body[data-page="showcase"] .main-header {
-    flex-shrink: 0;
-    position: static; /* Override sticky/fixed header for this page */
-}
-
-body[data-page="showcase"] .main-footer {
-    flex-shrink: 0;
-}
-
-main.showcase-container {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-}
-
-/* --- Account Page Entry Summary --- */
-.entries-summary {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    justify-content: space-around;
-    flex-wrap: wrap;
-}
-
-.summary-item {
-    text-align: center;
-    background-color: var(--dark-bg);
-    padding: 1rem;
-    border-radius: 5px;
-    flex-grow: 1;
-    min-width: 150px;
-}
-
-.summary-label {
-    display: block;
-    font-size: 0.9rem;
-    color: #aaa;
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-}
-
-.summary-value {
-    font-family: var(--font-heading);
-    font-size: 2rem;
-    color: var(--primary-gold);
-}
-
-/* --- Competition Entry Group visual improvement --- */
-.competition-entry-group {
-    background-color: var(--card-bg); /* Use card-bg for consistency */
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.competition-entry-group:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-}
-
-.competition-group-header {
-    background-color: #222; /* Slightly different bg for header */
-}
-
-/* Making the WON status more prominent */
-.status-won {
-    background-color: var(--primary-gold);
-    color: var(--dark-bg);
-    box-shadow: 0 0 10px var(--primary-gold);
-    animation: pulse-glow 1.5s infinite;
-}
-
-/* --- Accordion Styles for Competition Entries --- */
-.accordion-toggle {
-    width: 12px;
-    height: 12px;
-    border-style: solid;
-    border-color: var(--primary-gold);
-    border-width: 0 3px 3px 0;
-    transform: rotate(45deg);
-    transition: transform 0.3s ease;
-    flex-shrink: 0;
-    margin-left: auto; /* Push to the far right */
-}
-
-.competition-entry-group.expanded .accordion-toggle {
-    transform: rotate(-135deg);
-    margin-top: -6px; /* Adjust position when open */
-}
-
-.entry-list-container {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.4s ease-out, padding 0.4s ease-out;
-    padding: 0 1rem;
-}
-
-.competition-entry-group.expanded .entry-list-container {
-    max-height: 1000px; /* Generous max height */
-    padding: 0.5rem 1rem 1rem 1rem;
-    transition: max-height 0.6s ease-in, padding 0.6s ease-in;
-}
-
-/* --- Visual Polish for Entry List Item --- */
-.entry-list-item {
-    display: flex;
-    flex-wrap: wrap; /* Allow wrapping on small screens */
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.8rem 0;
-    font-size: 0.95rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.entry-list-item:last-child {
-    border-bottom: none;
-}
-
-.entry-date { color: #aaa; flex-basis: 25%; min-width: 120px; }
-.entry-tickets { font-weight: 700; flex-basis: 20%; min-width: 100px; }
-.entry-numbers { color: #ccc; font-family: monospace; flex-basis: 35%; min-width: 150px; }
-.instant-win-tag { flex-shrink: 0; }
-
-.group-header-badges {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.entry-count-badge {
-    background-color: #333;
-    color: #ccc;
-    font-weight: bold;
-    padding: 4px 8px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-}
-
-@media (max-width: 768px) {
-    .competition-group-header {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding-bottom: 1.5rem;
-    }
-
-    .group-header-details {
-        align-items: center;
-    }
-
-    .accordion-toggle {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-    }
-
-    .competition-entry-group.expanded .accordion-toggle {
-        margin-top: 0;
-    }
-
-    .entry-list-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-
-    .entry-date, .entry-tickets, .entry-numbers {
-        flex-basis: auto;
-        width: 100%;
-    }
-
-    .instant-win-tag {
-        margin-top: 0.5rem;
-        align-self: flex-start;
-    }
-}
-
-/* Instant Wins promo (keeps brand tokens: --primary-gold, --light-white, --border-color) */
-.spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); }
-.spin-promo .card { background:#1a1a1a; border:1px solid var(--border-color, #2c2c2c); border-radius:12px; padding:20px; margin-bottom:16px; }
-.spin-promo-body .section-title {
-    font-family: var(--font-heading, 'Chakra Petch', sans-serif);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    font-weight: 700;
-    margin: 0 0 12px;
-    position: relative;
-    padding-bottom: var(--divider-gap, 0.5em);
-}
-
-.spin-promo-body .section-title::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100px;
-    height: 3px;
-    background-color: var(--primary-gold);
-}
-
-.spin-hero { display:grid; grid-template-columns: 1.2fr 0.8fr; gap:18px; overflow:hidden; }
-@media (max-width: 900px){ .spin-hero{ grid-template-columns: 1fr; } }
-.spin-hero__title { font-family: var(--font-heading, 'Chakra Petch', sans-serif); font-size: clamp(2rem, 1.4rem + 2.2vw, 3rem); margin:6px 0; text-transform:uppercase; letter-spacing:2px; }
-.spin-hero__subtitle { color:#cfd6e6; margin:0 0 12px; }
-.spin-hero__ctas { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 6px; }
-.btn.btn--ghost { background:transparent; color:var(--primary-gold, #68D6FF); border:2px solid var(--primary-gold, #68D6FF); }
-.badge.coming-soon { display:inline-block; padding:6px 10px; border-radius:999px; background:linear-gradient(180deg, #A0E8FF, var(--primary-gold, #68D6FF)); color:#121212; font-weight:800; border:1px solid #8AD9FF; }
-
-.spin-hero__art { position:relative; min-height:220px; border:1px solid var(--border-color, #2c2c2c); border-radius:10px; background:#121418; overflow:hidden; }
-.spin-hero__shard{ position:absolute; inset:-40% -10% auto auto; width:120%; height:120%; transform:skew(-18deg) rotate(24deg); background:linear-gradient(90deg, rgba(224,169,74,0), rgba(224,169,74,.35), rgba(255,122,26,0)); filter:blur(16px); opacity:.45; }
-
-.token-card { display:flex; gap:12px; align-items:flex-start; background:#141414; border:1px solid var(--border-color, #2c2c2c); border-radius:10px; padding:12px; margin-top:8px; }
-.token-card__icon { color:var(--primary-gold, #68D6FF); display:grid; place-items:center; }
-.token-card__label { color:#99a3b5; font-size:12px; letter-spacing:.3px; }
-.token-card__value { font-size:22px; font-weight:800; line-height:1.1; }
-.token-card__hint { color:#b6bed0; font-size:12px; margin-top:2px; }
-
-.steps-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
-@media (max-width: 900px){ .steps-grid{ grid-template-columns:1fr; } }
-.step { background:#141414; border:1px solid var(--border-color, #2c2c2c); border-radius:10px; padding:14px; }
-.step__icon { font-size:20px; font-weight:800; color:var(--primary-gold, #68D6FF); }
-.step__title { margin:6px 0 4px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
-.step__text { color:#d6dce9; margin:0; }
-
-.faq-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
-@media (max-width: 900px){ .faq-grid{ grid-template-columns:1fr; } }
-.faq { background:#141414; border:1px solid var(--border-color, #2c2c2c); border-radius:10px; padding:14px; }
-.faq__q { margin:0 0 6px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
-.faq__a { color:#cfd6e6; margin:0; }
-
-.is-disabled { pointer-events: none; cursor: default; }
-.btn.disabled,
-.btn[aria-disabled="true"] {
-  pointer-events: none;
-  opacity: .8;
-  filter: grayscale(.1);
-  cursor: default;
-}
-
-/* --- 30. Competition Gallery --- */
-.comp-gallery{ margin-top:1.25rem }
-.comp-gallery-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }
-.comp-gallery-grid .thumb{ position:relative; overflow:hidden; border:1px solid var(--border-color); border-radius:6px; background:#111; padding:0; cursor:pointer }
-.comp-gallery-grid img{ width:100%; aspect-ratio:16/10; object-fit:cover; display:block }
-.comp-gallery-grid .thumb:hover{ transform:translateY(-2px); transition:transform .18s ease }
-.lightbox{ position:fixed; inset:0; background:rgba(0,0,0,.9); display:flex; align-items:center; justify-content:center; z-index:9999 }
-.lightbox[hidden]{ display:none }
-.lightbox__img{ max-width:92vw; max-height:86vh; border:1px solid var(--border-color); border-radius:8px }
-.lightbox__close{ position:absolute; top:14px; right:16px; font-size:36px; line-height:1; background:transparent; color:#fff; border:0; cursor:pointer }
-
-/* --- 29. New Balance Styles --- */
-
-/* Icon for cash balance on instant win page */
-.inventory-card .cash-icon {
-    font-size: 1.5rem;
-    width: 40px;
-    height: 40px;
-    line-height: 40px;
-    text-align: center;
-    border-radius: 5px;
-    background-color: rgba(39, 174, 96, 0.2);
-    color: var(--success-green);
-    font-weight: bold;
-}
-
-/* Account page balance display */
-.account-balances {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    justify-content: center;
-    text-align: center;
-}
-
-.balance-display {
-    background-color: var(--dark-bg);
-    padding: 1rem 2rem;
-    border-radius: 5px;
-    border: 1px solid var(--border-color);
-    flex-grow: 1;
-}
-
-.balance-display span {
-    display: block;
-    color: #aaa;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-}
-
-.balance-display strong {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    color: var(--primary-gold);
-}
-
-.balance-display:last-child strong {
-    color: var(--success-green);
-}
-
-/* Account page balance actions */
-.balance-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.balance-form h4 {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-    margin-bottom: 0.5rem;
-}
-
-.balance-form p {
-    font-size: 0.9rem;
-    color: #aaa;
-    margin-bottom: 1rem;
-    min-height: 40px;
-}
-
-.balance-form .form-field {
-    margin-bottom: 1rem;
-}
-
-.balance-form label {
-    display: block;
-    font-size: 0.9rem;
-    color: #ccc;
-    margin-bottom: 0.25rem;
-}
-
-.balance-form input {
-    width: 100%;
-    padding: 0.8rem;
-    background-color: var(--dark-bg);
-    border: 1px solid #444;
-    color: var(--light-white);
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-.balance-form input:focus {
-    outline: none;
-    border-color: var(--primary-gold);
-}
-
-.balance-form button {
-    width: 100%;
-}
-
-#balance-feedback {
-    text-align: center;
-    font-size: 1rem;
-    min-height: 1.5rem;
-}
-
-
-@media (max-width: 768px) {
-    .balance-actions {
-        grid-template-columns: 1fr;
-    }
-    .account-balances {
-        flex-direction: column;
-        gap: 1rem;
-    }
-}
+.purchase-modal-content { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 5px; width: 90%; max-width: 500px; text-align: center; display: flex; flex-direction: column; max-height: 90vh; }
+#purchase-modal-body { padding: 2rem; overflow-y: auto; }
+#purchase-modal-body h2 { font-family: var(--font-heading); font-size: 1.8rem; text-transform: uppercase; color: var(--primary-gold); }
+#purchase-modal-body p { color: #aaa; margin: 0.5rem 0 2rem 0; }
+.modal-form .skill-question-box, .modal-form .ticket-selector-box { text-align: left; margin-bottom: 1.5rem; padding: 1.5rem; border: 1px solid var(--border-color); background-color: var(--dark-bg); border-radius: 4px; }
+.modal-form .question-text { font-size: 1.1rem; color: var(--light-white); margin-bottom: 1rem; }
+.modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; padding: 1.5rem; border-top: 1px solid var(--border-color); background-color: #111; }
 
 /* =================================================== */
 /* ==      SECTION 27: MULTI-SPIN & PRIZE REVEAL    == */
 /* =================================================== */
+.spin-actions { display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem; width: 100%; }
+.btn-spin { flex-grow: 1; max-width: 150px; padding: 1rem; font-size: 1.1rem; }
+#spin-prize-reveal { position: relative; min-height: 50px; width: 100%; max-width: 400px; margin: 1rem auto; border: 2px dashed var(--border-color); border-radius: 5px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: all 0.3s ease; padding: 1rem; }
+#spin-prize-reveal:hover { border-color: var(--primary-gold); background-color: rgba(224, 169, 74, 0.05); }
+#spin-prize-reveal::before { content: 'Click to reveal prize'; font-family: var(--font-heading); color: #888; text-transform: uppercase; letter-spacing: 1px; font-size: 1rem; position: absolute; transition: opacity 0.3s ease; }
+#spin-prize-reveal .spin-result-container { opacity: 0; transition: opacity 0.3s ease; }
+#spin-prize-reveal.revealed { border-style: solid; border-color: transparent; background-color: transparent; cursor: default; }
+#spin-prize-reveal.revealed::before { opacity: 0; pointer-events: none; }
+#spin-prize-reveal.revealed .spin-result-container { opacity: 1; }
+#spin-prize-reveal.is-spinning { pointer-events: none; user-select: none; opacity: 0.5; }
+#spin-prize-reveal.is-spinning::before { content: 'Spinning...'; }
+.multi-win-modal .modal-content { max-width: 500px; }
+.multi-win-results-list { list-style: none; padding: 0; margin: 1.5rem 0; max-height: 40vh; overflow-y: auto; }
+.multi-win-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; margin-bottom: 0.5rem; background-color: var(--dark-bg); border-radius: 4px; opacity: 0; transform: translateX(-20px); animation: fadeInSlideIn 0.5s ease-out forwards; }
+.multi-win-item.is-cash { border-left: 4px solid var(--success-green); }
+.multi-win-item.is-credit { border-left: 4px solid var(--primary-gold); }
+.multi-win-prize-type { font-weight: bold; font-size: 1.1rem; }
+.multi-win-prize-value { font-family: var(--font-heading); font-size: 1.5rem; color: var(--primary-gold); }
+.multi-win-total { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); text-align: right; }
+.multi-win-total h3 { font-family: var(--font-heading); font-size: 1.8rem; color: var(--primary-gold); }
+@keyframes fadeInSlideIn { to { opacity: 1; transform: translateX(0); } }
+main.showcase-container spline-viewer { flex-grow: 1; min-height: 0; width: 100%; height: 100%; }
 
-.spin-actions {
+/* --- Analytics Page Styles --- */
+.analytics-nav {
     display: flex;
-    justify-content: center;
-    gap: 1rem;
+    border-bottom: 2px solid #333;
     margin-bottom: 1.5rem;
-    width: 100%;
 }
 
-.btn-spin {
-    flex-grow: 1;
-    max-width: 150px;
-    padding: 1rem;
-    font-size: 1.1rem;
-}
-
-#spin-prize-reveal {
-    position: relative;
-    min-height: 50px;
-    width: 100%;
-    max-width: 400px;
-    margin: 1rem auto;
-    border: 2px dashed var(--border-color);
-    border-radius: 5px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+.analytics-nav-link {
+    padding: 0.75rem 1.5rem;
     cursor: pointer;
-    transition: all 0.3s ease;
-    padding: 1rem;
-}
-
-#spin-prize-reveal:hover {
-    border-color: var(--primary-gold);
-    background-color: rgba(224, 169, 74, 0.05);
-}
-
-#spin-prize-reveal::before {
-    content: 'Click to reveal prize';
-    font-family: var(--font-heading);
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 1rem;
-    position: absolute;
-    transition: opacity 0.3s ease;
-}
-
-#spin-prize-reveal .spin-result-container {
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-#spin-prize-reveal.revealed {
-    border-style: solid;
-    border-color: transparent;
+    border: none;
     background-color: transparent;
-    cursor: default;
+    color: #ccc;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border-bottom: 3px solid transparent;
+    transform: translateY(2px);
 }
 
-#spin-prize-reveal.revealed::before {
-    opacity: 0;
-    pointer-events: none;
+.analytics-nav-link:hover {
+    color: #fff;
+    background-color: #2a2a2a;
 }
 
-#spin-prize-reveal.revealed .spin-result-container {
-    opacity: 1;
+.analytics-nav-link.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
 }
 
-#spin-prize-reveal.is-spinning {
-    pointer-events: none;
-    user-select: none;
-    opacity: 0.5;
+.analytics-pane {
+    display: none;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
 }
 
-#spin-prize-reveal.is-spinning::before {
-    content: 'Spinning...';
-}
-
-.multi-win-modal .modal-content {
-    max-width: 500px;
-}
-
-.multi-win-results-list {
-    list-style: none;
-    padding: 0;
-    margin: 1.5rem 0;
-    max-height: 40vh;
-    overflow-y: auto;
-}
-
-.multi-win-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    margin-bottom: 0.5rem;
-    background-color: var(--dark-bg);
-    border-radius: 4px;
-    opacity: 0;
-    transform: translateX(-20px);
-    animation: fadeInSlideIn 0.5s ease-out forwards;
-}
-
-.multi-win-item.is-cash {
-    border-left: 4px solid var(--success-green);
-}
-
-.multi-win-item.is-credit {
-    border-left: 4px solid var(--primary-gold);
-}
-
-.multi-win-prize-type {
-    font-weight: bold;
-    font-size: 1.1rem;
-}
-
-.multi-win-prize-value {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    color: var(--primary-gold);
-}
-
-.multi-win-total {
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border-color);
-    text-align: right;
-}
-
-.multi-win-total h3 {
-    font-family: var(--font-heading);
-    font-size: 1.8rem;
-    color: var(--primary-gold);
-}
-
-@keyframes fadeInSlideIn {
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-main.showcase-container spline-viewer {
-    flex-grow: 1;
-    min-height: 0;
-    width: 100%;
-    height: 100%;
+.analytics-pane.active {
+    display: grid;
 }

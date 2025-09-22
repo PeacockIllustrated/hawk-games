@@ -689,8 +689,6 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
 
 // getRevenueAnalytics
 export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
-  await assertIsAdmin(request);
-
   const competitionsSnapshot = await db.collection("competitions").get();
   let totalRevenue = 0;
 

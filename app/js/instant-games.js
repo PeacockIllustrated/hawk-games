@@ -53,6 +53,21 @@ const prizesTableContainer = document.getElementById('prizes-table-container');
 // const MAX_PLINKO_BALLS = 12;
 
 // --- Utility Functions ---
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const toNumber = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+
+function pricePerTicket(data) {
+  // Prefer tiers if present; fallback to ticketPricePence/pricePence; else £1.00
+  const tiers = Array.isArray(data?.ticketTiers) ? data.ticketTiers : [];
+  if (tiers.length > 0 && tiers[0]?.price && tiers[0]?.amount) {
+    const unit = Number(tiers[0].price) / Number(tiers[0].amount);
+    if (Number.isFinite(unit) && unit > 0) return unit;
+  }
+  if (typeof data?.ticketPricePence === "number") return data.ticketPricePence / 100;
+  if (typeof data?.pricePence === "number") return data.pricePence / 100;
+  return 1.0;
+}
+
 function createElement(tag, options = {}, children = []) {
     const el = document.createElement(tag);
     Object.entries(options).forEach(([key, value]) => {
@@ -546,9 +561,32 @@ async function openPurchaseModal(tokenType) {
         const answers = Object.entries(activeTokenCompetition.skillQuestion.answers)
             .map(([key, value]) => createElement('button', { type: 'button', class: 'answer-btn', 'data-answer': key, textContent: value }));
 
-        const bundlesHTML = activeTokenCompetition.ticketTiers.map(b => 
-            createElement('button', { type: 'button', class: 'ticket-option', 'data-amount': b.amount, 'data-price': b.price, textContent: `${b.amount} Entries for £${b.price.toFixed(2)}` })
-        );
+        const userLimit = toNumber(activeTokenCompetition?.userEntryLimit, 75);
+        const maxTickets = clamp(userLimit, 1, 1000); // Just a sanity cap
+        const basePricePerTicket = pricePerTicket(activeTokenCompetition);
+
+        const sliderContainer = createElement('div', { class: 'ticket-slider-container' });
+        if (maxTickets > 0) {
+            const sliderLabel = createElement('div', { class: 'ticket-slider-label' }, [
+                createElement('span', { textContent: 'Number of entries:' }),
+                createElement('span', { id: 'ticket-count-display', textContent: '1' }),
+            ]);
+            const slider = createElement('input', {
+                type: 'range',
+                id: 'ticket-slider',
+                min: '1',
+                max: String(maxTickets),
+                value: '1',
+                class: 'ticket-slider',
+            });
+            const priceDisplay = createElement('div', { class: 'ticket-price-display' }, [
+                createElement('span', { textContent: 'Total Price: ' }),
+                createElement('span', { id: 'ticket-price-display-value', textContent: `£${basePricePerTicket.toFixed(2)}` }),
+            ]);
+            sliderContainer.append(sliderLabel, slider, priceDisplay);
+        } else {
+            sliderContainer.append(createElement('p', { textContent: 'No tickets available.' }));
+        }
         
         modalBody.innerHTML = '';
         const form = createElement('form', { id: 'token-entry-form', class: 'modal-form' }, [
@@ -559,7 +597,7 @@ async function openPurchaseModal(tokenType) {
                 createElement('div', { class: 'answer-options' }, answers)
             ]),
             createElement('div', { class: 'ticket-selector-box' }, [
-                 createElement('div', { class: 'ticket-options' }, bundlesHTML)
+                 sliderContainer
             ]),
             createElement('div', { id: 'credit-payment-option', style: { display: 'none', marginTop: '1rem' } }),
             createElement('div', { id: 'terms-container', style: { marginTop: '1rem' } }),
@@ -615,12 +653,16 @@ buySpinnerBtn.addEventListener('click', () => openPurchaseModal('spinner'));
 
 async function handleTokenCompEntry(form, tokenType, paymentMethod = 'card') {
     const selectedAnswer = form.querySelector('.answer-btn.selected');
-    const selectedBundle = form.querySelector('.ticket-option.selected');
+    const slider = form.querySelector('#ticket-slider');
 
     if (!activeTokenCompetition) { alert('Error: No active competition selected.'); return; }
     if (!selectedAnswer) { alert('Please answer the question.'); return; }
     if (selectedAnswer.dataset.answer !== activeTokenCompetition.skillQuestion.correctAnswer) { alert('Incorrect answer. Please try again.'); return; }
-    if (!selectedBundle) { alert('Please select a bundle.'); return; }
+    if (!slider) { alert('Could not find ticket slider.'); return; }
+
+    const qty = parseInt(slider.value, 10);
+    const unitPrice = pricePerTicket(activeTokenCompetition);
+    const expectedPrice = qty * unitPrice;
 
     const submitBtn = form.querySelector('button[type="submit"]');
     const creditBtn = form.querySelector('#pay-with-credit-btn');
@@ -635,8 +677,8 @@ async function handleTokenCompEntry(form, tokenType, paymentMethod = 'card') {
         const allocateTicketsAndAwardTokens = httpsCallable(functions, 'allocateTicketsAndAwardTokens');
         await allocateTicketsAndAwardTokens({
             compId: activeTokenCompetition.id,
-            ticketsBought: parseInt(selectedBundle.dataset.amount),
-            expectedPrice: parseFloat(selectedBundle.dataset.price),
+            ticketsBought: qty,
+            expectedPrice: expectedPrice,
             paymentMethod: paymentMethod,
             tokenType: tokenType
         });
@@ -669,17 +711,30 @@ document.getElementById('purchase-modal').addEventListener('click', (e) => {
         form.querySelectorAll('.answer-btn').forEach(btn => btn.classList.remove('selected'));
         target.classList.add('selected');
     }
-    if (target.classList.contains('ticket-option')) {
-        const price = parseFloat(target.dataset.price);
-        form.querySelectorAll('.ticket-option').forEach(opt => opt.classList.remove('selected'));
-        target.classList.add('selected');
+});
+
+document.getElementById('purchase-modal').addEventListener('input', (e) => {
+    if (e.target.id === 'ticket-slider') {
+        const slider = e.target;
+        const form = slider.closest('form');
+        if (!form) return;
+
+        const ticketCountDisplay = form.querySelector("#ticket-count-display");
+        const priceDisplay = form.querySelector("#ticket-price-display-value");
+        const unit = pricePerTicket(activeTokenCompetition);
+
+        const qty = clamp(parseInt(slider.value, 10) || 1, 1, toNumber(slider.max, 100));
+        const price = qty * unit;
+
+        if (ticketCountDisplay) ticketCountDisplay.textContent = String(qty);
+        if (priceDisplay) priceDisplay.textContent = `£${price.toFixed(2)}`;
 
         const creditOptionDiv = form.querySelector('#credit-payment-option');
         creditOptionDiv.innerHTML = '';
         if (userCreditBalance >= price) {
             const creditButton = createElement('button', { type: 'button', id: 'pay-with-credit-btn', class: ['btn', 'btn-credit'], textContent: `Pay with £${price.toFixed(2)} Credit` });
             creditButton.onclick = () => {
-                 handleTokenCompEntry(target.closest('form'), currentTokenType, 'credit');
+                 handleTokenCompEntry(form, 'spinner', 'credit');
             };
             creditOptionDiv.append(creditButton);
             creditOptionDiv.style.display = 'block';

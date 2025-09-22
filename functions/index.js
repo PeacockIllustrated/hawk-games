@@ -723,15 +723,17 @@ export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
     totalSiteCreditAwarded += w.data().prizeValue;
   });
 
-  const creditSpentSnapshot = await db.collectionGroup("entries").where("entryType", "==", "credit").get();
   let totalSiteCreditSpent = 0;
-  for (const doc of creditSpentSnapshot.docs) {
-    const entryData = doc.data();
-    const compDoc = await db.collection("competitions").doc(doc.ref.parent.parent.id).get();
+  for (const compDoc of competitionsSnapshot.docs) {
     const competitionData = compDoc.data();
-    const tier = competitionData.ticketTiers?.find((t) => t.amount === entryData.ticketsBought);
-    if (tier) {
-      totalSiteCreditSpent += tier.price;
+    const compId = compDoc.id;
+    const creditEntriesSnapshot = await db.collection("competitions").doc(compId).collection("entries").where("entryType", "==", "credit").get();
+    for (const entryDoc of creditEntriesSnapshot.docs) {
+        const entryData = entryDoc.data();
+        const tier = competitionData.ticketTiers?.find((t) => t.amount === entryData.ticketsBought);
+        if (tier) {
+            totalSiteCreditSpent += tier.price;
+        }
     }
   }
 

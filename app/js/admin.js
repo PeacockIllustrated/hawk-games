@@ -615,46 +615,122 @@ function initializeSpinnerSettingsListeners() {
     const form = document.getElementById('spinner-settings-form');
     const prizesContainer = document.getElementById('spinner-prizes-container');
     const addPrizeBtn = document.getElementById('add-spinner-prize-btn');
-    const addPrizeTier = (type = 'credit', value = '', odds = '') => {
+
+    const createCompetitionSelect = (selectedCompId) => {
+        const liveCompetitions = allCompetitions.filter(c => c.status === 'live' && c.competitionType !== 'token');
+        if (liveCompetitions.length === 0) {
+            return createElement('p', { class: 'no-comps-message', textContent: 'No live competitions available.' });
+        }
+        const selectOptions = liveCompetitions.map(c => createElement('option', {
+            value: c.id,
+            textContent: c.title
+        }));
+        const select = createElement('select', { class: 'spinner-prize-competition' }, selectOptions);
+        if (selectedCompId) {
+            select.value = selectedCompId;
+        }
+        return select;
+    };
+
+    const addPrizeTier = (prize = {}) => {
+        const { type = 'credit', value = '', odds = '', competitionId = '' } = prize;
         const removeBtn = createElement('button', { type: 'button', class: 'btn-remove-tier', textContent: '×' });
+
+        const typeSelect = createElement('select', { class: 'spinner-prize-type' }, [
+            createElement('option', { value: 'credit', textContent: 'Site Credit' }),
+            createElement('option', { value: 'cash', textContent: 'Cash' }),
+            createElement('option', { value: 'ticket', textContent: 'Ticket' })
+        ]);
+        typeSelect.value = type;
+
+        const valueLabel = createElement('label', { textContent: 'Value (£)' });
+        const valueInput = createElement('input', { type: 'number', step: '0.01', class: 'spinner-prize-value', value: value, required: true });
+
+        const competitionSelectContainer = createElement('div', { class: 'form-group competition-select-container', style: { flex: '2', display: 'none' } }, [
+            createElement('label', { textContent: 'Competition' }),
+            createCompetitionSelect(competitionId)
+        ]);
+
         const prizeEl = createElement('div', { class: ['form-group-inline', 'spinner-prize-row'] }, [
             createElement('div', { class: 'form-group', style: { flex: '1' } }, [
                 createElement('label', { textContent: 'Prize Type' }),
-                createElement('select', { class: 'spinner-prize-type' }, [
-                    createElement('option', { value: 'credit', textContent: 'Site Credit' }),
-                    createElement('option', { value: 'cash', textContent: 'Cash' })
-                ])
+                typeSelect
             ]),
-            createElement('div', { class: 'form-group', style: { flex: '1' } }, [createElement('label', { textContent: 'Value (£)' }), createElement('input', { type: 'number', step: '0.01', class: 'spinner-prize-value', value: value, required: true })]),
+            createElement('div', { class: 'form-group', style: { flex: '1' } }, [valueLabel, valueInput]),
+            competitionSelectContainer,
             createElement('div', { class: 'form-group', style: { flex: '1' } }, [createElement('label', { textContent: 'Odds (1 in X)' }), createElement('input', { type: 'number', class: 'spinner-prize-odds', value: odds, required: true })]),
             removeBtn
         ]);
-        prizeEl.querySelector('.spinner-prize-type').value = type;
+
+        const handlePrizeTypeChange = (selectedType) => {
+            if (selectedType === 'ticket') {
+                competitionSelectContainer.style.display = 'block';
+                valueLabel.textContent = 'Number of Tickets';
+                valueInput.step = '1';
+            } else {
+                competitionSelectContainer.style.display = 'none';
+                valueLabel.textContent = 'Value (£)';
+                valueInput.step = '0.01';
+            }
+        };
+
+        typeSelect.addEventListener('change', (e) => handlePrizeTypeChange(e.target.value));
+
         prizesContainer.appendChild(prizeEl);
         removeBtn.addEventListener('click', () => { prizeEl.remove(); });
+
+        // Initial state setup
+        handlePrizeTypeChange(type);
     };
+
     addPrizeBtn.addEventListener('click', () => addPrizeTier());
-    const loadSettings = async () => { 
+
+    const loadSettings = async () => {
         const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
         const docSnap = await getDoc(defaultsRef);
         prizesContainer.innerHTML = '';
         if (docSnap.exists() && docSnap.data().prizes) {
-            docSnap.data().prizes.forEach(p => addPrizeTier(p.type, p.value, p.odds));
+            docSnap.data().prizes.forEach(p => addPrizeTier(p));
         }
-        if (prizesContainer.children.length === 0) addPrizeTier();
+        if (prizesContainer.children.length === 0) {
+            addPrizeTier();
+        }
     };
+
     loadSettings();
-    form.addEventListener('submit', async (e) => { 
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
         try {
-            const prizes = Array.from(document.querySelectorAll('.spinner-prize-row')).map(row => ({
-                type: row.querySelector('.spinner-prize-type').value,
-                value: parseFloat(row.querySelector('.spinner-prize-value').value),
-                odds: parseInt(row.querySelector('.spinner-prize-odds').value)
-            }));
+            const prizes = Array.from(document.querySelectorAll('.spinner-prize-row')).map(row => {
+                const type = row.querySelector('.spinner-prize-type').value;
+                const prizeData = {
+                    type: type,
+                    value: parseFloat(row.querySelector('.spinner-prize-value').value),
+                    odds: parseInt(row.querySelector('.spinner-prize-odds').value)
+                };
+                if (type === 'ticket') {
+                    const competitionSelect = row.querySelector('.spinner-prize-competition');
+                    if (competitionSelect) {
+                        prizeData.competitionId = competitionSelect.value;
+                    } else {
+                        // This case handles when no live competitions are available
+                        prizeData.competitionId = null;
+                    }
+                }
+                return prizeData;
+            });
+
+            // Validation
+            for (const prize of prizes) {
+                if (prize.type === 'ticket' && !prize.competitionId) {
+                    throw new Error('A competition must be selected for all "Ticket" type prizes. If none are available, please create a live competition first.');
+                }
+            }
+
             const defaultsRef = doc(db, 'admin_settings', 'spinnerPrizes');
             await setDoc(defaultsRef, { prizes });
             alert('Spinner settings saved successfully!');

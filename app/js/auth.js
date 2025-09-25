@@ -182,7 +182,11 @@ async function createUserProfileIfNotExists(user) {
 
 // -------------------- DOM helpers --------------------
 function createElement(tag, options = {}, children = []) {
-  const el = document.createElement(tag);
+  const isSvg = ["svg", "path"].includes(tag);
+  const el = isSvg
+    ? document.createElementNS("http://www.w3.org/2000/svg", tag)
+    : document.createElement(tag);
+
   Object.entries(options).forEach(([key, value]) => {
     if (key === "class") {
       const classes = Array.isArray(value) ? value : String(value).split(" ");

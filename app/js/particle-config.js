@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     particlesJS('particles-js', {
         "particles": {
             "number": {
-                "value": 100,
+                "value": 150,
                 "density": {
                     "enable": true,
                     "value_area": 800
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             "move": {
                 "enable": true,
-                "speed": 0.4,
+                "speed": 1,
                 "direction": "none",
                 "random": true,
                 "straight": false,
@@ -51,12 +51,27 @@ document.addEventListener('DOMContentLoaded', () => {
             "detect_on": "canvas",
             "events": {
                 "onhover": {
-                    "enable": false,
+                    "enable": true,
+                    "mode": "bubble"
                 },
                 "onclick": {
-                    "enable": false,
+                    "enable": true,
+                    "mode": "repulse"
                 },
                 "resize": true
+            },
+            "modes": {
+                "bubble": {
+                    "distance": 200,
+                    "size": 6,
+                    "duration": 2,
+                    "opacity": 0.8,
+                    "speed": 3
+                },
+                "repulse": {
+                    "distance": 100,
+                    "duration": 0.4
+                }
             }
         },
         "retina_detect": true

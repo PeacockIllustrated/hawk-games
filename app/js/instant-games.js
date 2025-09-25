@@ -37,11 +37,7 @@ const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
 const spinX3Button = document.getElementById('spin-x3-button');
 const spinX5Button = document.getElementById('spin-x5-button');
-const spinPrizeReveal = document.getElementById('spin-prize-reveal');
-const spinResultContainer = document.getElementById('spin-result');
-const showPrizesBtn = document.getElementById('show-prizes-btn');
-const prizesModal = document.getElementById('prizes-modal');
-const prizesTableContainer = document.getElementById('prizes-table-container');
+const spinPrizeReveal = document.getElementById('spin-prize-reveal'); // This is now the prize list container
 
 // Plinko Elements
 // const plinkoSvg = document.getElementById('plinko-svg');
@@ -111,7 +107,7 @@ async function loadAllGameSettings() {
         const docSnap = await getDoc(settingsRef);
         if (docSnap.exists() && docSnap.data().prizes) {
             spinnerPrizes = docSnap.data().prizes;
-            renderPrizesTable(spinnerPrizes);
+            renderPrizesList(spinnerPrizes); // New function call
         } else { console.error("Spinner settings not found."); }
     } catch (error) { console.error("Error fetching spinner prizes:", error); }
 
@@ -178,21 +174,25 @@ initializeHub();
 
 
 // --- Spinner Logic ---
-function renderPrizesTable(prizes) {
-    prizesTableContainer.innerHTML = '';
-    const tableRows = prizes.map(prize => {
+function renderPrizesList(prizes) {
+    // This function now renders a styled list in the main content area
+    spinPrizeReveal.innerHTML = ''; // Clear previous content
+    spinPrizeReveal.append(createElement('h3', { class: 'prizes-list-title', textContent: 'Available Prizes' }));
+
+    const prizeItems = prizes.map(prize => {
         const prizeText = prize.type === 'credit' ? `£${prize.value.toFixed(2)} Site Credit` : `£${prize.value.toFixed(2)} Cash`;
-        return createElement('tr', {}, [
-            createElement('td', { textContent: prizeText }),
-            createElement('td', { textContent: `1 in ${prize.odds.toLocaleString()}` })
+        const oddsText = `1 in ${prize.odds.toLocaleString()}`;
+
+        return createElement('div', { class: 'prize-item' }, [
+            createElement('span', { class: 'prize-item-name', textContent: prizeText }),
+            createElement('span', { class: 'prize-item-odds', textContent: oddsText })
         ]);
     });
-    const table = createElement('table', { class: 'prizes-table' }, [
-        createElement('thead', {}, [createElement('tr', {}, [createElement('th', { textContent: 'Prize' }), createElement('th', { textContent: 'Odds' })])]),
-        createElement('tbody', {}, tableRows)
-    ]);
-    prizesTableContainer.append(table);
+
+    const list = createElement('div', { class: 'prizes-list' }, prizeItems);
+    spinPrizeReveal.append(list);
 }
+
 
 function showWinCelebrationModal(prizeType, value, game = 'spinner') {
     const prizeValueText = `£${value.toFixed(2)}`;
@@ -233,9 +233,6 @@ async function handleMultiSpin(spinCount) {
 
     isSpinning = true;
     updateUI();
-    spinPrizeReveal.classList.remove('revealed');
-    spinPrizeReveal.classList.add('is-spinning');
-    spinResultContainer.innerHTML = '';
 
     wheel.style.transition = 'none';
     wheel.style.transform = 'rotate(0deg)';
@@ -280,13 +277,10 @@ async function handleMultiSpin(spinCount) {
             showMultiWinModal(wins);
         } else if (wins.length === 1) {
             showWinCelebrationModal(wins[0].prizeType, wins[0].value, 'spinner');
-        } else {
-            spinResultContainer.innerHTML = '';
-            spinResultContainer.append(createElement('p', { textContent: 'Better luck next time!' }));
         }
+        // "Better luck" message is implicitly handled by the absence of a win modal.
 
         isSpinning = false;
-        spinPrizeReveal.classList.remove('is-spinning');
         updateUI();
     }, spinDuration * 1000 + 500);
 }
@@ -347,11 +341,7 @@ spinButton.addEventListener('click', createSpinHandler(1));
 spinX3Button.addEventListener('click', createSpinHandler(3));
 spinX5Button.addEventListener('click', createSpinHandler(5));
 
-spinPrizeReveal.addEventListener('click', () => {
-    if (isSpinning || spinPrizeReveal.classList.contains('revealed')) return;
-    spinPrizeReveal.classList.add('revealed');
-});
-
+// The click-to-reveal logic is no longer needed as the prize list is always visible.
 
 // --- Plinko Logic ---
 /*
@@ -744,8 +734,6 @@ document.getElementById('purchase-modal').addEventListener('input', (e) => {
     }
 });
 
-showPrizesBtn.addEventListener('click', () => prizesModal.classList.add('show'));
-
 const closeModalHandler = (e) => {
     const modal = e.target.closest('.modal-container');
     if (modal && e.target === modal) {
@@ -754,7 +742,6 @@ const closeModalHandler = (e) => {
 };
 
 purchaseModal.addEventListener('click', closeModalHandler);
-prizesModal.addEventListener('click', closeModalHandler);
 
 tokenAccordionContainer.addEventListener('click', (e) => {
     const header = e.target.closest('.accordion-header');

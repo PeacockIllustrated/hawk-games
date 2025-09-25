@@ -1662,6 +1662,61 @@ main.showcase-container {
     border-bottom: none;
 }
 
+/* New styles for the always-visible prize list */
+.available-prizes-container {
+    background: var(--bg-color);
+    border-radius: var(--border-radius-lg);
+    padding: 1rem 1.25rem;
+    margin-top: 1.5rem;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.prizes-list-title {
+    font-family: var(--font-family-headings);
+    color: var(--primary-gold);
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color-light);
+    text-align: center;
+}
+
+.prizes-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.prize-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--bg-color-accent);
+    padding: 0.6rem 1rem;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease-in-out;
+}
+
+.prize-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    border-color: var(--primary-gold-tint);
+}
+
+.prize-item-name {
+    font-weight: 700;
+    color: var(--text-color-light);
+}
+
+.prize-item-odds {
+    font-size: 0.85rem;
+    color: var(--text-color-muted);
+    font-weight: 500;
+}
+
 .entry-date { color: #aaa; flex-basis: 25%; min-width: 120px; }
 .entry-tickets { font-weight: 700; flex-basis: 20%; min-width: 100px; }
 .entry-numbers { color: #ccc; font-family: monospace; flex-basis: 35%; min-width: 150px; }

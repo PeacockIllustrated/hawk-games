@@ -175,18 +175,35 @@ initializeHub();
 
 // --- Spinner Logic ---
 function renderPrizesList(prizes) {
-    // This function now renders a styled list in the main content area
-    spinPrizeReveal.innerHTML = ''; // Clear previous content
+    spinPrizeReveal.innerHTML = '';
     spinPrizeReveal.append(createElement('h3', { class: 'prizes-list-title', textContent: 'Available Prizes' }));
 
     const prizeItems = prizes.map(prize => {
-        const prizeText = prize.type === 'credit' ? `£${prize.value.toFixed(2)} Site Credit` : `£${prize.value.toFixed(2)} Cash`;
+        const prizeValueText = `£${prize.value.toFixed(2)}`;
+        const prizeTypeText = prize.type === 'credit' ? 'Site Credit' : 'Cash';
         const oddsText = `1 in ${prize.odds.toLocaleString()}`;
 
-        return createElement('div', { class: 'prize-item' }, [
-            createElement('span', { class: 'prize-item-name', textContent: prizeText }),
-            createElement('span', { class: 'prize-item-odds', textContent: oddsText })
-        ]);
+        const prizeValue = createElement('span', { class: 'prize-item-value', textContent: prizeValueText });
+        const prizeType = createElement('span', { class: 'prize-item-type', textContent: prizeTypeText });
+        const prizeInfo = createElement('div', { class: 'prize-item-info' }, [prizeValue, prizeType]);
+
+        const odds = createElement('span', { class: 'prize-item-odds', textContent: oddsText });
+        const revealCTA = createElement('span', { class: 'prize-item-cta', textContent: 'View Odds' });
+        const oddsContainer = createElement('div', { class: 'prize-item-odds-container' }, [odds]);
+
+        const item = createElement('div', { class: 'prize-item' }, [prizeInfo, revealCTA, oddsContainer]);
+
+        item.addEventListener('click', () => {
+            const isRevealed = item.classList.contains('revealed');
+            // Close any already revealed items
+            spinPrizeReveal.querySelectorAll('.prize-item.revealed').forEach(i => i.classList.remove('revealed'));
+            // If the clicked item was not the one already revealed, open it.
+            if (!isRevealed) {
+                item.classList.add('revealed');
+            }
+        });
+
+        return item;
     });
 
     const list = createElement('div', { class: 'prizes-list' }, prizeItems);

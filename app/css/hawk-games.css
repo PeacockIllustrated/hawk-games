@@ -1664,12 +1664,10 @@ main.showcase-container {
 
 /* New styles for the always-visible prize list */
 .available-prizes-container {
-    background: var(--bg-color);
-    border-radius: var(--border-radius-lg);
-    padding: 1rem 1.25rem;
+    background: transparent;
+    border: none;
+    padding: 0;
     margin-top: 1.5rem;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .prizes-list-title {
@@ -1678,43 +1676,90 @@ main.showcase-container {
     font-size: 1.1rem;
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    text-align: center;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--border-color-light);
-    text-align: center;
 }
 
 .prizes-list {
-    display: grid;
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .prize-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     background-color: var(--bg-color-accent);
-    padding: 0.6rem 1rem;
     border-radius: var(--border-radius-md);
     border: 1px solid var(--border-color);
-    transition: all 0.2s ease-in-out;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s ease-in-out;
 }
 
 .prize-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
     border-color: var(--primary-gold-tint);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-.prize-item-name {
+.prize-item-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.prize-item-value {
+    font-family: var(--font-family-headings);
+    font-size: 2rem;
     font-weight: 700;
+    color: var(--primary-gold);
+    line-height: 1.1;
+}
+
+.prize-item-type {
+    font-size: 0.9rem;
     color: var(--text-color-light);
 }
 
-.prize-item-odds {
+.prize-item-cta {
+    position: absolute;
+    top: 50%;
+    right: 1.25rem;
+    transform: translateY(-50%);
     font-size: 0.85rem;
+    font-weight: 700;
     color: var(--text-color-muted);
-    font-weight: 500;
+    transition: opacity 0.3s ease;
+}
+
+.prize-item.revealed .prize-item-cta {
+    opacity: 0;
+}
+
+.prize-item-odds-container {
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.4s ease-in-out, opacity 0.4s ease, margin-top 0.4s ease;
+    margin-top: 0;
+}
+
+.prize-item.revealed .prize-item-odds-container {
+    max-height: 50px; /* Adjust as needed */
+    opacity: 1;
+    margin-top: 0.75rem;
+}
+
+.prize-item-odds {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-color-light);
+    background-color: var(--bg-color);
+    padding: 0.5rem;
+    border-radius: var(--border-radius-sm);
+    text-align: center;
 }
 
 .entry-date { color: #aaa; flex-basis: 25%; min-width: 120px; }

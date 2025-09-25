@@ -1581,11 +1581,12 @@ main.showcase-container {
 }
 
 /* Instant Wins promo (keeps brand tokens: --primary-gold, --light-white, --border-color) */
-.spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); }
-.spin-promo .card { background:#1a1a1a; border:1px solid var(--border-color, #2c2c2c); border-radius:12px; padding:20px; margin-bottom:16px; }
+.spin-promo-body { background: linear-gradient(180deg, #0a0c10 0%, #0b0f15 100%); padding-bottom: 3rem; }
+.spin-promo-body .card { background:#1a1a1a; border:1px solid var(--border-color, #2c2c2c); border-radius:12px; padding:20px; margin-bottom:16px; }
 .spin-promo-body .section-title {
     font-family: var(--font-heading, 'Chakra Petch', sans-serif);
     text-transform: uppercase;
+    margin-top: 3rem;
     letter-spacing: 1.5px;
     font-weight: 700;
     margin: 0 0 12px;
@@ -1633,6 +1634,10 @@ main.showcase-container {
 .faq { background:#141414; border:1px solid var(--border-color, #2c2c2c); border-radius:10px; padding:14px; }
 .faq__q { margin:0 0 6px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
 .faq__a { color:#cfd6e6; margin:0; }
+
+.spin-game-panel {
+    margin-top: 3rem;
+}
 
 /* --- Visual Polish for Entry List Item --- */
 .entry-list-item {

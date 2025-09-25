@@ -1000,7 +1000,7 @@ input:checked + .slider:before { transform: translateX(26px); }
     height: 44px;
     border: 1px solid var(--border-color);
     border-radius: 50%;
-    color: var(--primary-gold);
+    color: #888;
     transition: all 0.3s ease;
 }
 

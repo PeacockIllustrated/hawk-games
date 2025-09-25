@@ -232,6 +232,7 @@ input:checked + .slider:before { transform: translateX(26px); }
 .spin-panel-header .section-title::after { width: 80px; }
 .spin-panel-header .section-subtitle { margin-bottom: 2rem; max-width: 400px; text-align: center; }
 .wheel-area { position: relative; width: 100%; max-width: 450px; margin: 1rem auto; }
+#particles-js { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 .wheel-container { position: relative; width: 100%; padding-bottom: 100%; height: 0; display: flex; justify-content: center; align-items: center; }
 .wheel-pointer { position: absolute; width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent; border-top: 45px solid var(--primary-gold); top: -20px; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transition: transform 0.3s ease; }
 .wheel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background-image: url('../assets/spin-wheel-bg.png'); background-size: contain; background-repeat: no-repeat; background-position: center; transition: transform 8s cubic-bezier(0.25, 0.1, 0.25, 1); transform: rotate(0deg); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }

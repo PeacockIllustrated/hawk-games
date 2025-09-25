@@ -179,25 +179,48 @@ function renderPrizesList(prizes) {
     spinPrizeReveal.append(createElement('h3', { class: 'prizes-list-title', textContent: 'Available Prizes' }));
 
     const prizeItems = prizes.map(prize => {
-        const prizeValueText = `£${prize.value.toFixed(2)}`;
-        const prizeTypeText = prize.type === 'credit' ? 'Site Credit' : 'Cash';
+        let prizeValueText, prizeTypeText, iconClass;
+
+        switch (prize.type) {
+            case 'cash':
+                prizeValueText = `£${prize.value.toFixed(2)}`;
+                prizeTypeText = 'Cash Prize';
+                iconClass = 'prize-icon--cash';
+                break;
+            case 'credit':
+                prizeValueText = `£${prize.value.toFixed(2)}`;
+                prizeTypeText = 'Site Credit';
+                iconClass = 'prize-icon--credit';
+                break;
+            case 'tickets':
+                prizeValueText = `${prize.value}`;
+                prizeTypeText = 'Main Draw Tickets';
+                iconClass = 'prize-icon--tickets';
+                break;
+            default:
+                prizeValueText = `£${prize.value.toFixed(2)}`;
+                prizeTypeText = 'Prize';
+                iconClass = 'prize-icon--default';
+        }
+
         const oddsText = `1 in ${prize.odds.toLocaleString()}`;
 
-        const prizeValue = createElement('span', { class: 'prize-item-value', textContent: prizeValueText });
-        const prizeType = createElement('span', { class: 'prize-item-type', textContent: prizeTypeText });
-        const prizeInfo = createElement('div', { class: 'prize-item-info' }, [prizeValue, prizeType]);
+        const icon = createElement('div', { class: ['prize-icon', iconClass] });
+        const value = createElement('div', { class: 'prize-value', textContent: prizeValueText });
+        const type = createElement('div', { class: 'prize-type', textContent: prizeTypeText });
+        const mainContent = createElement('div', { class: 'prize-main' }, [icon, value, type]);
 
-        const odds = createElement('span', { class: 'prize-item-odds', textContent: oddsText });
-        const revealCTA = createElement('span', { class: 'prize-item-cta', textContent: 'View Odds' });
-        const oddsContainer = createElement('div', { class: 'prize-item-odds-container' }, [odds]);
+        const odds = createElement('div', { class: 'prize-odds', textContent: oddsText });
+        const oddsWrapper = createElement('div', { class: 'prize-odds-wrapper' }, [
+            createElement('span', { textContent: 'Odds:' }),
+            odds
+        ]);
 
-        const item = createElement('div', { class: 'prize-item' }, [prizeInfo, revealCTA, oddsContainer]);
+        const item = createElement('div', { class: ['prize-card', `prize-card--${prize.type}`] }, [mainContent, oddsWrapper]);
 
         item.addEventListener('click', () => {
             const isRevealed = item.classList.contains('revealed');
-            // Close any already revealed items
-            spinPrizeReveal.querySelectorAll('.prize-item.revealed').forEach(i => i.classList.remove('revealed'));
-            // If the clicked item was not the one already revealed, open it.
+            spinPrizeReveal.querySelectorAll('.prize-card.revealed').forEach(i => i.classList.remove('revealed'));
             if (!isRevealed) {
                 item.classList.add('revealed');
             }

@@ -327,7 +327,12 @@ export function renderFooter() {
   const socialIcons = createElement("div", { class: "footer-social-icons" }, [
     createElement(
       "a",
-      { href: "#", "aria-label": "Facebook", target: "_blank", rel: "noopener noreferrer" },
+      {
+        href: "https://www.facebook.com/profile.php?id=61580013034678",
+        "aria-label": "Facebook",
+        target: "_blank",
+        rel: "noopener noreferrer",
+      },
       [
         createElement("svg", { viewBox: "0 0 24 24" }, [
           createElement("path", {
@@ -349,11 +354,11 @@ export function renderFooter() {
     ),
     createElement(
       "a",
-      { href: "#", "aria-label": "X Twitter", target: "_blank", rel: "noopener noreferrer" },
+      { href: "#", "aria-label": "TikTok", target: "_blank", rel: "noopener noreferrer" },
       [
         createElement("svg", { viewBox: "0 0 24 24" }, [
           createElement("path", {
-            d: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.617l-5.21-6.817-6.044 6.817h-3.308l7.73-8.805-7.994-10.69h6.77l4.613 6.162 5.432-6.162zm-1.146 17.52h1.839l-9.424-12.59h-1.99l9.575 12.59z",
+            d: "M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.01-3.48.01-6.95.01-10.42-2.52-.01-5.04-.02-7.57 0-.01 2.21-.01 4.41.01 6.62 1.78-.35 3.57-.64 5.35-.99v4.02c-1.87.31-3.74.63-5.61.97v3.83c-1.84-.3-3.68-.61-5.52-.92V1.99c1.83.29 3.67.61 5.51.92V.02h1.84z",
           }),
         ]),
       ]

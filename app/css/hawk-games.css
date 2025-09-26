@@ -1662,9 +1662,18 @@ main.showcase-container {
     border-bottom: none;
 }
 
-/* New styles for the visually stunning prize list */
+/* New styles for the visually stunning, collapsible prize list */
 .available-prizes-container {
-    margin-top: 1.5rem;
+    margin-top: 0.75rem;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out, margin-top 0.5s ease-in-out;
+}
+
+.available-prizes-container.visible {
+    max-height: 1000px; /* Large enough to not clip content */
+    opacity: 1;
 }
 
 .prizes-list-title {
@@ -1701,15 +1710,17 @@ main.showcase-container {
 
 .prize-main {
     display: flex;
-    align-items: center;
-    padding: 1rem 1.25rem;
+    flex-direction: column; /* Stack content vertically */
+    align-items: center;   /* Center content horizontally */
+    text-align: center;    /* Center text */
+    padding: 1.5rem 1.25rem;
 }
 
 .prize-icon {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     flex-shrink: 0;
-    margin-right: 1rem;
+    margin-bottom: 1rem; /* Space between icon and value */
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;

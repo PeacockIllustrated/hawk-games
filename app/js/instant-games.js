@@ -37,7 +37,8 @@ const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
 const spinX3Button = document.getElementById('spin-x3-button');
 const spinX5Button = document.getElementById('spin-x5-button');
-const spinPrizeReveal = document.getElementById('spin-prize-reveal'); // This is now the prize list container
+const spinPrizeReveal = document.getElementById('spin-prize-reveal'); // This is the prize list container
+const showPrizesBtn = document.getElementById('show-prizes-btn');
 
 // Plinko Elements
 // const plinkoSvg = document.getElementById('plinko-svg');
@@ -232,6 +233,12 @@ function renderPrizesList(prizes) {
     const list = createElement('div', { class: 'prizes-list' }, prizeItems);
     spinPrizeReveal.append(list);
 }
+
+showPrizesBtn.addEventListener('click', () => {
+    const container = spinPrizeReveal;
+    container.classList.toggle('visible');
+    showPrizesBtn.textContent = container.classList.contains('visible') ? 'Hide Available Prizes' : 'View Available Prizes';
+});
 
 
 function showWinCelebrationModal(prizeType, value, game = 'spinner') {

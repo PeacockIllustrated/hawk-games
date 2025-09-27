@@ -1694,6 +1694,7 @@ main.showcase-container {
     border: 2px dashed var(--border-color);
     border-radius: 5px;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     cursor: pointer;

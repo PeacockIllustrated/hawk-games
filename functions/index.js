@@ -555,8 +555,8 @@ export const trustWebhook = onRequest(
       res.status(200).send("ok");
     } catch (err) {
       logger.error("trustWebhook error", { msg: err?.message || err, stack: err?.stack });
-      // Return 200 to prevent retry storms on unexpected errors; we have logs.
-      res.status(200).send("ok");
+      // Return 500 for server errors so Trust retries; 401 is for auth failure.
+      res.status(500).send("internal server error");
     }
   }
 );
@@ -564,7 +564,7 @@ export const trustWebhook = onRequest(
 // -------------------- Safety net: retry fulfilment --------------------
 export const retryUnfulfilledPaidOrders = onSchedule(
   {
-    schedule: "every 10 minutes",
+    schedule: "every 3 minutes",
     timeZone: "Europe/London",
     region: "us-central1",
   },

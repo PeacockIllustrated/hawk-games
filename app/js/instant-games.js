@@ -243,8 +243,27 @@ spinPrizeRevealContainer.querySelector('.prize-reveal-header').addEventListener(
 
 
 function showWinCelebrationModal(prizeType, value, game = 'spinner') {
-    const prizeValueText = `£${value.toFixed(2)}`;
-    const prizeTypeText = prizeType === 'credit' ? "SITE CREDIT" : "CASH";
+    let prizeValueText;
+    let prizeTypeText;
+
+    switch (prizeType) {
+        case 'cash':
+            prizeValueText = `£${value.toFixed(2)}`;
+            prizeTypeText = 'CASH';
+            break;
+        case 'credit':
+            prizeValueText = `£${value.toFixed(2)}`;
+            prizeTypeText = 'SITE CREDIT';
+            break;
+        case 'tickets':
+            prizeValueText = `${value}`;
+            prizeTypeText = value === 1 ? 'MAIN DRAW TICKET' : 'MAIN DRAW TICKETS';
+            break;
+        default: // Fallback for any unexpected prize types
+            prizeValueText = `£${value.toFixed(2)}`;
+            prizeTypeText = prizeType.toUpperCase();
+            break;
+    }
 
     const closeBtn = createElement('button', { class: 'btn', textContent: 'Close' });
     closeBtn.addEventListener('click', closeWinCelebrationModal, { once: true });
@@ -336,19 +355,48 @@ async function handleMultiSpin(spinCount) {
 function showMultiWinModal(wins) {
     const totalCredit = wins.filter(w => w.prizeType === 'credit').reduce((acc, w) => acc + w.value, 0);
     const totalCash = wins.filter(w => w.prizeType === 'cash').reduce((acc, w) => acc + w.value, 0);
+    const totalTickets = wins.filter(w => w.prizeType === 'tickets').reduce((acc, w) => acc + w.value, 0);
 
     const resultsList = createElement('div', { class: 'multi-win-results-list' });
     wins.forEach((win, index) => {
+        let prizeTypeText;
+        let prizeValueText;
+
+        switch (win.prizeType) {
+            case 'cash':
+                prizeTypeText = 'Cash';
+                prizeValueText = `£${win.value.toFixed(2)}`;
+                break;
+            case 'credit':
+                prizeTypeText = 'Site Credit';
+                prizeValueText = `£${win.value.toFixed(2)}`;
+                break;
+            case 'tickets':
+                prizeTypeText = win.value === 1 ? 'Ticket' : 'Tickets';
+                prizeValueText = `${win.value}`;
+                break;
+            default:
+                prizeTypeText = win.prizeType;
+                prizeValueText = `${win.value}`;
+        }
+
         const prizeItem = createElement('div', { class: ['multi-win-item', `is-${win.prizeType}`], style: { animationDelay: `${index * 0.2}s` } }, [
-            createElement('span', { class: 'multi-win-prize-type', textContent: `${win.prizeType === 'credit' ? 'Site Credit' : 'Cash'}` }),
-            createElement('span', { class: 'multi-win-prize-value', textContent: `£${win.value.toFixed(2)}` })
+            createElement('span', { class: 'multi-win-prize-type', textContent: prizeTypeText }),
+            createElement('span', { class: 'multi-win-prize-value', textContent: prizeValueText })
         ]);
         resultsList.append(prizeItem);
     });
 
-    const totalSection = createElement('div', { class: 'multi-win-total' }, [
-        createElement('h3', { textContent: `Total Won: £${(totalCredit + totalCash).toFixed(2)}` })
-    ]);
+    const totalSection = createElement('div', { class: 'multi-win-total' });
+    if (totalCash > 0) {
+        totalSection.append(createElement('h3', { textContent: `Total Cash: £${totalCash.toFixed(2)}` }));
+    }
+    if (totalCredit > 0) {
+        totalSection.append(createElement('h3', { textContent: `Total Credit: £${totalCredit.toFixed(2)}` }));
+    }
+    if (totalTickets > 0) {
+        totalSection.append(createElement('h3', { textContent: `Total Tickets: ${totalTickets}` }));
+    }
 
     const closeBtn = createElement('button', { class: 'btn', textContent: 'Awesome!' });
     closeBtn.addEventListener('click', closeWinCelebrationModal, { once: true });

@@ -37,8 +37,8 @@ const wheel = document.getElementById('wheel');
 const spinButton = document.getElementById('spin-button');
 const spinX3Button = document.getElementById('spin-x3-button');
 const spinX5Button = document.getElementById('spin-x5-button');
-const spinPrizeReveal = document.getElementById('spin-prize-reveal'); // This is the prize list container
-const showPrizesBtn = document.getElementById('show-prizes-btn');
+const spinPrizeRevealContainer = document.getElementById('spin-prize-reveal');
+const spinPrizeReveal = spinPrizeRevealContainer.querySelector('.prizes-list-content');
 
 // Plinko Elements
 // const plinkoSvg = document.getElementById('plinko-svg');
@@ -176,8 +176,7 @@ initializeHub();
 
 // --- Spinner Logic ---
 function renderPrizesList(prizes) {
-    spinPrizeReveal.innerHTML = '';
-    spinPrizeReveal.append(createElement('h3', { class: 'prizes-list-title', textContent: 'Available Prizes' }));
+    spinPrizeReveal.innerHTML = ''; // Clear only the content area
 
     const prizeItems = prizes.map(prize => {
         let prizeValueText, prizeTypeText, iconClass;
@@ -234,10 +233,12 @@ function renderPrizesList(prizes) {
     spinPrizeReveal.append(list);
 }
 
-showPrizesBtn.addEventListener('click', () => {
-    const container = spinPrizeReveal;
-    container.classList.toggle('visible');
-    showPrizesBtn.textContent = container.classList.contains('visible') ? 'Hide Available Prizes' : 'View Available Prizes';
+spinPrizeRevealContainer.querySelector('.prize-reveal-header').addEventListener('click', () => {
+    const isExpanded = spinPrizeRevealContainer.classList.toggle('expanded');
+    const cta = spinPrizeRevealContainer.querySelector('.header-cta');
+    if (cta) {
+        cta.textContent = isExpanded ? 'Click to hide' : 'Click to reveal';
+    }
 });
 
 

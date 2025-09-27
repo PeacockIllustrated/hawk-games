@@ -1662,19 +1662,6 @@ main.showcase-container {
     border-bottom: none;
 }
 
-/* New styles for the visually stunning, collapsible prize list */
-.available-prizes-container {
-    margin-top: 0.75rem;
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out, margin-top 0.5s ease-in-out;
-}
-
-.available-prizes-container.visible {
-    max-height: 1000px; /* Large enough to not clip content */
-    opacity: 1;
-}
 
 .prizes-list-title {
     font-family: var(--font-family-headings);
@@ -2048,67 +2035,56 @@ main.showcase-container {
     font-size: 1.1rem;
 }
 
-#spin-prize-reveal {
-    position: relative;
-    min-height: 50px;
+/* New styles for the collapsible prize list */
+.spin-prize-reveal {
     width: 100%;
-    max-width: 400px;
-    margin: 1rem auto;
-    border: 2px dashed var(--border-color);
+    max-width: 450px;
+    margin: 1.5rem auto 0;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
+    background-color: var(--dark-bg);
+    overflow: hidden;
+}
+
+.prize-reveal-header {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
+    padding: 1rem 1.5rem;
     cursor: pointer;
-    transition: all 0.3s ease;
-    padding: 1rem;
+    background-color: var(--card-bg);
+    transition: background-color 0.2s ease;
 }
 
-#spin-prize-reveal:hover {
-    border-color: var(--primary-gold);
-    background-color: rgba(224, 169, 74, 0.05);
+.prize-reveal-header:hover {
+    background-color: #222;
 }
 
-#spin-prize-reveal::before {
-    content: 'Click to reveal prize';
+.header-title {
     font-family: var(--font-heading);
-    color: #888;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
-    font-size: 1rem;
-    position: absolute;
-    transition: opacity 0.3s ease;
 }
 
-#spin-prize-reveal .spin-result-container {
+.header-cta {
+    font-size: 0.9rem;
+    color: var(--primary-gold);
+}
+
+.prizes-list-content {
+    max-height: 0;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    overflow-y: auto;
+    transition: max-height 0.4s ease-out, opacity 0.3s ease-out, padding 0.4s ease-out;
+    padding: 0 1.5rem;
 }
 
-#spin-prize-reveal.revealed {
-    border-style: solid;
-    border-color: transparent;
-    background-color: transparent;
-    cursor: default;
-}
-
-#spin-prize-reveal.revealed::before {
-    opacity: 0;
-    pointer-events: none;
-}
-
-#spin-prize-reveal.revealed .spin-result-container {
+.spin-prize-reveal.expanded .prizes-list-content {
+    max-height: 400px; /* Or another value that fits the design */
     opacity: 1;
-}
-
-#spin-prize-reveal.is-spinning {
-    pointer-events: none;
-    user-select: none;
-    opacity: 0.5;
-}
-
-#spin-prize-reveal.is-spinning::before {
-    content: 'Spinning...';
+    padding: 1.5rem;
+    transition: max-height 0.5s ease-in, opacity 0.4s ease-in, padding 0.5s ease-in;
 }
 
 .multi-win-modal .modal-content {

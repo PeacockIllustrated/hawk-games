@@ -495,7 +495,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     const city = emailPasswordForm['address-city'].value;
                     const state = emailPasswordForm['address-state'].value;
                     const zip = emailPasswordForm['address-zip'].value;
-                    const country = emailPasswordForm['address-country'].value;
                     // Register
                     if (!validatePassword(password)) {
                         showError("Password does not meet the policy requirements.");
@@ -516,7 +515,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             city: city,
                             state: state,
                             zip: zip,
-                            country: country,
                         },
                         photoURL: '',
                         createdAt: serverTimestamp(),

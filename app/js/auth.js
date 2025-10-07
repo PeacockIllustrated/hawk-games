@@ -423,6 +423,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const authTitle = document.getElementById('auth-title');
         const authSubtitle = document.getElementById('auth-subtitle');
         const nameGroup = document.getElementById('name-group');
+        const dobGroup = document.getElementById('dob-group');
+        const phoneGroup = document.getElementById('phone-group');
+        const addressGroup = document.getElementById('address-group');
         const passwordPolicy = document.getElementById('password-policy');
         const authModeText = document.getElementById('auth-mode-text');
         const forgotPasswordLink = document.getElementById('forgot-password-link');
@@ -438,6 +441,9 @@ document.addEventListener("DOMContentLoaded", () => {
             authSubtitle.textContent = register ? 'Create a new account.' : 'Enter your details to access your account.';
             authSubmitBtn.textContent = register ? 'Register' : 'Sign In';
             nameGroup.style.display = register ? 'block' : 'none';
+            dobGroup.style.display = register ? 'block' : 'none';
+            phoneGroup.style.display = register ? 'block' : 'none';
+            addressGroup.style.display = register ? 'block' : 'none';
             passwordPolicy.style.display = register ? 'block' : 'none';
             authModeText.textContent = register ? 'Already have an account?' : "Don't have an account?";
             authModeToggle.textContent = register ? 'Sign In' : 'Register';
@@ -478,10 +484,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const email = emailPasswordForm.email.value;
             const password = emailPasswordForm.password.value;
-            const name = emailPasswordForm.name.value;
+
 
             try {
                 if (isRegisterMode) {
+                    const name = emailPasswordForm.name.value;
+                    const dob = emailPasswordForm.dob.value;
+                    const phone = emailPasswordForm.phone.value;
+                    const street = emailPasswordForm['address-street'].value;
+                    const city = emailPasswordForm['address-city'].value;
+                    const state = emailPasswordForm['address-state'].value;
+                    const zip = emailPasswordForm['address-zip'].value;
+                    const country = emailPasswordForm['address-country'].value;
                     // Register
                     if (!validatePassword(password)) {
                         showError("Password does not meet the policy requirements.");
@@ -489,6 +503,31 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     await updateProfile(userCredential.user, { displayName: name });
+
+                    const userRef = doc(db, "users", userCredential.user.uid);
+                    const userData = {
+                        uid: userCredential.user.uid,
+                        email: email,
+                        displayName: name,
+                        dob: dob,
+                        phone: phone,
+                        address: {
+                            street: street,
+                            city: city,
+                            state: state,
+                            zip: zip,
+                            country: country,
+                        },
+                        photoURL: '',
+                        createdAt: serverTimestamp(),
+                        isAdmin: false,
+                        entryCount: {},
+                        marketingConsent: false,
+                        spinTokens: [],
+                        creditBalance: 0,
+                    };
+                    await setDoc(userRef, userData);
+
                     await sendEmailVerification(userCredential.user);
                     window.location.href = "verify-email.html";
                 } else {

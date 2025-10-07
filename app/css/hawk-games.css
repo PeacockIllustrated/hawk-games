@@ -343,6 +343,12 @@ input:checked + .slider:before { transform: translateX(26px); }
 .admin-form .btn-remove-tier { background: #c0392b; border: none; color: white; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 1.2rem; line-height: 28px; }
 .admin-form .spinner-prize-row { margin-bottom: 1.5rem; }
 
+/* Ensure date picker icon is visible on dark backgrounds */
+.form-group input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
 /* --- 17. Homepage Sections (Enhancements) --- */
 #spinner-competition-section { position: relative; overflow: hidden; }
 #spinner-competition-section::before { content: ''; position: absolute; top: 50%; left: 50%; width: 500px; height: 500px; background-image: url('../assets/spin-wheel-bg.png'); background-size: contain; background-repeat: no-repeat; background-position: center; transform: translate(-50%, -50%); opacity: 0.03; z-index: -1; }

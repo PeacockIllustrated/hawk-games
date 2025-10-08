@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Action Handler | The Hawk Games</title>
+    <link rel="stylesheet" href="css/hawk-games.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .action-container { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 200px); padding: 2rem 0; }
+        .action-box { background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 3rem; border-radius: 5px; text-align: center; max-width: 500px; width: 100%; }
+        .action-box h1 { font-family: var(--font-heading); font-size: 2rem; text-transform: uppercase; margin-bottom: 1rem; }
+        .action-box p { color: #aaa; margin-bottom: 2rem; line-height: 1.6; }
+        #action-links a { display: inline-block; margin: 0.5rem; }
+    </style>
+</head>
+<body data-page="action">
+    <header class="main-header"></header>
+    <main>
+        <div class="action-container">
+            <div class="action-box">
+                <h1 id="action-title">Processing...</h1>
+                <p id="action-message">Please wait while we process your request.</p>
+                <div id="action-links"></div>
+            </div>
+        </div>
+    </main>
+    <footer class="main-footer"></footer>
+    <script type="module" src="js/action.js"></script>
+</body>
+</html>

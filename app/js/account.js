@@ -18,7 +18,6 @@ const requestCashPayout = httpsCallable(functions, 'requestCashPayout');
 
 const elUserName = document.getElementById('account-user-name');
 const elUserEmail = document.getElementById('account-user-email');
-const elUserAvatar = document.getElementById('account-user-avatar');
 const elSignOut = document.getElementById('sign-out-btn');
 const elMarketingTgl = document.getElementById('marketing-consent');
 const elMarketingFeedback = document.getElementById('preference-feedback');
@@ -39,6 +38,8 @@ const elTransferAmount = document.getElementById('transfer-amount');
 const elPayoutForm = document.getElementById('payout-form');
 const elPayoutAmount = document.getElementById('payout-amount');
 
+const elBalancesAccordion = document.getElementById('balances-accordion');
+
 // Accordion functionality for competition entries
 if (elEntriesList) {
     elEntriesList.addEventListener('click', (event) => {
@@ -52,6 +53,16 @@ if (elEntriesList) {
             group.classList.toggle('expanded');
         }
     });
+}
+
+// Accordion functionality for balances
+if (elBalancesAccordion) {
+    const header = elBalancesAccordion.querySelector('.accordion-header');
+    if (header) {
+        header.addEventListener('click', () => {
+            elBalancesAccordion.classList.toggle('expanded');
+        });
+    }
 }
 
 function createElement(tag, options = {}, children = []) {
@@ -71,12 +82,6 @@ function createElement(tag, options = {}, children = []) {
 function setText(el, text) {
   if (!el) return;
   el.textContent = text ?? '';
-}
-
-function renderAvatar(el, user) {
-  if (!el || !user) return;
-  el.src = user.photoURL || `https://i.pravatar.cc/150?u=${user.email}`;
-  el.alt = user.displayName || 'User Avatar';
 }
 
 function renderSummaryStatistics(competitionsMap, groupedEntries) {
@@ -364,7 +369,6 @@ auth.onAuthStateChanged(async(user) => {
             // Update profile info
             setText(elUserName, profile.displayName || 'My Account');
             setText(elUserEmail, user.email || '');
-            renderAvatar(elUserAvatar, user);
 
             // Update balances
             const creditBalance = profile.creditBalance || 0;

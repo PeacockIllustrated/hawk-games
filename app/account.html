@@ -20,7 +20,7 @@
         <h2 class="section-title">My Account</h2>
         <div class="account-layout">
             <aside class="profile-card">
-                <img id="account-user-avatar" class="profile-avatar" alt="User Avatar" src="https://i.pravatar.cc/150">
+                <img class="profile-logo" alt="The Hawk Games Logo" src="assets/logo-icon.png">
                 <h2 id="account-user-name" class="profile-name">Loading...</h2>
                 <p id="account-user-email" class="profile-email">...</p>
                 <div id="admin-panel-container"></div>
@@ -31,39 +31,15 @@
 
             <div class="account-main-content">
                 <div class="content-panel">
-                    <h3>Your Balances</h3>
-                    <div class="account-balances">
-                        <div class="balance-display">
-                            <span>Site Credit</span>
-                            <strong id="account-credit-balance">£0.00</strong>
-                        </div>
-                        <div class="balance-display">
-                            <span>Cold Hard Cash</span>
-                            <strong id="account-cash-balance">£0.00</strong>
-                        </div>
+                    <h3>Your Competition Entries</h3>
+                    <div id="entries-summary" class="entries-summary">
+                        <!-- Summary stats will be loaded here -->
                     </div>
-                    <div class="balance-actions">
-                        <form id="transfer-form" class="balance-form">
-                            <h4>Transfer Cash to Credit</h4>
-                            <p>Get a 50% bonus when you transfer your cash to site credit!</p>
-                            <div class="form-field">
-                                <label for="transfer-amount">Amount (£)</label>
-                                <input type="number" id="transfer-amount" name="transfer-amount" min="0.01" step="0.01" placeholder="e.g., 10.00" required>
-                            </div>
-                            <button type="submit" class="btn btn-secondary">Transfer</button>
-                        </form>
-                        <form id="payout-form" class="balance-form">
-                            <h4>Request Payout</h4>
-                            <p>Request a payout of your cash balance.</p>
-                            <div class="form-field">
-                                <label for="payout-amount">Amount (£)</label>
-                                <input type="number" id="payout-amount" name="payout-amount" min="0.01" step="0.01" placeholder="e.g., 25.00" required>
-                            </div>
-                            <button type="submit" class="btn">Cash Out</button>
-                        </form>
+                    <div id="entries-list">
+                        <div class="placeholder">Loading your entries...</div>
                     </div>
-                    <p id="balance-feedback" class="feedback-message"></p>
                 </div>
+
                 <div class="content-panel">
                     <h3>Communication Preferences</h3>
                     <div class="preference-row">
@@ -75,14 +51,44 @@
                     </div>
                     <p id="preference-feedback" class="feedback-message"></p>
                 </div>
-                
-                <div class="content-panel">
-                    <h3>Your Competition Entries</h3>
-                    <div id="entries-summary" class="entries-summary">
-                        <!-- Summary stats will be loaded here -->
+
+                <div class="content-panel accordion-group" id="balances-accordion">
+                    <div class="accordion-header">
+                        <h3>Your Balances</h3>
+                        <span class="accordion-toggle"></span>
                     </div>
-                    <div id="entries-list">
-                        <div class="placeholder">Loading your entries...</div>
+                    <div class="accordion-content">
+                        <div class="account-balances">
+                            <div class="balance-display">
+                                <span>Site Credit</span>
+                                <strong id="account-credit-balance">£0.00</strong>
+                            </div>
+                            <div class="balance-display">
+                                <span>Cold Hard Cash</span>
+                                <strong id="account-cash-balance">£0.00</strong>
+                            </div>
+                        </div>
+                        <div class="balance-actions">
+                            <form id="transfer-form" class="balance-form">
+                                <h4>Transfer Cash to Credit</h4>
+                                <p>Get a 50% bonus when you transfer your cash to site credit!</p>
+                                <div class="form-field">
+                                    <label for="transfer-amount">Amount (£)</label>
+                                    <input type="number" id="transfer-amount" name="transfer-amount" min="0.01" step="0.01" placeholder="e.g., 10.00" required>
+                                </div>
+                                <button type="submit" class="btn btn-secondary">Transfer</button>
+                            </form>
+                            <form id="payout-form" class="balance-form">
+                                <h4>Request Payout</h4>
+                                <p>Request a payout of your cash balance.</p>
+                                <div class="form-field">
+                                    <label for="payout-amount">Amount (£)</label>
+                                    <input type="number" id="payout-amount" name="payout-amount" min="0.01" step="0.01" placeholder="e.g., 25.00" required>
+                                </div>
+                                <button type="submit" class="btn">Cash Out</button>
+                            </form>
+                        </div>
+                        <p id="balance-feedback" class="feedback-message"></p>
                     </div>
                 </div>
             </div>

@@ -3,7 +3,7 @@
 // Uses Firebase v9 modular CDN (9.23.0). Depends on /app/js/auth.js and /app/js/payments.js.
 
 // --- Firebase Imports ---
-import { getAuth } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore,
   doc,
@@ -13,7 +13,7 @@ import {
   query,
   where,
   getDocs,
-} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // --- App glue ---
 // --- App glue ---
@@ -205,7 +205,7 @@ async function loadCompetitionDetails(id) {
       const initialQty = slider ? parseInt(slider.value, 10) : 1;
       const preview = mountWalletPreview({
         containerSelector: "#wallet-demo",
-        compId: id,
+        compId: competitionId,
         qty: initialQty,
         compTitle: currentCompetitionData.title
       });

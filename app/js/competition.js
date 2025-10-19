@@ -16,6 +16,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // --- App glue ---
+// --- App glue ---
 import { app, requireVerifiedEmail } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";

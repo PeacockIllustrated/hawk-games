@@ -27,7 +27,7 @@ const compTitle = decodeURIComponent(params.get('compTitle') || '');
 
 function hardGuard() {
     if (!DEMO_WALLETS) {
-        window.location.replace(`/competition.html?id=${compId}`);
+        window.location.replace(`competition.html?id=${compId}`);
         return true;
     }
     return false;
@@ -39,8 +39,8 @@ function renderError(message) {
 
 function renderSummary(competitionData, estimatedTotal) {
     const brandIcon = brand === 'apple'
-        ? `<img src="/assets/wallet-apple.svg" alt="Apple Pay" style="height: 24px;">`
-        : `<img src="/assets/wallet-gpay.svg" alt="Google Pay" style="height: 24px;">`;
+        ? `<img src="assets/wallet-apple.svg" alt="Apple Pay" style="height: 24px;">`
+        : `<img src="assets/wallet-gpay.svg" alt="Google Pay" style="height: 24px;">`;
 
     container.innerHTML = `
         <div class="summary">
@@ -61,7 +61,7 @@ function renderSummary(competitionData, estimatedTotal) {
         <div class="pill">${brandIcon}</div>
         <div class="wallet-row" style="margin-top: 2rem;">
             <button id="place-order-btn" class="btn">${STRINGS.placeOrder}</button>
-            <a href="/competition.html?id=${compId}" class="btn btn-secondary">${STRINGS.backButton}</a>
+            <a href="competition.html?id=${compId}" class="btn btn-secondary">${STRINGS.backButton}</a>
         </div>
         <p class="muted" style="margin-top: 2rem;">${STRINGS.footerNote}</p>
         <p class="muted">${STRINGS.securityNote}</p>
@@ -78,7 +78,7 @@ function renderSuccess() {
             <p>${STRINGS.successBody}</p>
             <p class="muted">Ref: ${fakeRef}</p>
             <div class="wallet-row" style="margin-top: 2rem;">
-                <a href="/competition.html?id=${compId}" class="btn">${STRINGS.returnButton}</a>
+                <a href="competition.html?id=${compId}" class="btn">${STRINGS.returnButton}</a>
             </div>
         </div>
     `;

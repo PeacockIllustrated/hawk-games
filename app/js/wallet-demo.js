@@ -36,11 +36,11 @@ export function mountWalletPreview({ containerSelector, compId, qty, compTitle }
             <h3>${STRINGS.title}</h3>
             <div class="wallet-row">
                 <button class="wallet-btn wallet-apple" data-wallet="apple" aria-label="${STRINGS.applePayLabel}">
-                    <img src="/assets/wallet-apple.svg" alt="Apple Pay" style="height: 24px;">
+                    <img src="assets/wallet-apple.svg" alt="Apple Pay" style="height: 24px;">
                     <span>${STRINGS.applePayLabel.replace(' (Preview)', '')}</span>
                 </button>
                 <button class="wallet-btn wallet-gpay" data-wallet="google" aria-label="${STRINGS.googlePayLabel}">
-                    <img src="/assets/wallet-gpay.svg" alt="Google Pay" style="height: 24px;">
+                    <img src="assets/wallet-gpay.svg" alt="Google Pay" style="height: 24px;">
                     <span>${STRINGS.googlePayLabel.replace(' (Preview)', '')}</span>
                 </button>
             </div>
@@ -55,7 +55,7 @@ export function mountWalletPreview({ containerSelector, compId, qty, compTitle }
             brand,
             compTitle: encodeURIComponent(compTitle)
         });
-        return `/wallet-confirmation.html?${params.toString()}`;
+        return `wallet-confirmation.html?${params.toString()}`;
     };
 
     const handleClick = (event) => {

@@ -9,6 +9,14 @@ const STRINGS = {
     comingSoon: "Coming Soon — no payment taken",
 };
 
+const getSafeQty = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return 1;
+    }
+    return Math.floor(parsed);
+};
+
 /**
  * Mounts the wallet preview UI into a specified container.
  * @param {object} options
@@ -25,6 +33,11 @@ export function mountWalletPreview({ containerSelector, compId, qty, compTitle }
         return null;
     }
 
+    container.classList.add("wallet-preview");
+    if (!container.hasAttribute("aria-live")) {
+        container.setAttribute("aria-live", "polite");
+    }
+
     if (!DEMO_WALLETS) {
         container.innerHTML = `
             <div class="error-message" style="padding: 2rem; text-align: center; color: #ff6b6b;">
@@ -38,7 +51,7 @@ export function mountWalletPreview({ containerSelector, compId, qty, compTitle }
         return null;
     }
 
-    let currentQty = qty;
+    let currentQty = getSafeQty(qty);
 
     const render = () => {
         container.innerHTML = `
@@ -91,7 +104,7 @@ export function mountWalletPreview({ containerSelector, compId, qty, compTitle }
 
     return {
         updateQty: (newQty) => {
-            currentQty = newQty;
+            currentQty = getSafeQty(newQty);
             // No need to re-render, URL is built on click
         },
         destroy: () => {

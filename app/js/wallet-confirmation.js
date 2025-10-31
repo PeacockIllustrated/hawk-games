@@ -21,7 +21,8 @@ const STRINGS = {
 const container = document.getElementById("confirmation-container");
 const params = new URLSearchParams(window.location.search);
 const compId = params.get('compId');
-const qty = parseInt(params.get('qty'), 10) || 1;
+const qtyParam = Number.parseInt(params.get('qty'), 10);
+const qty = Number.isFinite(qtyParam) && qtyParam > 0 ? qtyParam : 1;
 const brand = params.get('brand');
 const compTitle = decodeURIComponent(params.get('compTitle') || '');
 
@@ -37,7 +38,103 @@ function renderError(message) {
     container.innerHTML = `<p class="muted">${message}</p>`;
 }
 
-function renderSummary(competitionData, estimatedTotal) {
+const toNumber = (value) => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+    }
+    if (typeof value === 'string') {
+        const cleaned = value.replace(/[^0-9.-]/g, '');
+        if (!cleaned) return null;
+        const parsed = Number(cleaned);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+};
+
+const resolveCurrencySymbol = (data) => {
+    if (typeof data?.currencySymbol === 'string' && data.currencySymbol.trim()) {
+        return data.currencySymbol.trim();
+    }
+
+    const code = typeof data?.currencyCode === 'string' ? data.currencyCode.toUpperCase() : 'GBP';
+    switch (code) {
+        case 'USD':
+            return '$';
+        case 'EUR':
+            return '€';
+        case 'GBP':
+            return '£';
+        case 'AUD':
+        case 'CAD':
+        case 'NZD':
+        case 'SGD':
+            return '$';
+        default:
+            return '£';
+    }
+};
+
+const formatCurrency = (amount, symbol) => {
+    const safeAmount = Number.isFinite(amount) ? amount : 0;
+    return `${symbol}${safeAmount.toFixed(2)}`;
+};
+
+const resolveUnitTicketPrice = (data) => {
+    const tiers = Array.isArray(data?.ticketTiers) ? data.ticketTiers : [];
+    if (tiers.length > 0) {
+        const primaryTier = tiers.find((tier) => {
+            const amount = toNumber(tier?.amount);
+            if (!amount || amount <= 0) return false;
+
+            if (toNumber(tier?.price) !== null) return true;
+            if (typeof tier?.pricePence === 'number') return true;
+            return false;
+        }) || tiers[0];
+
+        const amount = toNumber(primaryTier?.amount);
+        if (amount && amount > 0) {
+            const price = toNumber(primaryTier?.price);
+            if (price !== null) {
+                return price / amount;
+            }
+            if (typeof primaryTier?.pricePence === 'number') {
+                return (primaryTier.pricePence / 100) / amount;
+            }
+        }
+    }
+
+    if (typeof data?.ticketPricePence === 'number') {
+        return data.ticketPricePence / 100;
+    }
+    if (typeof data?.pricePence === 'number') {
+        return data.pricePence / 100;
+    }
+
+    const ticketPrice = toNumber(data?.ticketPrice);
+    if (ticketPrice !== null) return ticketPrice;
+
+    const price = toNumber(data?.price);
+    if (price !== null) return price;
+
+    return 0;
+};
+
+const resolvePricing = (competitionData, quantity) => {
+    const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 1;
+    const unitPrice = resolveUnitTicketPrice(competitionData);
+    const symbol = resolveCurrencySymbol(competitionData);
+    const total = unitPrice * safeQuantity;
+
+    return {
+        quantity: safeQuantity,
+        total,
+        symbol,
+        formattedTotal: formatCurrency(total, symbol),
+    };
+};
+
+function renderSummary(competitionData, pricing) {
     const brandIcon = brand === 'apple'
         ? `<img src="assets/wallet-apple.svg" alt="Apple Pay" style="height: 24px;">`
         : `<img src="assets/wallet-gpay.svg" alt="Google Pay" style="height: 24px;">`;
@@ -51,11 +148,11 @@ function renderSummary(competitionData, estimatedTotal) {
             </div>
             <div class="summary-item">
                 <span>${STRINGS.quantityLabel}</span>
-                <strong>${qty}</strong>
+                <strong>${pricing.quantity}</strong>
             </div>
             <div class="summary-item">
                 <span>${STRINGS.totalLabel}</span>
-                <strong>£${estimatedTotal.toFixed(2)}</strong>
+                <strong>${pricing.formattedTotal}</strong>
             </div>
         </div>
         <div class="pill">${brandIcon}</div>
@@ -113,14 +210,8 @@ async function init() {
         }
 
         const data = compSnap.data();
-        let price = data.ticketPricePence || data.pricePence || 0;
-
-        if (data.ticketTiers && data.ticketTiers.length > 0) {
-            price = data.ticketTiers[0].price; // Use cheapest tier for estimate
-        }
-
-        const estimatedTotal = (qty * price) / 100;
-        renderSummary(data, estimatedTotal);
+        const pricing = resolvePricing(data, qty);
+        renderSummary(data, pricing);
 
     } catch (error) {
         console.error("Error fetching competition data:", error);

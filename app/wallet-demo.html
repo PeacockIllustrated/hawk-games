@@ -17,7 +17,7 @@
         </section>
 
         <section>
-            <div id="wallet-preview" class="wallet-preview-card">
+            <div id="wallet-preview" class="wallet-preview" aria-live="polite">
                 <div class="placeholder">Loading Preview...</div>
             </div>
         </section>
@@ -28,7 +28,8 @@
 
         const params = new URLSearchParams(window.location.search);
         const compId = params.get('compId');
-        const qty = parseInt(params.get('qty'), 10) || 1;
+        const qtyParam = Number.parseInt(params.get('qty'), 10);
+        const qty = Number.isFinite(qtyParam) && qtyParam > 0 ? qtyParam : 1;
 
         // Render wallet buttons for the given competition
         mountWalletPreview({

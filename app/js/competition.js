@@ -115,10 +115,16 @@ function showError(target, text) {
 // --- Price helpers ---
 function pricePerTicket(data) {
   // Prefer tiers if present; fallback to ticketPricePence/pricePence; else £1.00
+  // ticketTiers[0].price is stored in GBP (pounds) as decimal, representing total for that tier
   const tiers = Array.isArray(data?.ticketTiers) ? data.ticketTiers : [];
-  if (tiers.length > 0 && tiers[0]?.price && tiers[0]?.amount) {
-    const unit = Number(tiers[0].price) / Number(tiers[0].amount);
-    if (Number.isFinite(unit) && unit > 0) return unit;
+  if (tiers.length > 0 && tiers[0]?.price != null && tiers[0]?.amount != null) {
+    const price = Number(tiers[0].price);
+    const amount = Number(tiers[0].amount);
+    if (Number.isFinite(price) && Number.isFinite(amount) && amount > 0 && price >= 0) {
+      const unit = price / amount;
+      // Round to 2 decimal places to match Firestore precision
+      return Math.round(unit * 100) / 100;
+    }
   }
   if (typeof data?.ticketPricePence === "number") return data.ticketPricePence / 100;
   if (typeof data?.pricePence === "number") return data.pricePence / 100;

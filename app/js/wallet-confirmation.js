@@ -1,7 +1,7 @@
 // app/js/wallet-confirmation.js
 import { DEMO_WALLETS } from './config.js';
 import { db } from './auth.js';
-import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js';
 
 // Centralized strings
 const STRINGS = {

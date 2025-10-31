@@ -7,13 +7,21 @@
     --accent: var(--primary-gold, #68D6FF);
 }
 
-.wallet-preview {
+.wallet-preview-card {
     background-color: var(--card-bg, #1a1a1a);
     border: 1px solid var(--border-color, #2c2c2c);
     border-radius: 8px;
     padding: 1.5rem;
     margin-top: 1.5rem;
     text-align: center;
+}
+
+.wallet-preview-card h3 {
+    font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+    text-transform: uppercase;
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+    color: var(--light-white, #f0f0f0);
 }
 
 .wallet-preview h3 {
@@ -100,6 +108,7 @@
     border: 1px solid var(--border-color, #2c2c2c);
     border-radius: 8px;
     padding: 2rem;
+    text-align: center;
 }
 
 .summary {
@@ -116,21 +125,48 @@
 .summary-item {
     display: flex;
     justify-content: space-between;
-    padding: 0.5rem 0;
+    align-items: center;
+    padding: 0.75rem 0;
+}
+
+.summary-item span {
+    color: #aaa;
+    font-size: 0.95rem;
+}
+
+.summary-item strong {
+    color: var(--light-white, #f0f0f0);
+    font-size: 1rem;
+    font-weight: 700;
 }
 
 .summary-item:not(:last-child) {
     border-bottom: 1px solid var(--border-color, #2c2c2c);
 }
 
+.summary-item:last-child {
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    border-top: 2px solid var(--border-color, #2c2c2c);
+}
+
+.summary-item:last-child strong {
+    font-size: 1.25rem;
+    color: var(--accent);
+}
+
 .pill {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     background-color: var(--dark-bg, #121212);
     padding: 0.5rem 1rem;
     border-radius: 20px;
     border: 1px solid var(--border-color, #2c2c2c);
+    margin: 1.5rem auto;
+    width: 100%;
+    max-width: fit-content;
 }
 
 .muted {

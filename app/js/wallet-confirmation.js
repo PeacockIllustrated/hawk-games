@@ -60,8 +60,8 @@ function renderSummary(competitionData, estimatedTotal) {
         </div>
         <div class="pill">${brandIcon}</div>
         <div class="wallet-row" style="margin-top: 2rem;">
-            <button id="place-order-btn" class="btn">${STRINGS.placeOrder}</button>
-            <a href="competition.html?id=${compId}" class="btn btn-secondary">${STRINGS.backButton}</a>
+            <button id="place-order-btn" class="btn" style="width: 100%; max-width: 320px;">${STRINGS.placeOrder}</button>
+            <a href="competition.html?id=${compId}" class="btn btn-secondary" style="width: 100%; max-width: 320px;">${STRINGS.backButton}</a>
         </div>
         <p class="muted" style="margin-top: 2rem;">${STRINGS.footerNote}</p>
         <p class="muted">${STRINGS.securityNote}</p>
@@ -113,13 +113,18 @@ async function init() {
         }
 
         const data = compSnap.data();
-        let price = data.ticketPricePence || data.pricePence || 0;
+        let pricePerTicketPence = data.ticketPricePence || data.pricePence || 0;
 
+        // Calculate price per ticket from ticketTiers if available
         if (data.ticketTiers && data.ticketTiers.length > 0) {
-            price = data.ticketTiers[0].price; // Use cheapest tier for estimate
+            const tier = data.ticketTiers[0];
+            if (tier.price && tier.amount) {
+                // Calculate price per ticket: tier price (in pence) / tier amount
+                pricePerTicketPence = Number(tier.price) / Number(tier.amount);
+            }
         }
 
-        const estimatedTotal = (qty * price) / 100;
+        const estimatedTotal = (qty * pricePerTicketPence) / 100;
         renderSummary(data, estimatedTotal);
 
     } catch (error) {

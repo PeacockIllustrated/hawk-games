@@ -689,6 +689,7 @@ export const allocateTicketsAndAwardTokens = onCall(functionOptions, async (requ
 
 // getRevenueAnalytics
 export const getRevenueAnalytics = onCall(functionOptions, async (request) => {
+  await assertIsAdmin(request);
   const competitionsSnapshot = await db.collection("competitions").get();
   let totalRevenue = 0;
 
@@ -814,6 +815,7 @@ export const spendSpinToken = onCall(functionOptions, async (request) => {
             if (ticketsSoldBefore + ticketsToAward > compData.totalTickets) {
                  logger.warn(`Not enough tickets available in competition ${finalPrize.competitionId} to award prize to user ${uid}.`);
             } else {
+                // Increment sold
                 transaction.update(compRef, { ticketsSold: FieldValue.increment(ticketsToAward) });
                 transaction.update(userRef, { [`entryCount.${finalPrize.competitionId}`]: FieldValue.increment(ticketsToAward) });
 
@@ -827,6 +829,18 @@ export const spendSpinToken = onCall(functionOptions, async (request) => {
                     enteredAt: nowServer(),
                     entryType: 'spinner_win'
                 });
+
+                // If prize causes sellout and closeMode is 'sellout', end competition
+                const cap  = Number(compData.totalTickets ?? compData.capacity ?? 0);
+                const isSellout = compData.closeMode === 'sellout';
+                const soldNow = Number(compData.ticketsSold ?? compData.soldCount ?? 0) + ticketsToAward;
+                if (cap > 0 && soldNow >= cap && isSellout) {
+                  transaction.update(compRef, {
+                    status: 'sold_out',
+                    isLive: false,
+                    soldOutAt: nowServer(),
+                  });
+                }
             }
         }
       }

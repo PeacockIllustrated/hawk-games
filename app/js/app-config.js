@@ -5,3 +5,5 @@
 // IMPORTANT: This key is tied to the domain and is public.
 // It is safe to be in client-side code.
 window.__APP_CHECK_KEY__ = "6LdkDqgrAAAAAAuWtoK941myjHGZd8vka_Q3JhKg";
+// Temporary: enable wallet demo (Apple Pay / Google Pay preview)
+window.__DEMO_WALLETS__ = true;

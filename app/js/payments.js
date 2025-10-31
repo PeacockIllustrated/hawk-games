@@ -8,6 +8,7 @@ import {
   httpsCallable,
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-functions.js";
 import { app } from "./auth.js";
+import { DEMO_WALLETS } from "./config.js";
 
 // Explicit region to match Functions v2 deployment ("us-central1")
 const functions = getFunctions(app, "us-central1");
@@ -54,6 +55,13 @@ export async function payByCard({ compId, qty }) {
     throw new Error("compId missing on client");
   }
   const nQty = Number.isFinite(Number(qty)) ? Math.max(1, Number(qty)) : 1;
+
+  // Temporary override: route to on-brand wallet demo when enabled
+  if (DEMO_WALLETS === true) {
+    const params = new URLSearchParams({ compId, qty: String(nQty) });
+    window.location.href = `wallet-demo.html?${params.toString()}`;
+    return;
+  }
 
   const createTrustOrder = httpsCallable(functions, "createTrustOrder");
   const { data } = await createTrustOrder({ compId, qty: nQty });

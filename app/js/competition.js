@@ -631,9 +631,6 @@ function createIntroDetails(data, isTrueHero) {
     el("span", { textContent: `£${cashAltVal.toLocaleString()}` }),
     " Cash Alternative",
   ]);
-  const timeRemaining = el("div", { class: "time-remaining" }, [
-      el("span", { id: "compEndChip", class: "badge" })
-  ]);
 
   const timer = el("div", { id: "timer", class: "hero-digital-timer" });
   const progressLabel = el("label", { textContent: `Tickets Sold: ${sold} / ${total}` });
@@ -643,10 +640,10 @@ function createIntroDetails(data, isTrueHero) {
   const progressSection = el("div", { class: "hero-comp-progress-section" }, [progressLabel, progressBar]);
 
   if (isTrueHero) {
-    return [title, cashAlternative, timeRemaining, timer, progressSection];
+    return [title, cashAlternative, timer, progressSection];
   } else {
     const container = el("div", { class: "intro-details-panel" });
-    container.append(title, cashAlternative, timeRemaining, timer, progressSection);
+    container.append(title, cashAlternative, timer, progressSection);
     return container;
   }
 }
@@ -720,6 +717,11 @@ function createGlanceSection(data) {
             alt: "Mercedes-Benz E220d AMG",
             loading: "lazy",
           }),
+          el("div", { class: "glance__badges" }, [
+            el("span", { class: "glance-badge", textContent: "AMG Line" }),
+            el("span", { class: "glance-badge", textContent: "9G-TRONIC" }),
+            el("span", { class: "glance-badge", textContent: "LED Headlights" }),
+          ]),
         ]),
         // Right: spec panel
         el("div", { class: "glance__specs" }, [
@@ -795,20 +797,7 @@ function createTrustBadges() {
 // -------------------- Instant Win (Spin) --------------------
 function hydrateCloseUi(comp){
   const state = computeState(comp);
-  const mode = resolveCloseMode(comp);
-  const chip = document.querySelector("#compEndChip");
   const cta  = document.querySelector("#enterBtn");
-
-  if (chip){
-    if (mode === "sellout"){
-      const left = formatLeft(comp);
-      chip.textContent = (state === "sold_out") ? "Sold out" : `Ends when sold out · ${left} left`;
-      chip.className = "badge " + (state === "sold_out" ? "bad" : "pending");
-    } else {
-      chip.className = "badge pending";
-      startCountdown(comp.closeAt, chip, "Ends in ");
-    }
-  }
 
   if (cta){
     if (state === "live"){ cta.disabled = false; cta.textContent = "Enter now"; }

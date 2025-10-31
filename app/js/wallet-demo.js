@@ -19,13 +19,22 @@ const STRINGS = {
  * @returns {object|null} An object with an updateQty method, or null if demo wallets are disabled.
  */
 export function mountWalletPreview({ containerSelector, compId, qty, compTitle }) {
-    if (!DEMO_WALLETS) {
-        return null;
-    }
-
     const container = document.querySelector(containerSelector);
     if (!container) {
         console.error(`Wallet preview container not found: ${containerSelector}`);
+        return null;
+    }
+
+    if (!DEMO_WALLETS) {
+        container.innerHTML = `
+            <div class="error-message" style="padding: 2rem; text-align: center; color: #ff6b6b;">
+                <h3>Wallet Preview Disabled</h3>
+                <p>To enable wallet preview, run in console:</p>
+                <code style="display: block; background: #2c2c2c; padding: 1rem; margin: 1rem 0; border-radius: 4px;">
+                    localStorage.setItem("wallet_demo", "1"); location.reload();
+                </code>
+            </div>
+        `;
         return null;
     }
 

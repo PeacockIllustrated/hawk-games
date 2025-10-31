@@ -205,25 +205,6 @@ async function loadCompetitionDetails(id) {
       safeGet(currentCompetitionData, "skillQuestion.answer") ??
       null;
     setupEntryLogic(correctAnswer);
-
-    // PREVIEW ONLY - Mount wallet demo
-    if (DEMO_WALLETS) {
-      const slider = document.getElementById("ticket-slider");
-      const initialQty = slider ? parseInt(slider.value, 10) : 1;
-      const preview = mountWalletPreview({
-        containerSelector: "#wallet-demo",
-        compId: competitionId,
-        qty: initialQty,
-        compTitle: currentCompetitionData.title
-      });
-
-      if (preview && slider) {
-        slider.addEventListener("input", () => {
-          const newQty = parseInt(slider.value, 10) || 1;
-          preview.updateQty(newQty);
-        });
-      }
-    }
   } catch (error) {
     console.error("Error fetching competition details:", error);
     showError(pageContent, "Could not load competition details.");
@@ -551,15 +532,6 @@ function createHeroPageElements(data) {
 
   // --- 2d. Entry Flow (shared) ---
   mainContentSections.push(createEntryFlow(data));
-
-  // --- Wallet Demo Container ---
-  if (DEMO_WALLETS) {
-    mainContentSections.push(
-      el("div", { class: "container" }, [
-        el("div", { id: "wallet-demo", class: "wallet-preview", "aria-live": "polite" })
-      ])
-    );
-  }
 
   // --- 2e. Confirm Button (shared) ---
   mainContentSections.push(

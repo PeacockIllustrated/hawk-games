@@ -73,5 +73,3 @@ export function openWalletModal({ compId, qty, compTitle }) {
   renderModalContent(root, { compId, qty, compTitle });
   requestAnimationFrame(() => root.classList.add('show'));
 }
-
-

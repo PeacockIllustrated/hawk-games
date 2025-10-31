@@ -720,11 +720,6 @@ function createGlanceSection(data) {
             alt: "Mercedes-Benz E220d AMG",
             loading: "lazy",
           }),
-          el("div", { class: "glance__badges" }, [
-            el("span", { class: "glance-badge", textContent: "AMG Line" }),
-            el("span", { class: "glance-badge", textContent: "9G-TRONIC" }),
-            el("span", { class: "glance-badge", textContent: "LED Headlights" }),
-          ]),
         ]),
         // Right: spec panel
         el("div", { class: "glance__specs" }, [

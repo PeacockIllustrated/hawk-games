@@ -1,3 +1,4 @@
+
 /* Landing overrides (brand-respecting, no navigation) */
 
 /* Remove default main padding since there's no fixed header here */
@@ -20,24 +21,3 @@ main { padding-top: 0 !important; }
 
 /* Keep everything non-clickable */
 .hawk-card a, .hawk-card button { pointer-events: none; }
-
-/* Mobile centering */
-@media (max-width: 768px) {
-    .hero-content {
-        text-align: center;
-    }
-    
-    .hero-logo {
-        margin-left: auto;
-        margin-right: auto;
-    }
-    
-    .showcase {
-        text-align: center;
-    }
-    
-    .hawk-card {
-        margin-left: auto;
-        margin-right: auto;
-    }
-}

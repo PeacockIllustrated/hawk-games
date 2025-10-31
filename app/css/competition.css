@@ -19,29 +19,6 @@
   padding: 18px;
 }
 @media (max-width: 900px){ .glance__inner{ grid-template-columns: 1fr; } }
-@media (max-width: 900px){ 
-    .glance__inner{ 
-        grid-template-columns: 1fr; 
-        text-align: center;
-    }
-    .glance__specs {
-        text-align: center;
-    }
-    .spec-grid {
-        justify-items: center;
-    }
-}
-@media (max-width: 560px){ 
-    .spec-grid{ 
-        grid-template-columns: 1fr; 
-        justify-items: center;
-    }
-    .spec {
-        text-align: center;
-        width: 100%;
-        max-width: 300px;
-    }
-}
 .glance__visual{
   position: relative;
   background: #181818;

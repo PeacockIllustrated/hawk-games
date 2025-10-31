@@ -96,7 +96,7 @@
     const HOME_URL    = "/app/";
 
     const qs = new URLSearchParams(location.search);
-    const orderRef = qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || "—";
+    const orderRef = qs.get("orderRef") || qs.get("orderreference") || qs.get("order_reference") || qs.get("orderid") || qs.get("orderId") || "—";
 
     const statusBadge   = document.getElementById("statusBadge");
     const orderRefBadge = document.getElementById("orderRefBadge");
@@ -121,32 +121,30 @@
     fireConfetti(900);
     setTimeout(()=> reassure.style.display = "block", 35000);
 
-    // Optional status flip (if you wire an endpoint later)
-    const endpoint = window.__ORDER_STATUS_ENDPOINT__;
-    if (endpoint && orderRef && orderRef !== "—") {
-      const poll = async (tries=30) => {
+    // Live order status via Firestore (keeps user on our URL)
+    if (orderRef && orderRef !== "—") {
+      (async () => {
         try {
-          const url = `${endpoint.replace(/\/$/,'')}/${encodeURIComponent(orderRef)}`;
-          const res = await fetch(url, { headers: { "Accept":"application/json" }});
-          if (!res.ok) throw 0;
-          const o = await res.json().catch(()=> ({}));
-          const s = (o.status || "").toUpperCase();
-          if (s === "FULFILLED") {
-            statusBadge.textContent = "Tickets confirmed";
-            statusBadge.className = "badge good";
-            return;
-          }
-          if (s === "FAILED") {
-            statusBadge.textContent = "Order not completed";
-            statusBadge.className = "badge pending";
-            return;
-          }
-          if (tries > 0) setTimeout(()=>poll(tries-1), 1200);
-        } catch {
-          if (tries > 0) setTimeout(()=>poll(tries-1), 1500);
-        }
-      };
-      poll();
+          const { db } = await import("/app/js/auth.js");
+          const { doc, onSnapshot } = await import("https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js");
+          const ref = doc(db, "orders", orderRef);
+          onSnapshot(ref, (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data() || {};
+            const s = String(data.status || "");
+            if (s === "fulfilled") {
+              statusBadge.textContent = "Tickets confirmed";
+              statusBadge.className = "badge good";
+            } else if (s === "failed" || s === "cancelled") {
+              statusBadge.textContent = "Order not completed";
+              statusBadge.className = "badge pending";
+            } else if (s === "paid") {
+              statusBadge.textContent = "Payment received — assigning tickets…";
+              statusBadge.className = "badge pending";
+            }
+          });
+        } catch {}
+      })();
     }
 
     // Load Cash Comps from Firestore if available (progressive enhancement)

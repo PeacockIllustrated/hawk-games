@@ -22,6 +22,7 @@ import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";
 import { computeState, resolveCloseMode, startCountdown, formatLeft } from "./lib/comp-state.js";
 import { DEMO_WALLETS } from "./config.js";
+import { openWalletModal } from "./wallet-modal.js";
 import { mountWalletPreview } from "./wallet-demo.js";
 
 // --- Firebase instances ---
@@ -304,7 +305,7 @@ function showConfirmationModal() {
   const unit = pricePerTicket(currentCompetitionData);
   const price = tickets * unit;
 
-  const payByCardBtn = el("button", { id: "pay-card-btn", class: "btn", disabled: true }, ["Pay by Card"]);
+  const payByCardBtn = el("button", { id: "pay-card-btn", class: "btn", disabled: true }, ["Pay by Card / Wallet"]);
   const payByCreditBtn = el("button", { id: "pay-credit-btn", class: ["btn", "btn-secondary"], disabled: true }, [
     "Pay with Credit",
   ]);
@@ -379,7 +380,13 @@ function showConfirmationModal() {
   });
 
   payByCardBtn.addEventListener("click", async () => {
-    await handleEntryCard(tickets);
+    // If on-site wallets are enabled, open modal; else fallback to HPP
+    const useOnsite = Boolean(window.__WALLETS_ONSITE__);
+    if (useOnsite) {
+      openWalletModal({ compId: competitionId, qty: tickets, compTitle: currentCompetitionData?.title || "" });
+    } else {
+      await handleEntryCard(tickets);
+    }
   });
 
   payByCreditBtn.addEventListener("click", async () => {

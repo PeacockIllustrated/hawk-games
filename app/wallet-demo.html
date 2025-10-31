@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fast Checkout (Preview) - The Hawk Games</title>
+    <link rel="stylesheet" href="css/hawk-games.css">
+    <link rel="stylesheet" href="css/wallet-demo.css">
+</head>
+<body>
+    <div class="demo-banner">Preview Mode — No payment will be taken.</div>
+
+    <main class="container">
+        <section class="checkout-hero">
+            <h1>Fast Checkout</h1>
+            <p class="muted">Apple Pay and Google Pay design preview.</p>
+        </section>
+
+        <section>
+            <div id="wallet-preview" class="wallet-preview-card">
+                <div class="placeholder">Loading Preview...</div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module">
+        import { mountWalletPreview } from './js/wallet-demo.js';
+
+        const params = new URLSearchParams(window.location.search);
+        const compId = params.get('compId');
+        const qty = parseInt(params.get('qty'), 10) || 1;
+
+        // Render wallet buttons for the given competition
+        mountWalletPreview({
+            containerSelector: '#wallet-preview',
+            compId,
+            qty,
+            compTitle: ''
+        });
+    </script>
+</body>
+</html>
+
+

@@ -21,9 +21,7 @@ import { app, requireVerifiedEmail } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";
 import { computeState, resolveCloseMode, startCountdown, formatLeft } from "./lib/comp-state.js";
-import { DEMO_WALLETS } from "./config.js";
 import { openWalletModal } from "./wallet-modal.js";
-import { mountWalletPreview } from "./wallet-demo.js";
 
 // --- Firebase instances ---
 const auth = getAuth(app);

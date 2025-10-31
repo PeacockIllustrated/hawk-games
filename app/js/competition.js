@@ -21,9 +21,7 @@ import { app, requireVerifiedEmail } from "./auth.js";
 import { payByCard, payByCredit } from "./payments.js";
 import { renderGalleryForCompetition } from "./gallery.js";
 import { computeState, resolveCloseMode, startCountdown, formatLeft } from "./lib/comp-state.js";
-import { DEMO_WALLETS } from "./config.js";
 import { openWalletModal } from "./wallet-modal.js";
-import { mountWalletPreview } from "./wallet-demo.js";
 
 // --- Firebase instances ---
 const auth = getAuth(app);
@@ -115,10 +113,16 @@ function showError(target, text) {
 // --- Price helpers ---
 function pricePerTicket(data) {
   // Prefer tiers if present; fallback to ticketPricePence/pricePence; else £1.00
+  // ticketTiers[0].price is stored in GBP (pounds) as decimal, representing total for that tier
   const tiers = Array.isArray(data?.ticketTiers) ? data.ticketTiers : [];
-  if (tiers.length > 0 && tiers[0]?.price && tiers[0]?.amount) {
-    const unit = Number(tiers[0].price) / Number(tiers[0].amount);
-    if (Number.isFinite(unit) && unit > 0) return unit;
+  if (tiers.length > 0 && tiers[0]?.price != null && tiers[0]?.amount != null) {
+    const price = Number(tiers[0].price);
+    const amount = Number(tiers[0].amount);
+    if (Number.isFinite(price) && Number.isFinite(amount) && amount > 0 && price >= 0) {
+      const unit = price / amount;
+      // Round to 2 decimal places to match Firestore precision
+      return Math.round(unit * 100) / 100;
+    }
   }
   if (typeof data?.ticketPricePence === "number") return data.ticketPricePence / 100;
   if (typeof data?.pricePence === "number") return data.pricePence / 100;
@@ -199,25 +203,6 @@ async function loadCompetitionDetails(id) {
       safeGet(currentCompetitionData, "skillQuestion.answer") ??
       null;
     setupEntryLogic(correctAnswer);
-
-    // PREVIEW ONLY - Mount wallet demo
-    if (DEMO_WALLETS) {
-      const slider = document.getElementById("ticket-slider");
-      const initialQty = slider ? parseInt(slider.value, 10) : 1;
-      const preview = mountWalletPreview({
-        containerSelector: "#wallet-demo",
-        compId: competitionId,
-        qty: initialQty,
-        compTitle: currentCompetitionData.title
-      });
-
-      if (preview && slider) {
-        slider.addEventListener("input", () => {
-          const newQty = parseInt(slider.value, 10) || 1;
-          preview.updateQty(newQty);
-        });
-      }
-    }
   } catch (error) {
     console.error("Error fetching competition details:", error);
     showError(pageContent, "Could not load competition details.");
@@ -545,15 +530,6 @@ function createHeroPageElements(data) {
 
   // --- 2d. Entry Flow (shared) ---
   mainContentSections.push(createEntryFlow(data));
-
-  // --- Wallet Demo Container ---
-  if (DEMO_WALLETS) {
-    mainContentSections.push(
-      el("div", { class: "container" }, [
-        el("div", { id: "wallet-demo", class: "wallet-preview", "aria-live": "polite" })
-      ])
-    );
-  }
 
   // --- 2e. Confirm Button (shared) ---
   mainContentSections.push(

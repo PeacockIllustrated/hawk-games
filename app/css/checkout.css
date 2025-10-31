@@ -252,3 +252,75 @@ p{margin:8px 0;color:#d6dce9}
 
 /* prevent iOS zoom-on-focus for our inputs (not Trust’s) */
 input, select, textarea { font-size: 16px; }
+
+/* Mobile centering */
+@media (max-width: 768px) {
+    .wrap {
+        width: 95%;
+        padding: 16px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    h1 {
+        text-align: center;
+    }
+    
+    .lead,
+    p {
+        text-align: center;
+    }
+    
+    .checkwrap {
+        justify-content: center;
+    }
+    
+    .row {
+        justify-content: center;
+        text-align: center;
+    }
+    
+    .card {
+        text-align: center;
+    }
+    
+    .section-title {
+        text-align: center !important;
+    }
+    
+    .competition-grid-container {
+        justify-items: center;
+    }
+    
+    .hawk-card {
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .btn {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        max-width: 300px;
+    }
+}
+
+@media (max-width: 480px) {
+    .wrap {
+        width: 98%;
+        padding: 12px;
+    }
+    
+    .card {
+        padding: 20px 16px;
+    }
+    
+    h1 {
+        font-size: 24px;
+    }
+    
+    .section-title {
+        font-size: 1.8rem;
+    }
+}

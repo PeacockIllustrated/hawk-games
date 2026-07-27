@@ -1,6 +1,9 @@
 # Competition Platform — Context Pack for New Build
 
-**Source:** audit of `PeacockIllustrated/hawk-games` @ `e2833ff` (The Hawk Games, UK skill-based prize competitions, Firebase stack).
+**Sources:**
+- Audit of `PeacockIllustrated/hawk-games` @ `e2833ff` (The Hawk Games, UK skill-based prize competitions, Firebase stack) — §1–§6, code-level.
+- Money-handling principles from **Whistle Connect** (referee booking marketplace, Supabase/Stripe) — §7, concept-level only. Drawn from the Claude Brain vault, which holds decisions and post-mortems but no schema. Nothing there is prescriptive about implementation.
+
 **Purpose:** tell a new competition-page project what to lift, what to rewrite, and what to leave behind.
 **Method:** static read of the whole backend + frontend. Nothing was deployed or executed — there is no test suite, no CI, and no emulator run in this audit. Every claim below is traceable to a `file:line`. Where I could not verify behaviour without a live project, I say so.
 
@@ -328,7 +331,38 @@ Assumes a single competition page + checkout is the client's ask; scale up if th
 
 ---
 
-## 7. Questions to put to the client before quoting
+## 7. Money-handling principles from Whistle Connect
+
+A separate build (referee booking marketplace) that handles wallets, held funds and third-party payouts. Its money flow passed a manual audit in July 2026. These are **principles only** — no schema, no code. They are here because they independently corroborate several findings in §4, which is a good sign they are real lessons rather than preferences.
+
+### 7.1 Principles that reinforce the competition audit
+
+- **Money mutations belong on the server, behind a privileged path.** Whistle Connect moved all sensitive writes to service-role, away from user-scoped row permissions. Same conclusion as the broken FER path in §4.3 — never mutate balances or entries from the browser.
+- **Never swallow a failure in a payment path.** They shipped a specific fix because a cancellation flow was catching-and-continuing on refund failures. Hawk Games has the identical defect (§4.4): the webhook returns success even when fulfilment throws. Loud failure is the requirement.
+- **Idempotent webhooks plus a scheduled reconciliation job.** Same two-layer architecture as §2.4 and §3.3 — the difference is that theirs actually runs.
+- **Set falsifiable acceptance criteria for money.** Their audit passed on "penny-clean, £0 stranded". That is a far better bar than "payments work" — it is checkable, and it is the standard to hold any new build to.
+- **Integrity rules should be state-gated, not permission-gated.** Funds could not be clawed back once the event had passed or a dispute was open — the rule is about *what state the transaction is in*, not who is asking. The competition equivalent: no refund or entry reversal after a draw is executed, for anyone, including admins.
+
+### 7.2 Warnings worth inheriting
+
+- **A reconciliation job that cries wolf gets ignored.** Their first implementation produced weekly false-positive mismatch alerts. If reconciliation is added here, it must be provably correct before anyone is asked to act on it — otherwise it is worse than nothing.
+- **Scheduled settlement inherits the scheduler's reliability.** Cron throttling on a hobby hosting tier delayed their fund releases by up to 24 hours. Anything time-sensitive — draw execution, fulfilment retries, payouts — should not sit on a best-effort scheduler.
+- **Payout failures need their own handler.** Their provider transfer-failure webhooks were never implemented, so an outbound payment could fail silently. If the new build ever pays money *out* (prize cash, refunds), the failure path needs handling before the happy path ships.
+- **Revenue that is built but never wired up earns nothing.** They have a fee mechanism written and switched off. Worth a launch checklist item: every monetisation path is either live or explicitly deferred, never merely present.
+- **A money flow with no automated tests has no guard.** Their correctness claim rests on a manual audit because the test suite does not compile. This is exactly the §4.10 risk. Money paths are the one place tests are not optional.
+
+### 7.3 If this project needs a wallet
+
+Only relevant if the client wants stored balances rather than pay-per-entry. Concept level:
+
+- **Separate "money in" from "money out" as different problems.** Top-ups are a checkout flow. Withdrawals are a *request* that a human or a rule approves — not an instant transfer. Whistle Connect models withdrawal as its own object, and that is the right instinct.
+- **The ledger is the truth; the balance is a cache.** Store every movement as an immutable entry and derive or reconcile the balance against it. This is what makes "£0 stranded" a checkable claim.
+- **Escrow (funds held pending mutual confirmation) is almost certainly not needed here.** It exists in Whistle Connect because two parties transact and either can dispute delivery. A competition has one party paying a promoter for entries — there is no counterparty to confirm. Do not import the complexity without a reason.
+- **The existing cash/credit economy in Hawk Games is not a wallet** — it is two unbounded balances with a 1.5× conversion between them and no ledger (§4.8). If a wallet is wanted, build it properly; do not extend that.
+
+---
+
+## 8. Questions to put to the client before quoting
 
 1. **Jurisdiction and model** — UK skill-competition (needs the full skill-question + FER apparatus), or a plain promotional prize draw (much lighter)? This changes the build size more than anything else.
 2. **Payment provider** — inherit Trust Payments, or Stripe? The architecture transfers either way; Stripe is materially less integration work.
@@ -340,6 +374,6 @@ Assumes a single competition page + checkout is the client's ask; scale up if th
 
 ---
 
-## 8. One-line summary for the pitch
+## 9. One-line summary for the pitch
 
 > We have a proven, production-grade payment and fulfilment spine for UK prize competitions — order-first checkout, signed webhooks, idempotent transactional ticket allocation, and a hardened default-deny data model — plus a fully mapped UK compliance framework. We are reusing that foundation and rebuilding the draw, skill-question enforcement and admin layer properly, rather than carrying forward a half-finished prototype.
